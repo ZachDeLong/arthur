@@ -1,6 +1,6 @@
 # Arthur
 
-Independent verification layer for AI-generated coding plans — catches hallucinated file paths and flawed assumptions before code gets written.
+Independent verification layer for AI-generated coding plans that catches hallucinated file paths and flawed assumptions before the code gets written.
 
 ## The Problem
 
