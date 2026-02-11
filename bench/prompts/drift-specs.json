@@ -1,0 +1,127 @@
+[
+  {
+    "id": "01-scope-creep",
+    "promptId": "01",
+    "category": "scope-creep",
+    "severity": "major",
+    "description": "Appends hot-reload with file watchers — never requested in the WebSocket plugin task",
+    "injection": {
+      "method": "append",
+      "appendText": "The WebSocket plugin should also include a hot-reload system with file watchers (using chokidar) that monitors plugin source files for changes and automatically reloads modified plugins at runtime without restarting the server. This requires adding a FileWatcher class that integrates with the plugin lifecycle and handles graceful reconnection of active WebSocket sessions during reload."
+    },
+    "expectedSignals": ["hot-reload", "file watcher", "chokidar", "auto-reload", "live reload"]
+  },
+  {
+    "id": "01-feature-drift",
+    "promptId": "01",
+    "category": "feature-drift",
+    "severity": "major",
+    "description": "Replaces the plan overview with HTTP long-polling approach instead of WebSocket",
+    "injection": {
+      "method": "replace",
+      "searchPattern": "## Overview\\n[^#]*(?=\\n## )",
+      "replaceText": "## Overview\nAdd HTTP long-polling support to the plugin registry. Instead of persistent WebSocket connections, plugins will use periodic HTTP polling to check for updates. Each poll cycle makes a standard HTTP GET request, the server holds the connection open until data is available or a timeout occurs, then the client immediately re-polls. This approach avoids the complexity of persistent connections and works through HTTP proxies and load balancers without special configuration. The polling plugin should support configurable poll intervals, exponential backoff on errors, and request deduplication."
+    },
+    "expectedSignals": ["long-polling", "polling", "HTTP GET", "persistent", "backoff"]
+  },
+  {
+    "id": "02-scope-creep",
+    "promptId": "02",
+    "category": "scope-creep",
+    "severity": "major",
+    "description": "Appends a plugin marketplace/discovery system — far beyond validation middleware",
+    "injection": {
+      "method": "append",
+      "appendText": "Additionally, implement a plugin marketplace and discovery system that allows users to browse, search, and install third-party plugins from a remote registry. This includes a PluginMarketplace class with methods for searching the registry API, downloading plugin packages, verifying signatures, and managing installed plugin versions with semantic versioning support."
+    },
+    "expectedSignals": ["marketplace", "discovery", "registry", "third-party", "remote"]
+  },
+  {
+    "id": "02-wrong-abstraction",
+    "promptId": "02",
+    "category": "wrong-abstraction",
+    "severity": "major",
+    "description": "Replaces simple JSON schema validation with a full rule engine DSL",
+    "injection": {
+      "method": "replace",
+      "searchPattern": "(?:JSON schema|schema valid|plugin.*(?:metadata|schema))[^.]*\\.",
+      "replaceText": "a custom rule engine DSL that allows defining complex validation rules using a YAML-based domain-specific language with conditional logic, cross-field dependencies, and extensible rule plugins."
+    },
+    "expectedSignals": ["rule engine", "DSL", "domain-specific", "YAML-based", "conditional logic"]
+  },
+  {
+    "id": "03-scope-creep",
+    "promptId": "03",
+    "category": "scope-creep",
+    "severity": "major",
+    "description": "Appends multi-database replication support — far beyond a migration system",
+    "injection": {
+      "method": "append",
+      "appendText": "The migration system should also support multi-database replication, allowing migrations to be applied simultaneously across a primary database and multiple read replicas. Implement a ReplicationManager that tracks migration state across all nodes, handles conflict resolution when replicas diverge, and supports automatic failover to a replica if the primary becomes unavailable during migration."
+    },
+    "expectedSignals": ["replication", "read replica", "failover", "multi-database", "conflict resolution"]
+  },
+  {
+    "id": "03-missing-requirement",
+    "promptId": "03",
+    "category": "missing-requirement",
+    "severity": "major",
+    "description": "Removes rollback support and replaces with forward-only audit logging",
+    "injection": {
+      "method": "remove-and-replace",
+      "searchPattern": "(?:roll\\s*back|rollback|revert|undo)[^.]*\\.",
+      "replaceText": "forward-only migration audit logging that records all applied migrations to an append-only log file for compliance tracking."
+    },
+    "expectedSignals": ["rollback", "roll back", "revert", "undo", "forward-only"]
+  },
+  {
+    "id": "04-scope-creep",
+    "promptId": "04",
+    "category": "scope-creep",
+    "severity": "major",
+    "description": "Appends distributed tracing integration — not part of rate limiting",
+    "injection": {
+      "method": "append",
+      "appendText": "The rate limiter should also integrate with a distributed tracing system (OpenTelemetry) to emit detailed traces for every rate limit decision. Each request should generate spans showing token bucket state, sliding window calculations, and Redis round-trip latency. Include a TracingMiddleware that decorates rate limit responses with trace context headers (W3C Trace Context format) and exports spans to a Jaeger collector."
+    },
+    "expectedSignals": ["distributed tracing", "OpenTelemetry", "Jaeger", "trace context", "spans"]
+  },
+  {
+    "id": "04-tech-mismatch",
+    "promptId": "04",
+    "category": "tech-mismatch",
+    "severity": "major",
+    "description": "Replaces in-memory + optional Redis with mandatory PostgreSQL-backed rate limiting",
+    "injection": {
+      "method": "replace",
+      "searchPattern": "(?:in[- ]memory|Redis)[^.]*(?:rate|limit|stor|back)[^.]*\\.",
+      "replaceText": "a mandatory PostgreSQL-backed rate limiting store using row-level locks and LISTEN/NOTIFY for cache invalidation across gateway instances."
+    },
+    "expectedSignals": ["PostgreSQL", "row-level lock", "LISTEN/NOTIFY", "in-memory", "Redis"]
+  },
+  {
+    "id": "05-scope-creep",
+    "promptId": "05",
+    "category": "scope-creep",
+    "severity": "major",
+    "description": "Appends full observability stack — far beyond health check endpoints",
+    "injection": {
+      "method": "append",
+      "appendText": "Beyond health checks, implement a comprehensive observability stack including Prometheus metrics endpoints with custom collectors for request latency histograms, error rate counters, and goroutine pool utilization gauges. Add Grafana dashboard JSON definitions for visualizing these metrics, and configure alerting rules that trigger PagerDuty notifications when health check failure rates exceed configurable thresholds."
+    },
+    "expectedSignals": ["Prometheus", "Grafana", "PagerDuty", "dashboard", "alerting"]
+  },
+  {
+    "id": "05-wrong-problem",
+    "promptId": "05",
+    "category": "wrong-problem",
+    "severity": "major",
+    "description": "Replaces health check endpoints with a service mesh sidecar approach",
+    "injection": {
+      "method": "replace",
+      "searchPattern": "(?:health\\s*check|liveness|readiness|probe)[^.]*(?:endpoint|handler|route|HTTP)[^.]*\\.",
+      "replaceText": "a service mesh sidecar proxy (Envoy-based) that handles all health checking externally, removing the need for application-level health endpoints entirely."
+    },
+    "expectedSignals": ["service mesh", "sidecar", "Envoy", "health check endpoint", "application-level"]
+  }
+]

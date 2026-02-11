@@ -7,6 +7,57 @@ export interface PromptDefinition {
   allowedNewPaths: string[];
 }
 
+// --- Tier 2: Intent Drift Detection ---
+
+/** Categories of drift that can be injected into a plan. */
+export type DriftCategory =
+  | "scope-creep"
+  | "feature-drift"
+  | "wrong-abstraction"
+  | "missing-requirement"
+  | "wrong-problem"
+  | "tech-mismatch";
+
+/** Methods for injecting drift into a plan. */
+export type DriftMethod = "append" | "replace" | "remove-and-replace";
+
+/** Injection definition within a drift spec. */
+export interface DriftInjection {
+  method: DriftMethod;
+  appendText?: string;
+  searchPattern?: string;
+  replaceText?: string;
+}
+
+/** Full drift spec (one entry in drift-specs.json). */
+export interface DriftSpec {
+  id: string;
+  promptId: string;
+  category: DriftCategory;
+  severity: "major" | "minor";
+  description: string;
+  injection: DriftInjection;
+  expectedSignals: string[];
+}
+
+/** Detection result for a single drift spec. */
+export interface DriftDetection {
+  specId: string;
+  category: DriftCategory;
+  injectionApplied: boolean;
+  detected: boolean;
+  method: "critical-callout" | "alignment-section" | "signal-match" | null;
+  matchedSignals: string[];
+}
+
+/** Tier 2 result for a single prompt. */
+export interface Tier2Result {
+  promptId: string;
+  fixture: string;
+  detections: DriftDetection[];
+  detectionRate: number;
+}
+
 /** Classification of an extracted file path */
 export type PathClassification = "valid" | "intentionalNew" | "hallucinated";
 
@@ -43,6 +94,8 @@ export interface BenchmarkRun {
   generatedPlan: string;
   verifierOutput: string;
   tier1: Tier1Result;
+  tier2?: Tier2Result;
+  driftVerifierOutputs?: Record<string, string>;
   apiUsage: ApiUsage;
   timestamp: string;
 }
@@ -64,6 +117,18 @@ export interface BenchmarkSummary {
       promptId: string;
       hallucinationRate: number;
       detectionRate: number;
+    }>;
+  };
+  tier2?: {
+    avgDetectionRate: number;
+    perCategory: Record<string, number>;
+    perMethod: Record<string, number>;
+    perSpec: Array<{
+      specId: string;
+      category: string;
+      injectionApplied: boolean;
+      detected: boolean;
+      method: string | null;
     }>;
   };
   apiUsage: {

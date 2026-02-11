@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "tsx bench/harness/runner.ts",
-    "bench:tier1": "tsx bench/harness/runner.ts tier1"
+    "bench:tier1": "tsx bench/harness/runner.ts tier1",
+    "bench:tier2": "tsx bench/harness/runner.ts tier2",
+    "bench:all": "tsx bench/harness/runner.ts all"
   },
   "keywords": [
     "claude",
