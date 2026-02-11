@@ -35,23 +35,6 @@ export interface Tier1Result {
   detectionRate: number;
 }
 
-/** Tier 2 rubric scores (1-5 scale) */
-export interface Tier2Scores {
-  missingLogic: number;
-  wrongAssumptions: number;
-  securityIssues: number;
-  completenessGaps: number;
-  conventionViolations: number;
-  overallQuality: number;
-}
-
-/** Tier 2 result for a single prompt run */
-export interface Tier2Result {
-  promptId: string;
-  scores: Tier2Scores;
-  notes: string;
-}
-
 /** Complete result for a single prompt run */
 export interface BenchmarkRun {
   promptId: string;
@@ -60,7 +43,6 @@ export interface BenchmarkRun {
   generatedPlan: string;
   verifierOutput: string;
   tier1: Tier1Result;
-  tier2?: Tier2Result;
   apiUsage: ApiUsage;
   timestamp: string;
 }
@@ -82,13 +64,6 @@ export interface BenchmarkSummary {
       promptId: string;
       hallucinationRate: number;
       detectionRate: number;
-    }>;
-  };
-  tier2?: {
-    avgScores: Tier2Scores;
-    perRun: Array<{
-      promptId: string;
-      scores: Tier2Scores;
     }>;
   };
   apiUsage: {

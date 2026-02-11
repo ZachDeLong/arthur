@@ -32,7 +32,6 @@ The naive prompt is frozen in `bench/naive-prompt.ts` as the baseline. The produ
 ### Benchmark tiers
 
 - **Tier 1** (automated): Hallucination rate in generated plans, detection rate by the verifier
-- **Tier 2** (human evaluation): Rubrics for actionability, accuracy, and review quality — requires real domain experts to score
 
 ## Architecture
 

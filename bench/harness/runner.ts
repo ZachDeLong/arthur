@@ -7,16 +7,13 @@ import type {
   PromptDefinition,
   BenchmarkRun,
   Tier1Result,
-  BenchmarkSummary,
 } from "./types.js";
 import { generatePlan } from "./plan-generator.js";
 import { analyzePaths } from "./path-checker.js";
 import { runVerification } from "./verifier-runner.js";
 import { parseDetections } from "./detection-parser.js";
 import { getAllFiles } from "../../src/context/tree.js";
-import { generateRubric } from "./rubric-generator.js";
 import { generateSummary } from "./report.js";
-import { scoreTier2, mergeTier2IntoSummary } from "./score-tier2.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_ROOT = path.resolve(__dirname, "..");
@@ -173,11 +170,6 @@ export async function runBenchmark(
     const runFile = path.join(runDir, `prompt-${prompt.id}.json`);
     fs.writeFileSync(runFile, JSON.stringify(run, null, 2) + "\n", "utf-8");
 
-    // Generate rubric template
-    const rubricFile = path.join(runDir, `prompt-${prompt.id}-rubric.md`);
-    const rubric = generateRubric(run);
-    fs.writeFileSync(rubricFile, rubric, "utf-8");
-
     // Print summary for this run
     console.log(
       chalk.green(
@@ -222,66 +214,16 @@ export async function runBenchmark(
     `  API usage: ${summary.apiUsage.totalInputTokens} in / ${summary.apiUsage.totalOutputTokens} out (${summary.apiUsage.totalCalls} calls)`,
   );
   console.log(chalk.dim(`\nResults saved to: ${runDir}`));
-  console.log(
-    chalk.dim(
-      `Fill in rubric files and run: npm run bench:score -- ${runDir}`,
-    ),
-  );
-}
-
-/** Score Tier 2 from filled-in rubric files. */
-export async function scoreBenchmark(runDir: string): Promise<void> {
-  const summaryFile = path.join(runDir, "summary.json");
-  if (!fs.existsSync(summaryFile)) {
-    console.error(chalk.red(`No summary.json found in ${runDir}`));
-    process.exit(1);
-  }
-
-  const summary = JSON.parse(
-    fs.readFileSync(summaryFile, "utf-8"),
-  ) as BenchmarkSummary;
-
-  const tier2Results = scoreTier2(runDir);
-  if (tier2Results.length === 0) {
-    console.error(
-      chalk.red(
-        "No scored rubrics found. Fill in the *-rubric.md files with scores first.",
-      ),
-    );
-    process.exit(1);
-  }
-
-  const updatedSummary = mergeTier2IntoSummary(summary, tier2Results);
-  fs.writeFileSync(
-    summaryFile,
-    JSON.stringify(updatedSummary, null, 2) + "\n",
-    "utf-8",
-  );
-
-  console.log(chalk.bold.cyan("\n— Tier 2 Scores —"));
-  if (updatedSummary.tier2) {
-    for (const [key, value] of Object.entries(updatedSummary.tier2.avgScores)) {
-      console.log(`  ${key}: ${value}/5`);
-    }
-  }
-  console.log(chalk.dim(`\nUpdated: ${summaryFile}`));
 }
 
 // CLI entry point
 const args = process.argv.slice(2);
 
-if (args[0] === "score") {
-  const runDir = args[1];
-  if (!runDir) {
-    console.error("Usage: bench:score <run-directory>");
-    process.exit(1);
-  }
-  scoreBenchmark(path.resolve(runDir));
-} else if (args[0] === "tier1" || args.length === 0) {
+if (args[0] === "tier1" || args.length === 0) {
   // Optional prompt IDs: bench:tier1 01 03
   const promptIds = args.slice(1);
   runBenchmark(promptIds.length > 0 ? promptIds : undefined);
 } else {
-  console.error("Usage: bench [tier1] [prompt-ids...] | bench score <run-dir>");
+  console.error("Usage: bench [tier1] [prompt-ids...]");
   process.exit(1);
 }
