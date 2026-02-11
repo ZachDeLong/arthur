@@ -1,0 +1,50 @@
+[
+  {
+    "id": "01",
+    "fixture": "fixture-a",
+    "task": "Add WebSocket plugin support to the plugin registry. The WebSocket plugin should extend the base plugin class, support connection lifecycle events (connect, disconnect, message), and integrate with the existing plugin configuration system.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths in your plan.",
+    "allowedNewPaths": [
+      "src/plugins/ws-*.ts",
+      "src/adapters/ws/*.ts"
+    ]
+  },
+  {
+    "id": "02",
+    "fixture": "fixture-a",
+    "task": "Add plugin validation middleware that validates plugin metadata against the project's JSON schema before registration. Invalid plugins should be rejected with descriptive error messages.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths in your plan.",
+    "allowedNewPaths": [
+      "src/middleware/*.ts"
+    ]
+  },
+  {
+    "id": "03",
+    "fixture": "fixture-a",
+    "task": "Add a database migration system that works with the existing migration script. Support creating new migrations, running pending migrations, and rolling back. Track migration state in a local SQLite database.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths in your plan.",
+    "allowedNewPaths": [
+      "scripts/*.ts",
+      "migrations/*.sql"
+    ]
+  },
+  {
+    "id": "04",
+    "fixture": "fixture-b",
+    "task": "Add rate limiting middleware to the API gateway. Support per-IP and per-token rate limits with configurable windows. Rate limit state should be stored in-memory with optional Redis backing.",
+    "systemContext": "You are a senior Go engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths in your plan.",
+    "allowedNewPaths": [
+      "internal/ratelimit/*.go",
+      "internal/middleware/*.go"
+    ]
+  },
+  {
+    "id": "05",
+    "fixture": "fixture-b",
+    "task": "Add Kubernetes health check endpoints (liveness and readiness probes) to the API gateway. The readiness probe should verify upstream service connectivity. Update the Kubernetes deployment manifests to include probe configuration.",
+    "systemContext": "You are a senior Go engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths in your plan.",
+    "allowedNewPaths": [
+      "internal/health/*.go"
+    ]
+  }
+]

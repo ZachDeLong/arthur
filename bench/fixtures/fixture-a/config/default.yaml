@@ -1,0 +1,12 @@
+registry:
+  strict: true
+  autoStart: true
+
+plugins:
+  - name: logger
+    enabled: true
+  - name: http
+    enabled: true
+    config:
+      port: 3000
+      host: "0.0.0.0"

@@ -1,0 +1,9 @@
+{
+  "name": "plugin-registry",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "migrate": "tsx scripts/migrate.ts"
+  }
+}

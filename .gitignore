@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.codeverifier/
+*.tsbuildinfo
+bench/results/
