@@ -32,6 +32,24 @@ The naive prompt is frozen in `bench/naive-prompt.ts` as the baseline. The produ
 ### Benchmark tiers
 
 - **Tier 1** (automated): Hallucination rate in generated plans, detection rate by the verifier
+- **Tier 2** (automated): Intent drift detection — known drift is injected into plans, then we measure whether the verifier catches it
+
+### Tier 2 Results (Claude Sonnet 4.5)
+
+Plan generation and verification both use `claude-sonnet-4-5-20250929`. 10 drift specs across 5 prompts, covering 6 drift categories.
+
+**Overall detection rate: 90% (9/10 injected drifts detected)**
+
+| Category | Detection Rate | Specs |
+|----------|---------------|-------|
+| scope-creep | 80% (4/5) | Appended unrequested features (hot-reload, marketplace, replication, tracing, observability) |
+| feature-drift | 100% (1/1) | Replaced WebSocket overview with HTTP long-polling |
+| wrong-abstraction | 100% (1/1) | Replaced JSON schema validation with a rule engine DSL |
+| missing-requirement | 100% (1/1) | Removed rollback support, replaced with forward-only logging |
+| tech-mismatch | 100% (1/1) | Replaced in-memory/Redis with mandatory PostgreSQL |
+| wrong-problem | 100% (1/1) | Replaced health check endpoints with service mesh sidecar |
+
+Detection methods: 7 via critical-callout (signal keyword near scope phrase), 2 via signal-match (≥40% of expected signals found), 1 missed.
 
 ## Architecture
 
