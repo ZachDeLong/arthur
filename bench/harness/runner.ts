@@ -645,7 +645,32 @@ if (subcommand === "tier1" || args.length === 0) {
 } else if (subcommand === "all") {
   const promptIds = args.slice(1);
   runBenchmarkAll(promptIds.length > 0 ? promptIds : undefined);
+} else if (subcommand === "tier3") {
+  console.log(chalk.bold.cyan("\n── Tier 3: Real-World Refactoring Verification ──\n"));
+  console.log("Tier 3 is a hybrid benchmark — automated setup + manual Claude Code sessions.\n");
+  console.log(chalk.bold("Workflow:\n"));
+  console.log("  1. Setup (~2 min)");
+  console.log("     npm run bench:tier3:setup\n");
+  console.log("  2. Vanilla run (~15 min)");
+  console.log("     Open Claude Code in bench/tier3/workspaces/vanilla/");
+  console.log("     Paste the prompt from bench/tier3/prompt.md");
+  console.log("     Let Opus plan + execute freely");
+  console.log("     Copy the plan to results/<ts>/vanilla/plan.md\n");
+  console.log("  3. Arthur-assisted run (~20 min)");
+  console.log("     Open Claude Code in bench/tier3/workspaces/arthur-assisted/");
+  console.log('     Tell it: "Create a plan for this task but DO NOT execute yet"');
+  console.log("     Paste the prompt.md content");
+  console.log("     Copy the plan to results/<ts>/arthur-assisted/plan.md");
+  console.log("     npm run bench:tier3:verify -- <plan-file> <workspace-dir>");
+  console.log("     Paste Arthur's feedback back into the Claude Code session");
+  console.log("     Let Opus execute with the feedback\n");
+  console.log("  4. Evaluate (~30 sec)");
+  console.log("     npm run bench:tier3:eval -- vanilla <workspace> <output-dir>");
+  console.log("     npm run bench:tier3:eval -- arthur-assisted <workspace> <output-dir>\n");
+  console.log("  5. Compare (~10 sec)");
+  console.log("     npm run bench:tier3:compare -- <results-dir>\n");
+  console.log("  6. Fill in qualitative.json manually\n");
 } else {
-  console.error("Usage: bench [tier1|tier2|all] [prompt-ids...]");
+  console.error("Usage: bench [tier1|tier2|tier3|all] [prompt-ids...]");
   process.exit(1);
 }

@@ -130,6 +130,107 @@ export interface ApiUsage {
   verifyOutputTokens: number;
 }
 
+// --- Tier 3: Real-World Refactoring Verification ---
+
+/** Evaluation result for a single arm (vanilla or arthur-assisted). */
+export interface Tier3EvaluationResult {
+  arm: string;
+  build: {
+    pass: boolean;
+    errors: string[];
+  };
+  appTsx: {
+    originalLines: number;
+    currentLines: number;
+    reductionPct: number;
+  };
+  extractedFiles: {
+    hooks: string[];
+    components: string[];
+    total: number;
+  };
+  hallucinatedImports: {
+    count: number;
+    paths: string[];
+  };
+  diffStats: {
+    filesChanged: number;
+    insertions: number;
+    deletions: number;
+  };
+  compositeScore: number;
+}
+
+/** Head-to-head comparison of vanilla vs arthur-assisted. */
+export interface Tier3Comparison {
+  vanilla: Tier3EvaluationResult;
+  arthurAssisted: Tier3EvaluationResult;
+  buildDelta: "both-pass" | "arthur-only" | "vanilla-only" | "both-fail";
+  scoreDelta: number;
+  fileCountDelta: number;
+  reductionDelta: number;
+  hallucinatedImportsDelta: number;
+  verdict: string;
+}
+
+// --- API Unification Benchmark ---
+
+/** Evaluation result for the API unification benchmark. */
+export interface ApiUnificationEvaluationResult {
+  arm: string;
+  build: {
+    pass: boolean;
+    errors: string[];
+  };
+  hallucinatedImports: {
+    count: number;
+    paths: string[];
+  };
+  typeAccuracy: {
+    interfacesFound: string[];
+    fieldAccuracy: Record<
+      string,
+      { expected: string[]; found: string[]; missing: string[]; extra: string[] }
+    >;
+    overallScore: number;
+  };
+  apiCoverage: {
+    rawFetchCalls: { file: string; line: number }[];
+    totalRawFetches: number;
+  };
+  errorHandling: {
+    functionsWithHandling: string[];
+    functionsWithoutHandling: string[];
+    coveragePct: number;
+  };
+  diffStats: {
+    filesChanged: number;
+    insertions: number;
+    deletions: number;
+  };
+  compositeScore: number;
+}
+
+/** Head-to-head comparison for the API unification benchmark. */
+export interface ApiUnificationComparison {
+  vanilla: ApiUnificationEvaluationResult;
+  arthurAssisted: ApiUnificationEvaluationResult;
+  buildDelta: "both-pass" | "arthur-only" | "vanilla-only" | "both-fail";
+  scoreDelta: number;
+  typeAccuracyDelta: number;
+  rawFetchDelta: number;
+  hallucinatedImportsDelta: number;
+  verdict: string;
+}
+
+/** Manual qualitative assessment (filled in by hand). */
+export interface Tier3Qualitative {
+  codeReadability: { vanilla: number; arthurAssisted: number };
+  separationOfConcerns: { vanilla: number; arthurAssisted: number };
+  overallPreference: "vanilla" | "arthur-assisted" | "tie";
+  notes: string;
+}
+
 /** Aggregated summary across all runs */
 export interface BenchmarkSummary {
   tier1: {
