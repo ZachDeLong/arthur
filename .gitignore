@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .codeverifier/
+.env
 *.tsbuildinfo
 bench/results/
 bench/tier3/workspaces/

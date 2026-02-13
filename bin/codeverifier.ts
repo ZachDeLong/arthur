@@ -27,6 +27,8 @@ program
   .option("--project <dir>", "Project directory (default: cwd)")
   .option("--model <model>", "Claude model to use")
   .option("--verbose", "Show token usage and context details")
+  .option("--no-static", "Skip static analysis (pure LLM mode)")
+  .option("--schema <file>", "Path to Prisma schema file for static validation")
   .action(async (opts: VerifyOptions) => {
     await runVerify(opts);
   });

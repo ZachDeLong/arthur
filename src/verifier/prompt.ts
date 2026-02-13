@@ -27,7 +27,7 @@ You are provided with the project's actual directory tree. Use it as ground trut
 Include a \`### File Path Verification\` section in your output that lists each referenced path and its status (exists, not found, or suggested correction).`;
 
 /** Build the user message with structured context sections. */
-export function buildUserMessage(context: ProjectContext): string {
+export function buildUserMessage(context: ProjectContext, staticFindings?: string): string {
   const sections: string[] = [];
 
   sections.push(`## Project Structure\n\nThis is the actual project directory tree. Reference it to verify file paths mentioned in the plan.\n\n\`\`\`\n${context.tree}\n\`\`\``);
@@ -58,6 +58,10 @@ export function buildUserMessage(context: ProjectContext): string {
       fileSection.push(`### ${filePath}\n\n\`\`\`\n${content}\n\`\`\``);
     }
     sections.push(fileSection.join("\n"));
+  }
+
+  if (staticFindings) {
+    sections.push(staticFindings);
   }
 
   return sections.join("\n\n---\n\n");

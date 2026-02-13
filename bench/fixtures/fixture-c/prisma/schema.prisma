@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ParticipantTier {
+  OBSERVER
+  CONTRIBUTOR
+  CURATOR
+  ADMINISTRATOR
+}
+
+enum InteractionKind {
+  VIEW
+  BOOKMARK
+  SHARE
+  REACTION
+  DEEP_READ
+}
+
+model Participant {
+  id                String                  @id @default(cuid())
+  displayIdentifier String                  @unique
+  contactEmail      String                  @unique
+  tier              ParticipantTier         @default(OBSERVER)
+  bio               String?
+  enrolledAt        DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  authoredContent   ContentItem[]
+  engagements       ParticipantEngagement[]
+}
+
+model ContentItem {
+  id              String                  @id @default(cuid())
+  headline        String
+  body            String
+  contentCategory String
+  visibility      Boolean                 @default(true)
+  authorId        String
+  publishedAt     DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  author          Participant             @relation(fields: [authorId], references: [id])
+  engagements     ParticipantEngagement[]
+
+  @@index([contentCategory])
+  @@index([authorId])
+}
+
+model ParticipantEngagement {
+  id            String          @id @default(cuid())
+  participantId String
+  contentItemId String
+  interaction   InteractionKind
+  occurredAt    DateTime        @default(now())
+
+  participant   Participant     @relation(fields: [participantId], references: [id])
+  contentItem   ContentItem     @relation(fields: [contentItemId], references: [id])
+
+  @@unique([participantId, contentItemId, interaction])
+  @@index([participantId])
+  @@index([contentItemId])
+}

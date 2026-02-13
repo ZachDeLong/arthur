@@ -14,8 +14,8 @@ src/
   verifier/     Prompt construction, API streaming, output rendering
 
 bench/
-  fixtures/     Test projects with known structures (fixture-a: TS, fixture-b: Go)
-  harness/      Benchmark runner, scoring, detection parsing
+  fixtures/     Test projects with known structures (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma)
+  harness/      Benchmark runner, scoring, detection parsing, schema checking
   prompts/      Benchmark prompts + drift specs
   naive-prompt.ts   Frozen baseline prompt (DO NOT MODIFY)
 bench/
@@ -45,12 +45,17 @@ bench/
 - **Results dir is gitignored** — benchmark results in `bench/results/` are local only.
 - **Config locations** — global: `~/.codeverifier/config.json`, project: `.codeverifier/config.json`, env: `ANTHROPIC_API_KEY`
 - **Token budget** — default 80k. Priority order: prompt > plan > README > CLAUDE.md > session feedback > referenced files > tree.
-- **Model default** — `claude-sonnet-4-5-20250929` (Sonnet 4.5). Override via config or `--model` flag.
+- **Model default** — `claude-sonnet-4-5-20250929` (Sonnet 4.5). Override via project config `.codeverifier/config.json` (currently set to `claude-opus-4-6`).
+- **Fixture src/ excluded from root tsconfig** — `bench/fixtures/*/src` is excluded because fixture source files have their own deps (Next.js, Prisma, etc.).
 
 ## Benchmark System
 
 ### Tier 1: Hallucination Detection
-Generates plans with README-only context, then verifies against full project tree. Measures whether the verifier catches file paths that don't exist. Detection via 4-tier parsing: direct match → sentiment → section → directory correction.
+Generates plans with README-only context, then verifies against full project tree. Two detection channels:
+
+**Path hallucination**: Catches file paths that don't exist. Detection via 4-tier parsing: direct match → sentiment → section → directory correction.
+
+**Schema hallucination** (prompts 06-08, fixture-c): Catches hallucinated Prisma models, fields, methods, and relations against a real `schema.prisma`. Fixture-c uses non-obvious naming (Participant not User, displayIdentifier not username, etc.) to tempt hallucinations. Schema checker at `bench/harness/schema-checker.ts` parses schema and classifies plan references.
 
 ### Tier 2: Intent Drift Detection
 Injects synthetic drift into generated plans (scope creep, feature drift, wrong abstraction, missing requirement, wrong problem, tech mismatch). Measures whether the verifier catches the drift. Detection via 3-tier scoring: critical-callout → alignment-section → signal-match.

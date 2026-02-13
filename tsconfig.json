@@ -15,5 +15,5 @@
     "sourceMap": true
   },
   "include": ["bin/**/*.ts", "src/**/*.ts", "bench/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests", "bench/fixtures/*/src"]
 }

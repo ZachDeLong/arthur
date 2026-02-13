@@ -6,6 +6,8 @@ export function generateSummary(runs: BenchmarkRun[]): BenchmarkSummary {
     promptId: run.promptId,
     hallucinationRate: run.tier1.pathAnalysis.hallucinationRate,
     detectionRate: run.tier1.detectionRate,
+    schemaHallucinationRate: run.tier1.schemaAnalysis?.hallucinationRate,
+    schemaDetectionRate: run.tier1.schemaDetectionRate,
   }));
 
   const avgHallucinationRate =
@@ -55,6 +57,52 @@ export function generateSummary(runs: BenchmarkRun[]): BenchmarkSummary {
     },
   };
 
+  // Build schema summary if any runs have schema data
+  const runsWithSchema = runs.filter((r) => r.tier1.schemaAnalysis);
+  if (runsWithSchema.length > 0) {
+    const schemaRates = runsWithSchema
+      .map((r) => r.tier1.schemaAnalysis!.hallucinationRate);
+    const avgSchemaHallucinationRate =
+      schemaRates.length > 0
+        ? Number((schemaRates.reduce((a, b) => a + b, 0) / schemaRates.length).toFixed(4))
+        : 0;
+
+    const schemaDetectionRates = runsWithSchema
+      .filter((r) => r.tier1.schemaDetectionRate !== undefined)
+      .map((r) => r.tier1.schemaDetectionRate!);
+    const avgSchemaDetectionRate =
+      schemaDetectionRates.length > 0
+        ? Number(
+            (schemaDetectionRates.reduce((a, b) => a + b, 0) / schemaDetectionRates.length).toFixed(4),
+          )
+        : 0;
+
+    // Aggregate per-category stats
+    const perCategory = {
+      models: { total: 0, hallucinated: 0 },
+      fields: { total: 0, hallucinated: 0 },
+      methods: { total: 0, invalid: 0 },
+      relations: { total: 0, wrong: 0 },
+    };
+    for (const run of runsWithSchema) {
+      const cats = run.tier1.schemaAnalysis!.byCategory;
+      perCategory.models.total += cats.models.total;
+      perCategory.models.hallucinated += cats.models.hallucinated;
+      perCategory.fields.total += cats.fields.total;
+      perCategory.fields.hallucinated += cats.fields.hallucinated;
+      perCategory.methods.total += cats.methods.total;
+      perCategory.methods.invalid += cats.methods.invalid;
+      perCategory.relations.total += cats.relations.total;
+      perCategory.relations.wrong += cats.relations.wrong;
+    }
+
+    summary.tier1.schema = {
+      avgSchemaHallucinationRate,
+      avgSchemaDetectionRate,
+      perCategory,
+    };
+  }
+
   // Build tier2 summary if any runs have tier2 data
   if (runsWithTier2.length > 0) {
     const allDetections = runsWithTier2.flatMap((r) => r.tier2!.detections);
@@ -84,14 +132,8 @@ export function generateSummary(runs: BenchmarkRun[]): BenchmarkSummary {
         : 0;
     }
 
-    // Per-method rates (injection method)
+    // Per-method rates
     const perMethod: Record<string, number> = {};
-    // We need the specs to know the injection method — derive from spec IDs
-    // Instead, group by the detection method used (critical-callout, alignment-section, signal-match)
-    // But the plan says "perMethod" = injection method. We can derive this from the spec data
-    // stored in drift-specs.json. For now, compute from what we have in detections.
-    // Since DriftDetection doesn't store injection method, we'll use the detection .method field
-    // to show which scoring methods succeeded. This is more useful for calibration anyway.
     const methodGroups = new Map<string, { applied: number; detected: number }>();
     for (const det of appliedDetections) {
       const key = det.method ?? "none";
