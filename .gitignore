@@ -3,3 +3,5 @@ dist/
 .codeverifier/
 *.tsbuildinfo
 bench/results/
+bench/tier3/workspaces/
+bench/tier3/results/
