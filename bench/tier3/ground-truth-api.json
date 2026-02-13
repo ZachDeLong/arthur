@@ -1,0 +1,42 @@
+{
+  "PapersResponse": {
+    "papers": "Paper[]",
+    "total_pages": "number",
+    "results_count": "number"
+  },
+  "Paper": {
+    "id": "number",
+    "arxiv_id": "string",
+    "title": "string",
+    "authors": "string",
+    "date": "string",
+    "reasoning_category": "string",
+    "arxiv_link": "string",
+    "tldr": "string",
+    "summary_md": "string",
+    "excitement_score": "number",
+    "excitement_reasoning": "string",
+    "score_breakdown": "string",
+    "last_scored_at": "string"
+  },
+  "StatsResponse": {
+    "papers": "StatsResponsePaper[]"
+  },
+  "StatsResponsePaper": {
+    "id": "number",
+    "title": "string",
+    "authors": "string",
+    "date": "string",
+    "reasoning_category": "string",
+    "arxiv_link": "string",
+    "excitement_score": "number",
+    "score_breakdown": "string"
+  },
+  "TrendsResponse": {
+    "weekly": "Record<string, Record<string, number>>",
+    "categories": "Record<string, number>",
+    "avg_scores": "Record<string, number>",
+    "growth": "Record<string, number>",
+    "weeks": "string[]"
+  }
+}

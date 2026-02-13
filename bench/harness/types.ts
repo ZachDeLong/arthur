@@ -151,6 +151,56 @@ export interface Tier3Comparison {
   verdict: string;
 }
 
+// --- API Unification Benchmark ---
+
+/** Evaluation result for the API unification benchmark. */
+export interface ApiUnificationEvaluationResult {
+  arm: string;
+  build: {
+    pass: boolean;
+    errors: string[];
+  };
+  hallucinatedImports: {
+    count: number;
+    paths: string[];
+  };
+  typeAccuracy: {
+    interfacesFound: string[];
+    fieldAccuracy: Record<
+      string,
+      { expected: string[]; found: string[]; missing: string[]; extra: string[] }
+    >;
+    overallScore: number;
+  };
+  apiCoverage: {
+    rawFetchCalls: { file: string; line: number }[];
+    totalRawFetches: number;
+  };
+  errorHandling: {
+    functionsWithHandling: string[];
+    functionsWithoutHandling: string[];
+    coveragePct: number;
+  };
+  diffStats: {
+    filesChanged: number;
+    insertions: number;
+    deletions: number;
+  };
+  compositeScore: number;
+}
+
+/** Head-to-head comparison for the API unification benchmark. */
+export interface ApiUnificationComparison {
+  vanilla: ApiUnificationEvaluationResult;
+  arthurAssisted: ApiUnificationEvaluationResult;
+  buildDelta: "both-pass" | "arthur-only" | "vanilla-only" | "both-fail";
+  scoreDelta: number;
+  typeAccuracyDelta: number;
+  rawFetchDelta: number;
+  hallucinatedImportsDelta: number;
+  verdict: string;
+}
+
 /** Manual qualitative assessment (filled in by hand). */
 export interface Tier3Qualitative {
   codeReadability: { vanilla: number; arthurAssisted: number };

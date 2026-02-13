@@ -18,7 +18,9 @@
     "bench:tier3:setup": "tsx bench/tier3/scripts/setup.ts",
     "bench:tier3:verify": "tsx bench/tier3/scripts/verify-plan.ts",
     "bench:tier3:eval": "tsx bench/tier3/scripts/evaluate.ts",
-    "bench:tier3:compare": "tsx bench/tier3/scripts/compare.ts"
+    "bench:tier3:compare": "tsx bench/tier3/scripts/compare.ts",
+    "bench:api:eval": "tsx bench/tier3/scripts/evaluate-api.ts",
+    "bench:api:compare": "tsx bench/tier3/scripts/compare-api.ts"
   },
   "keywords": [
     "claude",

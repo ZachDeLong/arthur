@@ -11,16 +11,16 @@ import { loadConfig } from "../../../src/config/manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TIER3_ROOT = path.resolve(__dirname, "..");
-const PROMPT_FILE = path.join(TIER3_ROOT, "prompt.md");
 
 const MODEL = "claude-opus-4-6";
 const TOKEN_BUDGET = 120_000;
 
 function usage(): never {
-  console.error("Usage: verify-plan <plan-file> <workspace-dir>");
+  console.error("Usage: verify-plan <plan-file> <workspace-dir> [prompt-file]");
   console.error("");
   console.error("  <plan-file>     Path to the saved plan markdown file");
   console.error("  <workspace-dir> Path to the workspace (e.g., bench/tier3/workspaces/arthur-assisted)");
+  console.error("  [prompt-file]   Optional path to the original prompt (default: bench/tier3/prompt.md)");
   process.exit(1);
 }
 
@@ -30,6 +30,9 @@ async function main(): Promise<void> {
 
   const planFile = path.resolve(args[0]);
   const workspaceDir = path.resolve(args[1]);
+  const promptFile = args[2]
+    ? path.resolve(args[2])
+    : path.join(TIER3_ROOT, "prompt.md");
 
   // Validate inputs
   if (!fs.existsSync(planFile)) {
@@ -63,7 +66,7 @@ async function main(): Promise<void> {
   const context = buildContext({
     projectDir: frontendDir,
     planText,
-    prompt: fs.readFileSync(PROMPT_FILE, "utf-8"),
+    prompt: fs.readFileSync(promptFile, "utf-8"),
     tokenBudget: TOKEN_BUDGET,
   });
 
