@@ -179,3 +179,181 @@ export function parseDetections(
     return { path: p, detected: false, method: null };
   });
 }
+
+// --- Schema Detection ---
+
+import type { SchemaDetection } from "./types.js";
+import type { SchemaRef } from "./schema-checker.js";
+
+/** Schema-specific negative sentiment phrases. */
+const SCHEMA_NEGATIVE_SENTIMENT = [
+  ...NEGATIVE_SENTIMENT,
+  "not a valid",
+  "no such model",
+  "no such field",
+  "not in the schema",
+  "doesn't have",
+  "does not have",
+  "no field named",
+  "no model named",
+  "schema does not",
+  "schema doesn't",
+  "the model is",
+  "the field is",
+  "the actual",
+  "the correct",
+  "should use",
+  "should be",
+  "the schema has",
+  "in the schema",
+  "not a relation",
+  "not a valid method",
+  "method does not exist",
+  "no such method",
+];
+
+/** Parse verifier output to determine which schema hallucinations were detected. */
+export function parseSchemaDetections(
+  hallucinations: SchemaRef[],
+  verifierOutput: string,
+): SchemaDetection[] {
+  return hallucinations.map((h) => {
+    // Build search terms based on the hallucination
+    const searchTerms = buildSearchTerms(h);
+
+    // Tier 1: Direct match — the exact hallucinated reference appears in verifier output
+    for (const term of searchTerms) {
+      if (verifierOutput.includes(term)) {
+        // Check if there's negative sentiment nearby
+        if (checkSchemaSentiment(term, verifierOutput)) {
+          return {
+            raw: h.raw,
+            category: h.hallucinationCategory!,
+            suggestion: h.suggestion,
+            detected: true,
+            method: "direct" as const,
+          };
+        }
+      }
+    }
+
+    // Tier 2: Sentiment match — search term near negative phrases
+    for (const term of searchTerms) {
+      if (checkSchemaSentiment(term, verifierOutput)) {
+        return {
+          raw: h.raw,
+          category: h.hallucinationCategory!,
+          suggestion: h.suggestion,
+          detected: true,
+          method: "sentiment" as const,
+        };
+      }
+    }
+
+    // Tier 3: Section-based detection — term appears under warning sections
+    for (const term of searchTerms) {
+      if (checkSectionMatch(term, verifierOutput)) {
+        return {
+          raw: h.raw,
+          category: h.hallucinationCategory!,
+          suggestion: h.suggestion,
+          detected: true,
+          method: "section" as const,
+        };
+      }
+    }
+
+    // Also check if the suggestion (correct name) is mentioned as a correction
+    if (h.suggestion) {
+      const correctionTerms = [h.suggestion];
+      for (const term of correctionTerms) {
+        if (verifierOutput.includes(term)) {
+          // The verifier mentions the correct name — likely flagging the hallucination
+          const nearHallucination = searchTerms.some((st) => {
+            const stIdx = verifierOutput.indexOf(st);
+            const sugIdx = verifierOutput.indexOf(term);
+            if (stIdx === -1 || sugIdx === -1) return false;
+            return Math.abs(stIdx - sugIdx) < 500;
+          });
+          if (nearHallucination) {
+            return {
+              raw: h.raw,
+              category: h.hallucinationCategory!,
+              suggestion: h.suggestion,
+              detected: true,
+              method: "sentiment" as const,
+            };
+          }
+        }
+      }
+    }
+
+    return {
+      raw: h.raw,
+      category: h.hallucinationCategory!,
+      suggestion: h.suggestion,
+      detected: false,
+      method: null,
+    };
+  });
+}
+
+/** Build search terms for finding a hallucination reference in verifier output. */
+function buildSearchTerms(h: SchemaRef): string[] {
+  const terms: string[] = [];
+
+  switch (h.hallucinationCategory) {
+    case "hallucinated-model":
+      if (h.modelAccessor) {
+        terms.push(`prisma.${h.modelAccessor}`);
+        terms.push(h.modelAccessor);
+        // Also check for PascalCase version
+        terms.push(h.modelAccessor[0].toUpperCase() + h.modelAccessor.slice(1));
+      }
+      break;
+    case "hallucinated-field":
+      if (h.fieldName) {
+        terms.push(h.fieldName);
+      }
+      break;
+    case "invalid-method":
+      if (h.methodName) {
+        terms.push(h.methodName);
+        terms.push(`.${h.methodName}`);
+      }
+      break;
+    case "wrong-relation":
+      if (h.fieldName) {
+        terms.push(h.fieldName);
+        terms.push(`include: { ${h.fieldName}`);
+        terms.push(`include: {${h.fieldName}`);
+      }
+      break;
+  }
+
+  return terms;
+}
+
+/** Check if a term appears near negative sentiment in the verifier output. */
+function checkSchemaSentiment(
+  term: string,
+  verifierOutput: string,
+): boolean {
+  const lines = verifierOutput.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes(term)) continue;
+
+    // Check wider window (±3 lines for schema context)
+    const window = lines
+      .slice(Math.max(0, i - 3), Math.min(lines.length, i + 4))
+      .join(" ")
+      .toLowerCase();
+
+    for (const phrase of SCHEMA_NEGATIVE_SENTIMENT) {
+      if (window.includes(phrase)) return true;
+    }
+  }
+
+  return false;
+}

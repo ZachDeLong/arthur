@@ -1,10 +1,11 @@
 /** Prompt definition from prompts.json */
 export interface PromptDefinition {
   id: string;
-  fixture: "fixture-a" | "fixture-b";
+  fixture: "fixture-a" | "fixture-b" | "fixture-c";
   task: string;
   systemContext: string;
   allowedNewPaths: string[];
+  schemaFile?: string;
 }
 
 // --- Tier 2: Intent Drift Detection ---
@@ -77,6 +78,24 @@ export interface PathDetection {
   method: "direct" | "sentiment" | "section" | null;
 }
 
+// --- Schema Hallucination Detection ---
+
+/** Category of schema hallucination */
+export type SchemaHallucinationCategory =
+  | "hallucinated-model"
+  | "hallucinated-field"
+  | "invalid-method"
+  | "wrong-relation";
+
+/** Detection result for a single schema hallucination */
+export interface SchemaDetection {
+  raw: string;
+  category: SchemaHallucinationCategory;
+  suggestion?: string;
+  detected: boolean;
+  method: "direct" | "sentiment" | "section" | null;
+}
+
 /** Tier 1 result for a single prompt run */
 export interface Tier1Result {
   promptId: string;
@@ -84,6 +103,9 @@ export interface Tier1Result {
   pathAnalysis: PathAnalysis;
   detections: PathDetection[];
   detectionRate: number;
+  schemaAnalysis?: import("./schema-checker.js").SchemaAnalysis;
+  schemaDetections?: SchemaDetection[];
+  schemaDetectionRate?: number;
 }
 
 /** Complete result for a single prompt run */
@@ -117,7 +139,19 @@ export interface BenchmarkSummary {
       promptId: string;
       hallucinationRate: number;
       detectionRate: number;
+      schemaHallucinationRate?: number;
+      schemaDetectionRate?: number;
     }>;
+    schema?: {
+      avgSchemaHallucinationRate: number;
+      avgSchemaDetectionRate: number;
+      perCategory: {
+        models: { total: number; hallucinated: number };
+        fields: { total: number; hallucinated: number };
+        methods: { total: number; invalid: number };
+        relations: { total: number; wrong: number };
+      };
+    };
   };
   tier2?: {
     avgDetectionRate: number;

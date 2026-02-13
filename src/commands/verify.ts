@@ -6,6 +6,13 @@ import { buildUserMessage, getSystemPrompt } from "../verifier/prompt.js";
 import { streamVerification } from "../verifier/client.js";
 import { createRenderer } from "../verifier/renderer.js";
 import { loadLastFeedback, saveSession } from "../session/store.js";
+import { analyzePaths } from "../analysis/path-checker.js";
+import { parseSchema, analyzeSchema } from "../analysis/schema-checker.js";
+import {
+  printPathAnalysis,
+  printSchemaAnalysis,
+  formatStaticFindings,
+} from "../analysis/formatter.js";
 import * as log from "../utils/logger.js";
 
 export interface VerifyOptions {
@@ -15,6 +22,8 @@ export interface VerifyOptions {
   project?: string;
   model?: string;
   verbose?: boolean;
+  static?: boolean; // --no-static sets this to false
+  schema?: string;
 }
 
 export async function runVerify(options: VerifyOptions): Promise<void> {
@@ -66,9 +75,45 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
     log.dim(`  TOTAL: ~${total} / ${config.tokenBudget} tokens`);
   }
 
+  // 4.5. Static analysis (between context build and LLM call)
+  let staticFindings: string | undefined;
+
+  if (options.static !== false) {
+    const pathAnalysis = analyzePaths(planText, projectDir);
+
+    let schemaAnalysis;
+    if (options.schema) {
+      const schemaPath = path.resolve(projectDir, options.schema);
+      try {
+        const schema = parseSchema(schemaPath);
+        schemaAnalysis = analyzeSchema(planText, schema);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.warn(`Could not parse schema at ${options.schema}: ${msg}`);
+      }
+    }
+
+    // Print to console immediately
+    const hasPathIssues = pathAnalysis.hallucinatedPaths.length > 0;
+    const hasSchemaIssues = schemaAnalysis && schemaAnalysis.hallucinations.length > 0;
+
+    if (hasPathIssues || hasSchemaIssues) {
+      if (hasPathIssues) printPathAnalysis(pathAnalysis);
+      if (hasSchemaIssues) printSchemaAnalysis(schemaAnalysis!);
+
+      // Format for LLM context injection
+      staticFindings = formatStaticFindings(
+        hasPathIssues ? pathAnalysis : undefined,
+        hasSchemaIssues ? schemaAnalysis : undefined,
+      );
+    } else {
+      log.success("Static analysis: no issues found");
+    }
+  }
+
   // 5. Build prompt
   const systemPrompt = getSystemPrompt();
-  const userMessage = buildUserMessage(context);
+  const userMessage = buildUserMessage(context, staticFindings);
 
   // 6. Stream response
   log.info(`Sending to ${model}...`);

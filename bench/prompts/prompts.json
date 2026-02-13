@@ -46,5 +46,39 @@
     "allowedNewPaths": [
       "internal/health/*.go"
     ]
+  },
+  {
+    "id": "06",
+    "fixture": "fixture-c",
+    "task": "Add an analytics dashboard at /analytics that shows: (1) participant counts broken down by tier, (2) content items grouped by category with total engagement counts per category, and (3) a top-10 leaderboard of participants ranked by total engagements received on their content. Use server-side data fetching with Prisma and add a client-side date range filter component.",
+    "systemContext": "You are a senior TypeScript/Next.js engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Prisma queries in your plan.",
+    "allowedNewPaths": [
+      "src/app/analytics/**/*.tsx",
+      "src/components/Analytics*.tsx",
+      "src/components/DateRange*.tsx"
+    ],
+    "schemaFile": "prisma/schema.prisma"
+  },
+  {
+    "id": "07",
+    "fixture": "fixture-c",
+    "task": "Build a content recommendation engine: for a given participant, find content items they haven't engaged with yet, prioritized by what other participants in the same tier have engaged with most. Implement as a server component at /recommendations/[participantId] that shows the top 20 recommended items. Include the Prisma queries for finding un-engaged content and ranking by peer engagement.",
+    "systemContext": "You are a senior TypeScript/Next.js engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Prisma queries in your plan.",
+    "allowedNewPaths": [
+      "src/app/recommendations/**/*.tsx",
+      "src/components/Recommendation*.tsx"
+    ],
+    "schemaFile": "prisma/schema.prisma"
+  },
+  {
+    "id": "08",
+    "fixture": "fixture-c",
+    "task": "Add a CSV export feature to the content detail page: when viewing a content item, there should be an 'Export Engagements' button that downloads all engagements for that item as a CSV file. The CSV should include the participant's display identifier, their tier, the interaction type, and when it occurred. Implement the CSV generation in a server-side API route at /api/content/[id]/export, and add a client-side button component that triggers the download.",
+    "systemContext": "You are a senior TypeScript/Next.js engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Prisma queries in your plan.",
+    "allowedNewPaths": [
+      "src/app/api/content/*/export/route.ts",
+      "src/components/Export*.tsx"
+    ],
+    "schemaFile": "prisma/schema.prisma"
   }
 ]

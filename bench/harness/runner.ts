@@ -14,11 +14,12 @@ import type {
 import { generatePlan } from "./plan-generator.js";
 import { analyzePaths } from "./path-checker.js";
 import { runVerification } from "./verifier-runner.js";
-import { parseDetections } from "./detection-parser.js";
+import { parseDetections, parseSchemaDetections } from "./detection-parser.js";
 import { injectDrift } from "./drift-injector.js";
 import { scoreDriftDetection } from "./drift-scorer.js";
 import { getAllFiles } from "../../src/context/tree.js";
 import { generateSummary } from "./report.js";
+import { parseSchema, analyzeSchema } from "./schema-checker.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_ROOT = path.resolve(__dirname, "..");
@@ -80,6 +81,20 @@ async function runTier1(
     ),
   );
 
+  // Step 2b: Schema analysis (when schemaFile is configured)
+  let schemaAnalysisResult: ReturnType<typeof analyzeSchema> | undefined;
+  if (prompt.schemaFile) {
+    console.log(chalk.blue(`  [${prompt.id}] Analyzing schema references...`));
+    const schemaPath = path.join(fixtureDir, prompt.schemaFile);
+    const schema = parseSchema(schemaPath);
+    schemaAnalysisResult = analyzeSchema(planResult.plan, schema);
+    console.log(
+      chalk.dim(
+        `  [${prompt.id}] Schema: ${schemaAnalysisResult.totalRefs} refs, ${schemaAnalysisResult.hallucinations.length} hallucinated`,
+      ),
+    );
+  }
+
   // Step 3: Run verifier (full tree context)
   console.log(chalk.blue(`  [${prompt.id}] Running verifier...`));
   const verifyResult = await runVerification(
@@ -108,12 +123,30 @@ async function runTier1(
       ? detectedCount / pathAnalysis.hallucinatedPaths.length
       : 1; // No hallucinations = perfect detection
 
+  // Step 4b: Parse schema detections
+  let schemaDetections: ReturnType<typeof parseSchemaDetections> | undefined;
+  let schemaDetectionRate: number | undefined;
+  if (schemaAnalysisResult && schemaAnalysisResult.hallucinations.length > 0) {
+    schemaDetections = parseSchemaDetections(
+      schemaAnalysisResult.hallucinations,
+      verifyResult.output,
+    );
+    const schemaDetectedCount = schemaDetections.filter((d) => d.detected).length;
+    schemaDetectionRate = schemaDetectedCount / schemaAnalysisResult.hallucinations.length;
+  } else if (schemaAnalysisResult) {
+    schemaDetections = [];
+    schemaDetectionRate = 1; // No hallucinations = perfect
+  }
+
   const tier1: Tier1Result = {
     promptId: prompt.id,
     fixture: prompt.fixture,
     pathAnalysis,
     detections,
     detectionRate,
+    schemaAnalysis: schemaAnalysisResult,
+    schemaDetections,
+    schemaDetectionRate,
   };
 
   return {
@@ -184,12 +217,7 @@ export async function runBenchmark(
     // Print summary for this run
     console.log(
       chalk.green(
-        `  Hallucination rate: ${(run.tier1.pathAnalysis.hallucinationRate * 100).toFixed(1)}%`,
-      ),
-    );
-    console.log(
-      chalk.green(
-        `  Detection rate: ${(run.tier1.detectionRate * 100).toFixed(1)}%`,
+        `  Paths: hallucination rate ${(run.tier1.pathAnalysis.hallucinationRate * 100).toFixed(1)}%, detection rate ${(run.tier1.detectionRate * 100).toFixed(1)}%`,
       ),
     );
     if (run.tier1.pathAnalysis.hallucinatedPaths.length > 0) {
@@ -200,6 +228,34 @@ export async function runBenchmark(
           ? chalk.green(`detected (${det.method})`)
           : chalk.red("missed");
         console.log(`    ${p} — ${status}`);
+      }
+    }
+    if (run.tier1.schemaAnalysis) {
+      const sa = run.tier1.schemaAnalysis;
+      console.log(
+        chalk.green(
+          `  Schema: ${sa.totalRefs} refs, ${sa.hallucinations.length} hallucinated (${(sa.hallucinationRate * 100).toFixed(1)}%)`,
+        ),
+      );
+      if (run.tier1.schemaDetectionRate !== undefined) {
+        console.log(
+          chalk.green(
+            `  Schema detection rate: ${(run.tier1.schemaDetectionRate * 100).toFixed(1)}%`,
+          ),
+        );
+      }
+      if (sa.hallucinations.length > 0 && run.tier1.schemaDetections) {
+        console.log(chalk.yellow("  Schema hallucinations:"));
+        for (const h of sa.hallucinations) {
+          const det = run.tier1.schemaDetections.find((d) => d.raw === h.raw);
+          const status = det?.detected
+            ? chalk.green(`detected (${det.method})`)
+            : chalk.red("missed");
+          const suggestion = h.suggestion ? ` (suggestion: ${h.suggestion})` : "";
+          console.log(
+            `    ${h.raw} — ${h.hallucinationCategory}${suggestion} — ${status}`,
+          );
+        }
       }
     }
   }
@@ -221,6 +277,7 @@ export async function runBenchmark(
   console.log(
     `  Avg detection rate: ${(summary.tier1.avgDetectionRate * 100).toFixed(1)}%`,
   );
+  printSchemaSummary(summary);
   console.log(
     `  API usage: ${summary.apiUsage.totalInputTokens} in / ${summary.apiUsage.totalOutputTokens} out (${summary.apiUsage.totalCalls} calls)`,
   );
@@ -522,11 +579,38 @@ export async function runBenchmarkAll(
   console.log(
     `  Avg detection rate: ${(summary.tier1.avgDetectionRate * 100).toFixed(1)}%`,
   );
+  printSchemaSummary(summary);
   printTier2Summary(summary);
   console.log(
     `\n  API usage: ${summary.apiUsage.totalInputTokens} in / ${summary.apiUsage.totalOutputTokens} out (${summary.apiUsage.totalCalls} calls)`,
   );
   console.log(chalk.dim(`\nResults saved to: ${runDir}`));
+}
+
+function printSchemaSummary(summary: ReturnType<typeof generateSummary>): void {
+  if (!summary.tier1.schema) return;
+
+  const s = summary.tier1.schema;
+  console.log(chalk.bold.cyan("\n— Schema Hallucination Summary —"));
+  console.log(
+    `  Avg schema hallucination rate: ${(s.avgSchemaHallucinationRate * 100).toFixed(1)}%`,
+  );
+  console.log(
+    `  Avg schema detection rate: ${(s.avgSchemaDetectionRate * 100).toFixed(1)}%`,
+  );
+  console.log(chalk.dim("  Per category:"));
+  console.log(
+    `    Models: ${s.perCategory.models.hallucinated}/${s.perCategory.models.total} hallucinated`,
+  );
+  console.log(
+    `    Fields: ${s.perCategory.fields.hallucinated}/${s.perCategory.fields.total} hallucinated`,
+  );
+  console.log(
+    `    Methods: ${s.perCategory.methods.invalid}/${s.perCategory.methods.total} invalid`,
+  );
+  console.log(
+    `    Relations: ${s.perCategory.relations.wrong}/${s.perCategory.relations.total} wrong`,
+  );
 }
 
 function printTier2Summary(summary: ReturnType<typeof generateSummary>): void {
