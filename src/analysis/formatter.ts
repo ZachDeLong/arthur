@@ -1,6 +1,11 @@
 import chalk from "chalk";
 import type { PathAnalysis } from "./path-checker.js";
 import type { SchemaAnalysis } from "./schema-checker.js";
+import type { ImportAnalysis } from "./import-checker.js";
+import type { EnvAnalysis } from "./env-checker.js";
+import type { TypeAnalysis } from "./type-checker.js";
+import type { ApiRouteAnalysis } from "./api-route-checker.js";
+import type { SqlSchemaAnalysis } from "./sql-schema-checker.js";
 
 /** Print static path analysis results to the console. */
 export function printPathAnalysis(analysis: PathAnalysis): void {
@@ -84,10 +89,166 @@ export function printSchemaAnalysis(analysis: SchemaAnalysis): void {
   console.log();
 }
 
+/** Print static import analysis results to the console. */
+export function printImportAnalysis(analysis: ImportAnalysis): void {
+  const { checkedImports, hallucinations, skippedImports } = analysis;
+
+  console.log(
+    chalk.bold.cyan("── Static Analysis: Imports ") +
+    chalk.dim("─".repeat(33)),
+  );
+
+  console.log(
+    chalk.dim(`   ${checkedImports} checked, ${skippedImports} skipped, `) +
+    (hallucinations.length > 0
+      ? chalk.red(`${hallucinations.length} hallucinated`)
+      : chalk.green("0 hallucinated")),
+  );
+
+  for (const h of hallucinations) {
+    const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
+    const suggestion = h.suggestion ? chalk.dim(` (${h.suggestion})`) : "";
+    console.log(chalk.red(`   ✗ ${h.raw}`) + chalk.dim(` — ${reason}`) + suggestion);
+  }
+
+  console.log();
+}
+
+/** Print static env analysis results to the console. */
+export function printEnvAnalysis(analysis: EnvAnalysis): void {
+  const { checkedRefs, hallucinations, skippedRefs, envFilesFound } = analysis;
+
+  console.log(
+    chalk.bold.cyan("── Static Analysis: Env Variables ") +
+    chalk.dim("─".repeat(27)),
+  );
+
+  console.log(
+    chalk.dim(`   ${checkedRefs} checked, ${skippedRefs} skipped (runtime), `) +
+    (hallucinations.length > 0
+      ? chalk.red(`${hallucinations.length} hallucinated`)
+      : chalk.green("0 hallucinated")),
+  );
+
+  console.log(chalk.dim(`   Sources: ${envFilesFound.join(", ")}`));
+
+  for (const h of hallucinations) {
+    const suggestion = h.suggestion ? chalk.dim(` (did you mean ${h.suggestion}?)`) : "";
+    console.log(chalk.red(`   ✗ ${h.varName}`) + chalk.dim(" — not in env files") + suggestion);
+  }
+
+  console.log();
+}
+
+/** Print static type analysis results to the console. */
+export function printTypeAnalysis(analysis: TypeAnalysis): void {
+  const { checkedRefs, hallucinations, skippedRefs, byCategory } = analysis;
+
+  console.log(
+    chalk.bold.cyan("── Static Analysis: TypeScript Types ") +
+    chalk.dim("─".repeat(23)),
+  );
+
+  console.log(
+    chalk.dim(`   ${checkedRefs} checked, ${skippedRefs} skipped (builtins), `) +
+    (hallucinations.length > 0
+      ? chalk.red(`${hallucinations.length} hallucinated`)
+      : chalk.green("0 hallucinated")),
+  );
+
+  for (const h of hallucinations) {
+    const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
+    const suggestion = h.suggestion ? chalk.dim(` (${h.suggestion})`) : "";
+    console.log(chalk.red(`   ✗ ${h.raw}`) + chalk.dim(` — ${category}`) + suggestion);
+  }
+
+  // Category breakdown
+  const parts: string[] = [];
+  if (byCategory.types.total > 0) {
+    parts.push(`${byCategory.types.total - byCategory.types.hallucinated}/${byCategory.types.total} types`);
+  }
+  if (byCategory.members.total > 0) {
+    parts.push(`${byCategory.members.total - byCategory.members.hallucinated}/${byCategory.members.total} members`);
+  }
+  if (parts.length > 0) {
+    console.log(chalk.dim(`   Valid: ${parts.join(", ")}`));
+  }
+
+  console.log();
+}
+
+/** Print static API route analysis results to the console. */
+export function printApiRouteAnalysis(analysis: ApiRouteAnalysis): void {
+  const { checkedRefs, hallucinations, routesIndexed } = analysis;
+
+  console.log(
+    chalk.bold.cyan("── Static Analysis: API Routes ") +
+    chalk.dim("─".repeat(30)),
+  );
+
+  console.log(
+    chalk.dim(`   ${checkedRefs} checked, ${routesIndexed} routes indexed, `) +
+    (hallucinations.length > 0
+      ? chalk.red(`${hallucinations.length} hallucinated`)
+      : chalk.green("0 hallucinated")),
+  );
+
+  for (const h of hallucinations) {
+    const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
+    const method = h.method ? `${h.method} ` : "";
+    const suggestion = h.suggestion ? chalk.dim(` (${h.suggestion})`) : "";
+    console.log(chalk.red(`   ✗ ${method}${h.urlPath}`) + chalk.dim(` — ${category}`) + suggestion);
+  }
+
+  console.log();
+}
+
+/** Print static SQL schema analysis results to the console. */
+export function printSqlSchemaAnalysis(analysis: SqlSchemaAnalysis): void {
+  const { checkedRefs, hallucinations, tablesIndexed, byCategory } = analysis;
+
+  console.log(
+    chalk.bold.cyan("── Static Analysis: SQL Schema ") +
+    chalk.dim("─".repeat(30)),
+  );
+
+  console.log(
+    chalk.dim(`   ${checkedRefs} checked, ${tablesIndexed} tables indexed, `) +
+    (hallucinations.length > 0
+      ? chalk.red(`${hallucinations.length} hallucinated`)
+      : chalk.green("0 hallucinated")),
+  );
+
+  for (const h of hallucinations) {
+    const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
+    const suggestion = h.suggestion ? chalk.dim(` (${h.suggestion})`) : "";
+    console.log(chalk.red(`   ✗ ${h.raw}`) + chalk.dim(` — ${category}`) + suggestion);
+  }
+
+  // Category breakdown
+  const parts: string[] = [];
+  if (byCategory.tables.total > 0) {
+    parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
+  }
+  if (byCategory.columns.total > 0) {
+    parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
+  }
+  if (parts.length > 0) {
+    console.log(chalk.dim(`   Valid: ${parts.join(", ")}`));
+  }
+
+  console.log();
+}
+
 /** Format static analysis findings as a markdown section for LLM context. */
 export function formatStaticFindings(
   pathAnalysis?: PathAnalysis,
   schemaAnalysis?: SchemaAnalysis,
+  importAnalysis?: ImportAnalysis,
+  envAnalysis?: EnvAnalysis,
+  typeAnalysis?: TypeAnalysis,
+  apiRouteAnalysis?: ApiRouteAnalysis,
+  sqlSchemaAnalysis?: SqlSchemaAnalysis,
 ): string | undefined {
   const sections: string[] = [];
 
@@ -114,6 +275,81 @@ export function formatStaticFindings(
     for (const h of schemaAnalysis.hallucinations) {
       const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
       lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (importAnalysis && importAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### Import Issues`,
+      ``,
+      `Static analysis found ${importAnalysis.hallucinations.length} hallucinated import(s):`,
+      ``,
+    ];
+    for (const h of importAnalysis.hallucinations) {
+      const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
+      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+      lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (envAnalysis && envAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### Environment Variable Issues`,
+      ``,
+      `Static analysis found ${envAnalysis.hallucinations.length} env variable(s) not defined in project env files (${envAnalysis.envFilesFound.join(", ")}):`,
+      ``,
+    ];
+    for (const h of envAnalysis.hallucinations) {
+      const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
+      lines.push(`- \`${h.varName}\` — not in env files${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (typeAnalysis && typeAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### TypeScript Type Issues`,
+      ``,
+      `Static analysis found ${typeAnalysis.hallucinations.length} TypeScript type hallucination(s):`,
+      ``,
+    ];
+    for (const h of typeAnalysis.hallucinations) {
+      const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
+      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (apiRouteAnalysis && apiRouteAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### API Route Issues`,
+      ``,
+      `Static analysis found ${apiRouteAnalysis.hallucinations.length} API route hallucination(s):`,
+      ``,
+    ];
+    for (const h of apiRouteAnalysis.hallucinations) {
+      const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
+      const method = h.method ? `${h.method} ` : "";
+      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+      lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (sqlSchemaAnalysis && sqlSchemaAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### SQL Schema Issues`,
+      ``,
+      `Static analysis found ${sqlSchemaAnalysis.hallucinations.length} SQL/Drizzle schema hallucination(s):`,
+      ``,
+    ];
+    for (const h of sqlSchemaAnalysis.hallucinations) {
+      const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
+      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
     }
     sections.push(lines.join("\n"));
   }

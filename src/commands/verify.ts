@@ -8,9 +8,19 @@ import { createRenderer } from "../verifier/renderer.js";
 import { loadLastFeedback, saveSession } from "../session/store.js";
 import { analyzePaths } from "../analysis/path-checker.js";
 import { parseSchema, analyzeSchema } from "../analysis/schema-checker.js";
+import { analyzeImports } from "../analysis/import-checker.js";
+import { analyzeEnv } from "../analysis/env-checker.js";
+import { analyzeTypes } from "../analysis/type-checker.js";
+import { analyzeApiRoutes } from "../analysis/api-route-checker.js";
+import { analyzeSqlSchema } from "../analysis/sql-schema-checker.js";
 import {
   printPathAnalysis,
   printSchemaAnalysis,
+  printImportAnalysis,
+  printEnvAnalysis,
+  printTypeAnalysis,
+  printApiRouteAnalysis,
+  printSqlSchemaAnalysis,
   formatStaticFindings,
 } from "../analysis/formatter.js";
 import * as log from "../utils/logger.js";
@@ -93,18 +103,48 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
       }
     }
 
+    // Import analysis
+    const importAnalysis = analyzeImports(planText, projectDir);
+
+    // Env analysis
+    const envAnalysis = analyzeEnv(planText, projectDir);
+
+    // Type analysis
+    const typeAnalysis = analyzeTypes(planText, projectDir);
+
+    // API route analysis
+    const apiRouteAnalysis = analyzeApiRoutes(planText, projectDir);
+
+    // SQL/Drizzle schema analysis
+    const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
+
     // Print to console immediately
     const hasPathIssues = pathAnalysis.hallucinatedPaths.length > 0;
     const hasSchemaIssues = schemaAnalysis && schemaAnalysis.hallucinations.length > 0;
+    const hasImportIssues = importAnalysis.hallucinations.length > 0;
+    const hasEnvIssues = envAnalysis.hallucinations.length > 0;
+    const hasTypeIssues = typeAnalysis.hallucinations.length > 0;
+    const hasApiRouteIssues = apiRouteAnalysis.hallucinations.length > 0;
+    const hasSqlSchemaIssues = sqlSchemaAnalysis.hallucinations.length > 0;
 
-    if (hasPathIssues || hasSchemaIssues) {
+    if (hasPathIssues || hasSchemaIssues || hasImportIssues || hasEnvIssues || hasTypeIssues || hasApiRouteIssues || hasSqlSchemaIssues) {
       if (hasPathIssues) printPathAnalysis(pathAnalysis);
       if (hasSchemaIssues) printSchemaAnalysis(schemaAnalysis!);
+      if (hasImportIssues) printImportAnalysis(importAnalysis);
+      if (hasEnvIssues) printEnvAnalysis(envAnalysis);
+      if (hasTypeIssues) printTypeAnalysis(typeAnalysis);
+      if (hasApiRouteIssues) printApiRouteAnalysis(apiRouteAnalysis);
+      if (hasSqlSchemaIssues) printSqlSchemaAnalysis(sqlSchemaAnalysis);
 
       // Format for LLM context injection
       staticFindings = formatStaticFindings(
         hasPathIssues ? pathAnalysis : undefined,
         hasSchemaIssues ? schemaAnalysis : undefined,
+        hasImportIssues ? importAnalysis : undefined,
+        hasEnvIssues ? envAnalysis : undefined,
+        hasTypeIssues ? typeAnalysis : undefined,
+        hasApiRouteIssues ? apiRouteAnalysis : undefined,
+        hasSqlSchemaIssues ? sqlSchemaAnalysis : undefined,
       );
     } else {
       log.success("Static analysis: no issues found");

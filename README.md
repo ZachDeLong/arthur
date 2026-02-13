@@ -1,10 +1,10 @@
 # Arthur
 
-Independent verification layer for AI-generated coding plans. Catches hallucinated file paths, schema references, and flawed assumptions before code gets written — using deterministic static analysis where LLMs are unreliable.
+Independent verification layer for AI-generated coding plans. Catches hallucinated file paths, schema references, imports, env vars, types, API routes, and flawed assumptions before code gets written — using deterministic static analysis where LLMs are unreliable.
 
 ## The Problem
 
-AI coding assistants hallucinate. They reference files that don't exist, use wrong model names, and build plans on flawed assumptions. Having the right context doesn't help — models "see" a Prisma schema but still generate `prisma.engagement` instead of `prisma.participantEngagement` because they pattern-match from the task description, not the schema.
+AI coding assistants hallucinate. They reference files that don't exist, use wrong model names, import packages that aren't installed, reference env vars that aren't defined, and build plans on flawed assumptions. Having the right context doesn't help — models "see" a Prisma schema but still generate `prisma.engagement` instead of `prisma.participantEngagement` because they pattern-match from the task description, not the schema.
 
 The model that generated the plan can't reliably catch its own mistakes. In benchmarks, an LLM verifier with the full project tree in context detected only **33% of hallucinated file paths** — and the rate varied wildly between runs (0% to 67%). A simple file existence check catches 100%, every time.
 
@@ -12,7 +12,7 @@ The model that generated the plan can't reliably catch its own mistakes. In benc
 
 Arthur combines two verification channels:
 
-1. **Static analysis** — Deterministic checks against ground truth. Parse the real Prisma schema, walk the real file tree, validate every reference mechanically. Zero LLM involvement, zero variance, zero cost.
+1. **Static analysis** — Deterministic checks against ground truth. Parse the real schemas, walk the real file tree, resolve real package exports, validate every reference mechanically. Zero LLM involvement, zero variance, zero cost.
 
 2. **LLM verifier** — A separate Claude instance reviews the plan as a fresh pair of eyes with project context. Catches the fuzzy stuff static analysis can't: intent drift, wrong abstractions, missing requirements, architectural issues.
 
@@ -20,21 +20,56 @@ Static analysis findings are injected into the LLM verifier's context, so it can
 
 **Why plans, not code?** Linters and type-checkers validate written code — they run *after* implementation. By the time `tsc` catches a hallucinated import, the AI has written 200 lines that depend on it. Arthur catches it at the plan stage, when the fix is "change the model name" not "rewrite the feature."
 
+## Static Analysis Checkers
+
+Seven deterministic checkers, each parsing references from AI output and validating against ground truth:
+
+| Checker | What it catches | Ground truth |
+|---------|----------------|-------------|
+| **Path checker** | Hallucinated file paths | Project directory tree |
+| **Prisma schema checker** | Wrong models, fields, methods, relations | `schema.prisma` |
+| **SQL/Drizzle schema checker** | Wrong tables, columns | `pgTable()`/`mysqlTable()`/`sqliteTable()` + `CREATE TABLE` |
+| **Import checker** | Non-existent packages, invalid subpaths | `node_modules` + package `exports` |
+| **Env checker** | Undefined environment variables | `.env*` files |
+| **Type checker** | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
+| **API route checker** | Non-existent routes, wrong HTTP methods | Next.js App Router `route.ts` files |
+
+All checkers auto-detect — no flags needed. If a project has no Prisma schema or no Drizzle tables, those checkers silently return empty results.
+
 ## How It Works
 
+### CLI
+
 ```bash
-# Full verification with schema checking
+# Full verification (static analysis + LLM review)
+codeverifier verify --plan plan.md --project ./my-app
+
+# With Prisma schema checking
 codeverifier verify --plan plan.md --project ./my-app --schema prisma/schema.prisma
 
 # Pure LLM mode (skip static analysis)
 codeverifier verify --no-static --plan plan.md --project ./my-app
 ```
 
-1. Arthur loads the plan and builds a project context snapshot (directory tree, README, CLAUDE.md, referenced source files)
-2. Static analysis runs first: validates file paths against the real tree, validates schema references against the real Prisma schema
-3. Results print immediately — you see hallucinations before the LLM even starts
-4. An independent Claude instance reviews the plan with both the project context and the static findings
-5. You get back structured feedback: what's wrong, what's missing, what doesn't exist
+### MCP Server (for Claude Code)
+
+```bash
+# Add to Claude Code
+claude mcp add arthur -- node /path/to/arthur/dist/bin/arthur-mcp.js
+```
+
+Eight tools available:
+
+| Tool | API Key | Description |
+|------|---------|-------------|
+| `check_paths` | No | Validate file paths against project tree |
+| `check_schema` | No | Validate Prisma schema references |
+| `check_sql_schema` | No | Validate Drizzle/SQL table and column references |
+| `check_imports` | No | Validate package imports against node_modules |
+| `check_env` | No | Validate env variable references against .env files |
+| `check_types` | No | Validate TypeScript type references |
+| `check_routes` | No | Validate Next.js API route references |
+| `verify_plan` | Yes | Full pipeline: all static checks + LLM review |
 
 ## Benchmark Results
 
@@ -80,8 +115,12 @@ The LLM had the full file tree in context and still missed 2/3 of hallucinated p
 ## Architecture
 
 ```
+bin/
+  codeverifier.ts   CLI entry point
+  arthur-mcp.ts     MCP server (stdio transport, 8 tools)
+
 src/
-  analysis/     Static analysis (path checker, schema checker, formatter)
+  analysis/     Static analysis (path, prisma-schema, sql-schema, imports, env, types, api-routes, formatter)
   commands/     CLI commands (verify, init)
   config/       Config management (global + project + env)
   context/      Project context builder (tree, file reader, token budget)
@@ -90,10 +129,9 @@ src/
   verifier/     Prompt construction, API streaming, output rendering
 
 bench/
-  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma)
+  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL)
   harness/      Benchmark runner, scoring, detection parsing, schema checking
   prompts/      Benchmark prompts + drift specs
-  naive-prompt.ts   Frozen baseline prompt (DO NOT MODIFY)
 ```
 
 ## Setup

@@ -6,3 +6,8 @@ dist/
 bench/results/
 bench/tier3/workspaces/
 bench/tier3/results/
+
+# Scratch/test artifacts
+path-analysis.json
+plan.md
+verification.md

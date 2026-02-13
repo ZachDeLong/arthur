@@ -1,11 +1,20 @@
 # Arthur
 
-Independent verification layer for AI-generated coding plans.
+Adversarial code reviewer for AI-generated plans and code. Arthur catches errors that self-review misses — hallucinated paths, wrong schema references, intent drift — even when the primary LLM has fresh context. It's code review, not memory management.
+
+## Core Value Prop
+
+Arthur isn't competing with "clear context." Even with a fresh context, an LLM that wrote a plan can faithfully execute a bad plan. Arthur reads adversarially — a second pair of eyes that catches blind spots the author can't see.
 
 ## Architecture
 
 ```
+bin/
+  codeverifier.ts   CLI entry point
+  arthur-mcp.ts     MCP server (stdio transport, 8 tools)
+
 src/
+  analysis/     Static analysis (path-checker, schema-checker, sql-schema-checker, import-checker, env-checker, type-checker, api-route-checker, formatter)
   commands/     CLI commands (verify, init)
   config/       Config management (global + project + env)
   context/      Project context builder (tree, file reader, token budget)
@@ -14,11 +23,13 @@ src/
   verifier/     Prompt construction, API streaming, output rendering
 
 bench/
-  fixtures/     Test projects with known structures (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma)
+  fixtures/     Test projects with known structures (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL)
   harness/      Benchmark runner, scoring, detection parsing, schema checking
+    report-generator.ts   Publishable markdown report from results
+    self-review-runner.ts Self-review vs Arthur comparison harness
   prompts/      Benchmark prompts + drift specs
+    self-review-prompt.ts Fair adversarial self-review prompt
   naive-prompt.ts   Frozen baseline prompt (DO NOT MODIFY)
-bench/
   tier3/
     prompt.md         Refactoring prompt for both arms
     scripts/          setup, verify-plan, evaluate, compare
@@ -26,12 +37,32 @@ bench/
     results/          Gitignored — per-run timestamped results
 ```
 
+## MCP Server
+
+Eight tools, two tiers:
+- `check_paths` — deterministic path validation against project tree (no API key)
+- `check_schema` — deterministic Prisma schema validation (no API key)
+- `check_imports` — deterministic package import validation against node_modules (no API key)
+- `check_env` — deterministic env variable validation against .env* files (no API key)
+- `check_types` — deterministic TypeScript type validation against project .ts/.tsx files (no API key)
+- `check_routes` — deterministic Next.js App Router API route validation (no API key)
+- `check_sql_schema` — deterministic Drizzle/SQL schema validation against pgTable/mysqlTable/sqliteTable + CREATE TABLE (no API key)
+- `verify_plan` — full pipeline: static analysis + LLM adversarial review (requires ANTHROPIC_API_KEY)
+
+**Add to Claude Code:** `claude mcp add arthur -- node /path/to/arthur/dist/bin/arthur-mcp.js`
+
+**Critical:** No `console.log()` in `arthur-mcp.ts` — stdout is JSON-RPC protocol. Use `console.error()` for debug output.
+
 ## Build & Run
 
 - `npm run build` — compile TypeScript (also verifies types)
 - `npm run dev` — run CLI via tsx
+- `npm run mcp` — run MCP server via tsx (for development)
 - `npm run bench` or `npm run bench:tier1` — run Tier 1 (hallucination detection)
 - `npm run bench:tier2` — run Tier 2 (intent drift detection)
+- `npm run bench:report` — generate publishable markdown report from existing results
+- `npm run bench:self-review` — run self-review vs Arthur comparison benchmark
+- `npm run bench:self-review -- 06 07 08` — run self-review on specific prompts
 - `npm run bench:tier3:setup` — clone target repo into workspaces
 - `npm run bench:tier3:verify -- <plan> <workspace>` — run Arthur verifier on a plan
 - `npm run bench:tier3:eval -- <arm> <workspace> <output-dir>` — evaluate post-refactoring
@@ -64,6 +95,14 @@ Injects synthetic drift into generated plans (scope creep, feature drift, wrong 
 - **Drift specs**: `bench/prompts/drift-specs.json` — each spec applied independently (one injection per verification run)
 - **Replace-based specs are fragile** — regex patterns must account for non-deterministic LLM output. `append` is always reliable.
 
+### Self-Review vs Arthur Benchmark
+Directly compares self-review (same LLM checks its own plan) vs Arthur (fresh instance). Both arms get identical context and a maximally adversarial prompt. Ground truth from static checkers.
+
+- **Self-review prompt**: `bench/prompts/self-review-prompt.ts` — mirrors Arthur's adversarial posture exactly
+- **Runner**: `bench/harness/self-review-runner.ts` — generates plan, runs both arms, scores against ground truth
+- **Results**: `bench/results/self-review-<timestamp>/` — per-run JSON + comparison report
+- **Report generation**: `bench/harness/report-generator.ts` — aggregates all results into publishable markdown
+
 ### Tier 3: Real-World Refactoring Verification
 Hybrid benchmark — automated setup + manual Claude Code sessions. Two arms (vanilla vs Arthur-assisted) run the same refactoring prompt on a real codebase. Automated scoring: build pass/fail, App.tsx reduction, files extracted, hallucinated imports.
 
@@ -78,8 +117,32 @@ Hybrid benchmark — automated setup + manual Claude Code sessions. Two arms (va
 - `arthur` — tool development (CLI, verifier, context builder)
 - `benchmarks` — benchmark harness, fixtures, drift specs
 
+## Strategic Direction
+
+Arthur's value is **adversarial review**, not context management. "Clear context" handles memory degradation. Arthur handles blind spots — errors an LLM can't catch in its own work because it has author bias.
+
+**Proven results (T1/T2):**
+- Schema hallucination: 91.7% detection rate (100% static). Opus hallucinates `prisma.engagement` every time
+- Path hallucination: 100% static detection vs 0-33% LLM detection
+- Intent drift: ~90% detection rate (Sonnet 4.5 baseline)
+
+**Self-review vs Arthur benchmark (implemented):**
+- Both arms get fresh context (no context degradation variable)
+- Arm A: LLM generates plan → LLM self-reviews (adversarial prompt, full codebase)
+- Arm B: LLM generates plan → Arthur reviews (fresh instance, adversarial posture)
+- Measure: detection rate of real errors against ground truth (static checker results)
+- Self-review prompt is maximally adversarial — same instructions as Arthur
+- Run with: `npm run bench:self-review` or `npm run bench:self-review -- 06 07 08`
+
+**Killed directions:**
+- Balatro benchmark: failed call rate 0-3%, Arthur's ceiling too low for signal
+- N-step context degradation: "clear context" solves this, Arthur is redundant for memory
+- Context regulation: not Arthur's differentiator
+
 ## Gotchas
 
 - `.*` in JS regex doesn't cross newlines — use `[^#]*` or `[\s\S]*?` for multi-line section matches
 - Plans are non-deterministic — `replace`-based drift injections may fail to match. Record as "skipped", not "missed".
 - ACT/SAT-style numeric extractions from LLMs may return decimals — round before storing.
+- **No `console.log()` in MCP server** — stdout is JSON-RPC. Use `console.error()`.
+- **Benchmark workspaces per-benchmark, not shared** — each benchmark creates its own vanilla/arthur-assisted pair at `~/.arthur-benchmarks/<name>/`
