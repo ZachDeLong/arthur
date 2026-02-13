@@ -20,6 +20,8 @@ import { scoreDriftDetection } from "./drift-scorer.js";
 import { getAllFiles } from "../../src/context/tree.js";
 import { generateSummary } from "./report.js";
 import { parseSchema, analyzeSchema } from "./schema-checker.js";
+import { runReport } from "./report-generator.js";
+import { runSelfReviewBenchmark } from "./self-review-runner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_ROOT = path.resolve(__dirname, "..");
@@ -670,7 +672,13 @@ if (subcommand === "tier1" || args.length === 0) {
   console.log("  5. Compare (~10 sec)");
   console.log("     npm run bench:tier3:compare -- <results-dir>\n");
   console.log("  6. Fill in qualitative.json manually\n");
+} else if (subcommand === "report") {
+  const reportArgs = args.slice(1);
+  runReport(reportArgs);
+} else if (subcommand === "self-review") {
+  const promptIds = args.slice(1);
+  runSelfReviewBenchmark(promptIds.length > 0 ? promptIds : undefined);
 } else {
-  console.error("Usage: bench [tier1|tier2|tier3|all] [prompt-ids...]");
+  console.error("Usage: bench [tier1|tier2|tier3|all|report|self-review] [prompt-ids...]");
   process.exit(1);
 }

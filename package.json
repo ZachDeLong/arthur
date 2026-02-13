@@ -4,17 +4,21 @@
   "description": "Independent verification layer for Claude Code plans",
   "type": "module",
   "bin": {
-    "codeverifier": "./dist/bin/codeverifier.js"
+    "codeverifier": "./dist/bin/codeverifier.js",
+    "arthur-mcp": "./dist/bin/arthur-mcp.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx bin/codeverifier.ts",
+    "mcp": "tsx bin/arthur-mcp.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "tsx bench/harness/runner.ts",
     "bench:tier1": "tsx bench/harness/runner.ts tier1",
     "bench:tier2": "tsx bench/harness/runner.ts tier2",
     "bench:all": "tsx bench/harness/runner.ts all",
+    "bench:report": "tsx bench/harness/runner.ts report",
+    "bench:self-review": "tsx bench/harness/runner.ts self-review",
     "bench:tier3:setup": "tsx bench/tier3/scripts/setup.ts",
     "bench:tier3:verify": "tsx bench/tier3/scripts/verify-plan.ts",
     "bench:tier3:eval": "tsx bench/tier3/scripts/evaluate.ts",
@@ -35,9 +39,11 @@
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
-    "ignore": "^7.0.5"
+    "ignore": "^7.0.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
