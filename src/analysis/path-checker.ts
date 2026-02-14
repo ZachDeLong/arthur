@@ -116,6 +116,79 @@ function filterCodeExpressions(paths: string[]): string[] {
   });
 }
 
+/** Find the closest matching file paths for a hallucinated path. */
+export function findClosestPaths(
+  hallucinated: string,
+  actualFiles: Set<string>,
+  maxResults: number = 5,
+): string[] {
+  const halParts = hallucinated.split("/");
+  const halFileName = halParts[halParts.length - 1]?.toLowerCase() ?? "";
+  const halDirParts = halParts.slice(0, -1).map(p => p.toLowerCase());
+
+  const scored: { path: string; score: number }[] = [];
+
+  for (const filePath of actualFiles) {
+    const parts = filePath.split("/");
+    const fileName = parts[parts.length - 1]?.toLowerCase() ?? "";
+    const dirParts = parts.slice(0, -1).map(p => p.toLowerCase());
+    let score = 0;
+
+    // Exact filename match is heavily weighted
+    if (fileName === halFileName) {
+      score += 10;
+    } else if (fileName.includes(halFileName) || halFileName.includes(fileName)) {
+      score += 5;
+    }
+
+    // Extension match
+    const halExt = halFileName.split(".").pop() ?? "";
+    const fileExt = fileName.split(".").pop() ?? "";
+    if (halExt === fileExt) score += 2;
+
+    // Directory overlap (how many dir segments match)
+    for (const halDir of halDirParts) {
+      if (dirParts.includes(halDir)) score += 3;
+    }
+
+    // Penalize large depth difference
+    const depthDiff = Math.abs(parts.length - halParts.length);
+    score -= depthDiff;
+
+    if (score > 0) {
+      scored.push({ path: filePath, score });
+    }
+  }
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxResults)
+    .map(s => s.path);
+}
+
+/** Get a listing of files in or near a directory path. */
+export function getDirectoryContext(
+  dirPath: string,
+  actualFiles: Set<string>,
+  maxFiles: number = 15,
+): string[] {
+  // Normalize: remove trailing filename to get directory
+  const dir = dirPath.includes("/")
+    ? dirPath.substring(0, dirPath.lastIndexOf("/"))
+    : "";
+
+  if (!dir) return [];
+
+  const matches: string[] = [];
+  for (const filePath of actualFiles) {
+    if (filePath.startsWith(dir + "/")) {
+      matches.push(filePath);
+      if (matches.length >= maxFiles) break;
+    }
+  }
+  return matches.sort();
+}
+
 /** Analyze paths extracted from a plan against a project's actual files. */
 export function analyzePaths(
   planText: string,

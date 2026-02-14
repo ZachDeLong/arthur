@@ -1,14 +1,15 @@
 {
-  "name": "codeverifier",
-  "version": "0.1.0",
-  "description": "Independent verification layer for Claude Code plans",
+  "name": "arthur-mcp",
+  "version": "0.2.0",
+  "description": "Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, and API routes — deterministically, zero cost, no API key.",
   "type": "module",
   "bin": {
-    "codeverifier": "./dist/bin/codeverifier.js",
-    "arthur-mcp": "./dist/bin/arthur-mcp.js"
+    "arthur-mcp": "dist/bin/arthur-mcp.js",
+    "codeverifier": "dist/bin/codeverifier.js"
   },
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "tsc",
     "dev": "tsx bin/codeverifier.ts",
     "mcp": "tsx bin/arthur-mcp.ts",
     "test": "vitest run",
@@ -30,14 +31,28 @@
   },
   "keywords": [
     "claude",
+    "claude-code",
+    "mcp",
+    "mcp-server",
     "verification",
-    "code-review"
+    "hallucination",
+    "static-analysis",
+    "code-review",
+    "prisma",
+    "drizzle",
+    "nextjs",
+    "ai-coding"
   ],
   "author": "ZachDeLong",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZachDeLong/arthur.git"
+  },
+  "homepage": "https://github.com/ZachDeLong/arthur",
   "files": [
-    "dist",
-    "bin"
+    "dist/bin",
+    "dist/src"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",

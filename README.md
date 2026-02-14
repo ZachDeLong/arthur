@@ -1,171 +1,158 @@
 # Arthur
 
-Independent verification layer for AI-generated coding plans. Catches hallucinated file paths, schema references, imports, env vars, types, API routes, and flawed assumptions before code gets written — using deterministic static analysis where LLMs are unreliable.
+Ground truth verification for AI-generated code. Catches hallucinated file paths, schema references, imports, env vars, types, and API routes before code gets written — deterministically, zero cost, no API key.
 
-## The Problem
+## Install
 
-AI coding assistants hallucinate. They reference files that don't exist, use wrong model names, import packages that aren't installed, reference env vars that aren't defined, and build plans on flawed assumptions. Having the right context doesn't help — models "see" a Prisma schema but still generate `prisma.engagement` instead of `prisma.participantEngagement` because they pattern-match from the task description, not the schema.
+```bash
+claude mcp add arthur -- npx arthur-mcp
+```
 
-The model that generated the plan can't reliably catch its own mistakes. In benchmarks, an LLM verifier with the full project tree in context detected only **33% of hallucinated file paths** — and the rate varied wildly between runs (0% to 67%). A simple file existence check catches 100%, every time.
+That's it. Arthur is now available as an MCP server in Claude Code. All tools run locally — no API key, no credits, no config.
 
-## The Approach
+## Why
 
-Arthur combines two verification channels:
+AI coding assistants hallucinate. They reference files that don't exist, use wrong schema names, import packages that aren't installed, and build plans on assumptions that don't match the codebase.
 
-1. **Static analysis** — Deterministic checks against ground truth. Parse the real schemas, walk the real file tree, resolve real package exports, validate every reference mechanically. Zero LLM involvement, zero variance, zero cost.
+The model can't reliably catch its own mistakes. In benchmarks, self-review with full project context and an adversarial prompt missed **40% of verifiable errors**. A simple file existence check catches 100%, every time.
 
-2. **LLM verifier** — A separate Claude instance reviews the plan as a fresh pair of eyes with project context. Catches the fuzzy stuff static analysis can't: intent drift, wrong abstractions, missing requirements, architectural issues.
-
-Static analysis findings are injected into the LLM verifier's context, so it can confirm and elaborate on what the deterministic checks already found.
-
-**Why plans, not code?** Linters and type-checkers validate written code — they run *after* implementation. By the time `tsc` catches a hallucinated import, the AI has written 200 lines that depend on it. Arthur catches it at the plan stage, when the fix is "change the model name" not "rewrite the feature."
-
-## Static Analysis Checkers
-
-Seven deterministic checkers, each parsing references from AI output and validating against ground truth:
-
-| Checker | What it catches | Ground truth |
-|---------|----------------|-------------|
-| **Path checker** | Hallucinated file paths | Project directory tree |
-| **Prisma schema checker** | Wrong models, fields, methods, relations | `schema.prisma` |
-| **SQL/Drizzle schema checker** | Wrong tables, columns | `pgTable()`/`mysqlTable()`/`sqliteTable()` + `CREATE TABLE` |
-| **Import checker** | Non-existent packages, invalid subpaths | `node_modules` + package `exports` |
-| **Env checker** | Undefined environment variables | `.env*` files |
-| **Type checker** | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
-| **API route checker** | Non-existent routes, wrong HTTP methods | Next.js App Router `route.ts` files |
-
-All checkers auto-detect — no flags needed. If a project has no Prisma schema or no Drizzle tables, those checkers silently return empty results.
+Arthur runs deterministic checks against ground truth (your actual files, schemas, packages) and returns the results — including what actually exists — so Claude Code can self-correct. No second LLM call needed.
 
 ## How It Works
 
-### CLI
+1. Claude Code generates a plan
+2. Claude Code calls Arthur's `check_all` tool
+3. Arthur validates every reference against ground truth (file tree, schemas, node_modules, .env files, types, routes)
+4. Arthur returns findings **with the correct values** — not just "this is wrong" but "this is wrong, here's what actually exists"
+5. Claude Code reads the findings and corrects its plan
 
-```bash
-# Full verification (static analysis + LLM review)
-codeverifier verify --plan plan.md --project ./my-app
+The LLM reasoning step is free because it's the same Claude Code session you're already paying for.
 
-# With Prisma schema checking
-codeverifier verify --plan plan.md --project ./my-app --schema prisma/schema.prisma
+## Recommended Setup
 
-# Pure LLM mode (skip static analysis)
-codeverifier verify --no-static --plan plan.md --project ./my-app
+Add this to your project's `CLAUDE.md` so Claude Code uses Arthur automatically:
+
+```markdown
+## Verification
+
+Before implementing any plan, call the `check_all` MCP tool with the plan text and project directory.
+Fix all hallucinated references using the ground truth provided in the response before writing code.
 ```
 
-### MCP Server (for Claude Code)
+## Tools
 
-```bash
-# Add to Claude Code
-claude mcp add arthur -- node /path/to/arthur/dist/bin/arthur-mcp.js
+### `check_all` (recommended)
+
+Runs all 7 checkers in a single call. Returns a comprehensive report with ground truth context for every finding. This is the tool Claude Code should call.
+
+```
+check_all(planText, projectDir)
 ```
 
-Eight tools available:
+### Individual Checkers
 
-| Tool | API Key | Description |
-|------|---------|-------------|
-| `check_paths` | No | Validate file paths against project tree |
-| `check_schema` | No | Validate Prisma schema references |
-| `check_sql_schema` | No | Validate Drizzle/SQL table and column references |
-| `check_imports` | No | Validate package imports against node_modules |
-| `check_env` | No | Validate env variable references against .env files |
-| `check_types` | No | Validate TypeScript type references |
-| `check_routes` | No | Validate Next.js API route references |
-| `verify_plan` | Yes | Full pipeline: all static checks + LLM review |
+| Tool | What it catches | Ground truth source |
+|------|----------------|-------------------|
+| `check_paths` | Hallucinated file paths | Project directory tree |
+| `check_schema` | Wrong Prisma models, fields, methods, relations | `schema.prisma` |
+| `check_sql_schema` | Wrong Drizzle/SQL tables, columns | `pgTable()` / `CREATE TABLE` |
+| `check_imports` | Non-existent packages, invalid subpaths | `node_modules` + `package.json` |
+| `check_env` | Undefined environment variables | `.env*` files |
+| `check_types` | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
+| `check_routes` | Non-existent API routes, wrong methods | Next.js App Router `route.ts` files |
+
+All checkers auto-detect — no flags needed. If a project has no Prisma schema, that checker silently returns nothing.
+
+### `verify_plan` (optional, requires API key)
+
+Full pipeline: all static checks + LLM review by a separate Claude instance. Use this for deep plan review (intent drift, wrong abstractions, missing requirements). Requires `ANTHROPIC_API_KEY`.
+
+## What the Output Looks Like
+
+When Arthur finds a hallucinated Prisma model:
+
+```
+✗ prisma.engagement — hallucinated-model → prisma.participantEngagement
+  Available models: participant (Participant), contentItem (ContentItem),
+                    participantEngagement (ParticipantEngagement)
+```
+
+When Arthur finds a hallucinated file path:
+
+```
+✗ src/models/User.ts — NOT FOUND
+  Closest: src/lib/db.ts, src/app/api/participants/route.ts
+```
+
+When Arthur finds a wrong relation:
+
+```
+✗ include: { comments } — wrong-relation
+  Available relations on ContentItem: author → Participant, engagements → ParticipantEngagement
+```
+
+Claude Code reads these findings and knows exactly what to use instead. No guessing, no second tool call.
 
 ## Benchmark Results
 
 ### Static Analysis vs Self-Review (Opus 4.6)
 
-**The main result.** 11 prompts across 4 fixtures, 5 checker categories. Opus generates plans with full README context, then:
-- **Arthur's static checkers** validate every reference against ground truth
-- **Self-review** (same model, adversarial prompt, full project context including schemas) tries to find the same errors
+11 prompts across 4 fixtures, 5 checker categories. Self-review had the full project tree, all schema files, and a maximally adversarial prompt.
 
-| Category | Errors Found | Self-Review Detected | Self-Review Missed | Self-Review Detection Rate |
-|----------|-------------|---------------------|-------------------|--------------------------|
-| Path | 30 | 19 | 11 | 63% |
-| Schema (Prisma) | 19 | 19 | 0 | 100% |
-| SQL Schema (Drizzle) | 15 | 0 | 15 | 0% |
-| Import | 22 | 17 | 5 | 77% |
-| Env | 7 | 7 | 0 | 100% |
-| **Total** | **93** | **56** | **37** | **60%** |
+| Category | Errors Found | Self-Review Missed | Self-Review Detection Rate |
+|----------|-------------|-------------------|--------------------------|
+| Path | 30 | 11 | 63% |
+| Schema (Prisma) | 19 | 0 | 100% |
+| SQL Schema (Drizzle) | 15 | 15 | 0% |
+| Import | 22 | 5 | 77% |
+| Env | 7 | 0 | 100% |
+| **Total** | **93** | **37** | **60%** |
 
-**Self-review missed 37 errors** despite having the full project tree, all schema files, and a maximally adversarial prompt. SQL schema references were a complete blind spot — 0% detection with the Drizzle schema file in context.
+Self-review missed 37 errors that Arthur caught deterministically. SQL schema references were a complete blind spot — 0% detection. 2.2% false positive rate.
 
-Arthur's static checkers caught all 93 by definition (they define the ground truth). But the ground truth is objective — file paths exist or they don't, schema fields exist or they don't. The 37 errors self-review missed are verifiable facts about the project.
+### Schema Hallucination Detail
 
-2.2% false positive rate (2 minor SQL schema FPs out of 93 findings).
+Fixture: Next.js + Prisma with non-obvious naming (`Participant` not `User`, `participantEngagement` not `engagement`).
 
-### Schema Hallucination Detail (Opus 4.6)
+| Task | Schema Refs | Hallucinated | Rate |
+|------|------------|-------------|------|
+| Analytics dashboard | 11 | 3 | 27.3% |
+| Recommendation engine | 18 | 4 | 22.2% |
+| CSV export | 7 | 1 | 14.3% |
+| **Avg** | **12** | **2.7** | **21.3%** |
 
-**Fixture:** Next.js + Prisma project with non-obvious naming (`Participant` not `User`, `displayIdentifier` not `username`, `participantEngagement` not `engagement`). Plans generated with README-only context — no schema file provided.
+Recurring hallucination: `prisma.engagement` (should be `prisma.participantEngagement`) appeared in all 3 runs — systematic bias, not random noise.
 
-| Prompt | Task | Schema Refs | Hallucinated | Rate |
-|--------|------|------------|-------------|------|
-| 06 | Analytics dashboard | 11 | 3 | 27.3% |
-| 07 | Recommendation engine | 18 | 4 | 22.2% |
-| 08 | CSV export | 7 | 1 | 14.3% |
-| **Avg** | | **12** | **2.7** | **21.3%** |
-
-Recurring hallucination: `prisma.engagement` (should be `prisma.participantEngagement`) appeared in **all 3 runs** — systematic bias, not random noise.
-
-### Path Hallucination Detail (Opus 4.6)
-
-| Prompt | Extracted | Hallucinated | Rate | LLM Detection |
-|--------|-----------|-------------|------|---------------|
-| 06 | 7 | 3 | 75% | 0% |
-| 07 | 4 | 3 | 75% | 66.7% |
-| 08 | 5 | 3 | 75% | 33.3% |
-| **Avg** | **5.3** | **3** | **75%** | **33.3%** |
-
-The LLM had the full file tree in context and still missed 2/3 of hallucinated paths. Static analysis: 100%, zero variance.
-
-### Intent Drift Detection (Sonnet 4.5)
-
-10 drift specs across 5 prompts, 6 drift categories. Known drift injected into generated plans.
-
-**Overall detection rate: 90% (9/10 injected drifts detected)**
-
-| Category | Detection Rate |
-|----------|---------------|
-| scope-creep | 80% (4/5) |
-| feature-drift | 100% (1/1) |
-| wrong-abstraction | 100% (1/1) |
-| missing-requirement | 100% (1/1) |
-| tech-mismatch | 100% (1/1) |
-| wrong-problem | 100% (1/1) |
-
-## Architecture
-
-```
-bin/
-  codeverifier.ts   CLI entry point
-  arthur-mcp.ts     MCP server (stdio transport, 8 tools)
-
-src/
-  analysis/     Static analysis (path, prisma-schema, sql-schema, imports, env, types, api-routes, formatter)
-  commands/     CLI commands (verify, init)
-  config/       Config management (global + project + env)
-  context/      Project context builder (tree, file reader, token budget)
-  plan/         Plan loading (file, stdin, interactive)
-  session/      Session feedback storage (iterative re-verification)
-  verifier/     Prompt construction, API streaming, output rendering
-
-bench/
-  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL)
-  harness/      Benchmark runner, scoring, detection parsing, schema checking
-  prompts/      Benchmark prompts + drift specs
-```
-
-## Setup
+## CLI (alternative to MCP)
 
 ```bash
+npm install -g arthur-mcp
+
+# Full verification (static analysis + LLM review)
+codeverifier verify --plan plan.md --project ./my-app
+
+# Set API key for LLM verification
+codeverifier init
+```
+
+## Development
+
+```bash
+git clone https://github.com/ZachDeLong/arthur.git
+cd arthur
 npm install
 npm run build
-codeverifier init  # Set API key
+
+# Run MCP server locally
+npm run mcp
 
 # Run benchmarks
-npm run bench:big         # Static analysis vs self-review (all prompts)
-npm run bench:big -- 06   # Single prompt
+npm run bench:big         # Static analysis vs self-review
 npm run bench:tier1       # Path + schema hallucination detection
 npm run bench:tier2       # Intent drift detection
-npm run bench:report      # Generate markdown report from results
+npm run bench:report      # Generate markdown report
 ```
+
+## License
+
+MIT

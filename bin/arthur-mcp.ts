@@ -30,16 +30,17 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 
-import { analyzePaths } from "../src/analysis/path-checker.js";
+import { analyzePaths, findClosestPaths, getDirectoryContext } from "../src/analysis/path-checker.js";
+import { getAllFiles } from "../src/context/tree.js";
 import {
   parseSchema,
   analyzeSchema,
 } from "../src/analysis/schema-checker.js";
 import { analyzeImports } from "../src/analysis/import-checker.js";
-import { analyzeEnv } from "../src/analysis/env-checker.js";
-import { analyzeTypes } from "../src/analysis/type-checker.js";
-import { analyzeApiRoutes } from "../src/analysis/api-route-checker.js";
-import { analyzeSqlSchema } from "../src/analysis/sql-schema-checker.js";
+import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
+import { analyzeTypes, buildTypeIndex } from "../src/analysis/type-checker.js";
+import { analyzeApiRoutes, buildRouteIndex } from "../src/analysis/api-route-checker.js";
+import { analyzeSqlSchema, buildSqlSchema } from "../src/analysis/sql-schema-checker.js";
 import { formatStaticFindings } from "../src/analysis/formatter.js";
 import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
@@ -70,15 +71,32 @@ server.tool(
       const intentionalNew = analysis.intentionalNewPaths.length;
       const valid = checked - hallucinated - intentionalNew;
 
+      // Get actual files for ground truth context
+      const actualFiles = getAllFiles(projectDir);
+
       lines.push(`## Path Analysis`);
       lines.push(``);
       lines.push(`**${checked}** paths checked — **${valid}** valid, **${hallucinated}** hallucinated, **${intentionalNew}** intentional new`);
+      lines.push(`**${actualFiles.size}** total files indexed in project`);
 
       if (hallucinated > 0) {
         lines.push(``);
         lines.push(`### Hallucinated Paths`);
         for (const p of analysis.hallucinatedPaths) {
           lines.push(`- \`${p}\` — **NOT FOUND**`);
+
+          // Closest matches
+          const closest = findClosestPaths(p, actualFiles);
+          if (closest.length > 0) {
+            lines.push(`  - Closest matches: ${closest.map(c => `\`${c}\``).join(", ")}`);
+          }
+
+          // Directory context — show what actually exists near the expected location
+          const dirFiles = getDirectoryContext(p, actualFiles);
+          if (dirFiles.length > 0) {
+            const parentDir = p.substring(0, p.lastIndexOf("/"));
+            lines.push(`  - Files in \`${parentDir}/\`: ${dirFiles.slice(0, 8).map(f => `\`${f}\``).join(", ")}${dirFiles.length > 8 ? ` (+${dirFiles.length - 8} more)` : ""}`);
+          }
         }
       }
 
@@ -150,6 +168,39 @@ server.tool(
         for (const h of hallucinations) {
           const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
           lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
+
+          // For hallucinated models, list all available models
+          if (h.hallucinationCategory === "hallucinated-model") {
+            const available = [...schema.accessorToModel.entries()]
+              .map(([accessor, model]) => `\`${accessor}\` (${model})`)
+              .join(", ");
+            lines.push(`  - Available models: ${available}`);
+          }
+
+          // For hallucinated fields, list all fields on the target model
+          if (h.hallucinationCategory === "hallucinated-field" && h.modelAccessor) {
+            const modelName = schema.accessorToModel.get(h.modelAccessor);
+            const model = modelName ? schema.models.get(modelName) : undefined;
+            if (model) {
+              const fields = [...model.fields.values()]
+                .map(f => `\`${f.name}\` (${f.type}${f.isRelation ? ", relation" : ""})`)
+                .join(", ");
+              lines.push(`  - Fields on ${modelName}: ${fields}`);
+            }
+          }
+
+          // For wrong relations, list available relation fields
+          if (h.hallucinationCategory === "wrong-relation" && h.modelAccessor) {
+            const modelName = schema.accessorToModel.get(h.modelAccessor);
+            const model = modelName ? schema.models.get(modelName) : undefined;
+            if (model) {
+              const relations = [...model.fields.values()]
+                .filter(f => f.isRelation)
+                .map(f => `\`${f.name}\` → ${f.relationModel}`)
+                .join(", ");
+              lines.push(`  - Available relations on ${modelName}: ${relations || "none"}`);
+            }
+          }
         }
       }
 
@@ -170,6 +221,19 @@ server.tool(
       if (parts.length > 0) {
         lines.push(``);
         lines.push(`**Breakdown:** ${parts.join(", ")}`);
+      }
+
+      // Always include schema summary as ground truth
+      lines.push(``);
+      lines.push(`### Schema Ground Truth`);
+      for (const [modelName, model] of schema.models) {
+        const fieldNames = [...model.fields.values()]
+          .map(f => f.name + (f.isRelation ? ` → ${f.relationModel}` : ""))
+          .join(", ");
+        lines.push(`- **${modelName}** (accessor: \`${model.accessor}\`): ${fieldNames}`);
+      }
+      if (schema.enums.size > 0) {
+        lines.push(`- **Enums:** ${[...schema.enums].join(", ")}`);
       }
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -207,6 +271,23 @@ server.tool(
           const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
           const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
           lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
+        }
+
+        // List installed packages as ground truth for package-not-found errors
+        const hasPackageErrors = hallucinations.some(h => h.reason === "package-not-found");
+        if (hasPackageErrors) {
+          const pkgJsonPath = path.join(projectDir, "package.json");
+          if (fs.existsSync(pkgJsonPath)) {
+            try {
+              const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+              const deps = Object.keys(pkg.dependencies ?? {});
+              const devDeps = Object.keys(pkg.devDependencies ?? {});
+              lines.push(``);
+              lines.push(`### Installed Packages`);
+              if (deps.length > 0) lines.push(`- **dependencies:** ${deps.map(d => `\`${d}\``).join(", ")}`);
+              if (devDeps.length > 0) lines.push(`- **devDependencies:** ${devDeps.map(d => `\`${d}\``).join(", ")}`);
+            } catch { /* ignore parse errors */ }
+          }
         }
       }
 
@@ -254,6 +335,14 @@ server.tool(
         }
       }
 
+      // Always include all defined env vars as ground truth
+      const { vars } = parseEnvFiles(projectDir);
+      if (vars.size > 0) {
+        lines.push(``);
+        lines.push(`### Defined Env Variables`);
+        lines.push([...vars].map(v => `\`${v}\``).join(", "));
+      }
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -291,10 +380,39 @@ server.tool(
       if (hallucinations.length > 0) {
         lines.push(``);
         lines.push(`### Hallucinated Types`);
+        const typeIndex = buildTypeIndex(projectDir);
         for (const h of hallucinations) {
           const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
           const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
           lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+          // For hallucinated members, show available members on the type
+          if (h.hallucinationCategory === "hallucinated-member" && h.typeName) {
+            const decl = typeIndex.get(h.typeName);
+            if (decl && decl.members.size > 0) {
+              const members = [...decl.members.keys()].join("`, `");
+              lines.push(`  - Members on ${h.typeName}: \`${members}\``);
+            }
+          }
+        }
+
+        // List project types as ground truth for type-not-found errors
+        const hasTypeErrors = hallucinations.some(h => h.hallucinationCategory === "hallucinated-type");
+        if (hasTypeErrors) {
+          const index = buildTypeIndex(projectDir);
+          if (index.size > 0) {
+            lines.push(``);
+            lines.push(`### Available Project Types`);
+            const typesByFile = new Map<string, string[]>();
+            for (const [name, decl] of index) {
+              const existing = typesByFile.get(decl.sourceFile) ?? [];
+              existing.push(`${name} (${decl.kind})`);
+              typesByFile.set(decl.sourceFile, existing);
+            }
+            for (const [file, types] of typesByFile) {
+              lines.push(`- \`${file}\`: ${types.join(", ")}`);
+            }
+          }
         }
       }
 
@@ -356,6 +474,17 @@ server.tool(
         }
       }
 
+      // Always include all available routes as ground truth
+      const routeIndex = buildRouteIndex(projectDir);
+      if (routeIndex.size > 0) {
+        lines.push(``);
+        lines.push(`### Available Routes`);
+        for (const [urlPath, route] of routeIndex) {
+          const methods = route.methods.size > 0 ? [...route.methods].join(", ") : "no exports";
+          lines.push(`- \`${urlPath}\` [${methods}] → \`${route.filePath}\``);
+        }
+      }
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -376,6 +505,7 @@ server.tool(
   async ({ planText, projectDir }) => {
     try {
       const analysis = analyzeSqlSchema(planText, projectDir);
+      const sqlSchema = buildSqlSchema(projectDir);
       const lines: string[] = [];
 
       const { checkedRefs, validRefs, hallucinations, tablesIndexed, byCategory } = analysis;
@@ -397,6 +527,24 @@ server.tool(
           const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
           const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
           lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+          // For hallucinated tables, list all available tables
+          if (h.hallucinationCategory === "hallucinated-table") {
+            const tableNames = [...sqlSchema.tables.keys()].join("`, `");
+            lines.push(`  - Available tables: \`${tableNames}\``);
+          }
+
+          // For hallucinated columns, list all columns on the target table
+          if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+            const table = sqlSchema.tables.get(h.tableName)
+              ?? sqlSchema.tables.get(sqlSchema.variableToTable.get(h.tableName) ?? "");
+            if (table) {
+              const cols = [...table.columns.entries()]
+                .map(([name, type]) => `\`${name}\` (${type})`)
+                .join(", ");
+              lines.push(`  - Columns on ${table.name}: ${cols}`);
+            }
+          }
         }
       }
 
@@ -411,6 +559,232 @@ server.tool(
       if (parts.length > 0) {
         lines.push(``);
         lines.push(`**Breakdown:** ${parts.join(", ")}`);
+      }
+
+      // Always include schema ground truth
+      lines.push(``);
+      lines.push(`### SQL Schema Ground Truth`);
+      for (const [tableName, table] of sqlSchema.tables) {
+        const varNote = table.variableName ? ` (var: \`${table.variableName}\`)` : "";
+        const cols = [...table.columns.entries()]
+          .map(([name, type]) => `${name} (${type})`)
+          .join(", ");
+        lines.push(`- **${tableName}**${varNote} [${table.source}]: ${cols}`);
+      }
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    }
+  },
+);
+
+// --- check_all ---
+
+server.tool(
+  "check_all",
+  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, imports, env vars, TypeScript types, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
+  {
+    planText: z.string().describe("The plan text to verify against the project"),
+    projectDir: z.string().describe("Absolute path to the project directory"),
+    schemaPath: z.string().optional().describe("Absolute path to schema.prisma (auto-detected if omitted)"),
+  },
+  async ({ planText, projectDir, schemaPath }) => {
+    try {
+      const lines: string[] = [];
+      let totalIssues = 0;
+
+      lines.push(`# Arthur Verification Report`);
+      lines.push(``);
+
+      // --- Paths ---
+      const pathAnalysis = analyzePaths(planText, projectDir);
+      const actualFiles = getAllFiles(projectDir);
+      const pathIssues = pathAnalysis.hallucinatedPaths.length;
+      totalIssues += pathIssues;
+
+      lines.push(`## File Paths`);
+      lines.push(`**${pathAnalysis.extractedPaths.length}** paths checked — **${pathIssues}** hallucinated | ${actualFiles.size} files indexed`);
+      if (pathIssues > 0) {
+        for (const p of pathAnalysis.hallucinatedPaths) {
+          lines.push(`- \`${p}\` — **NOT FOUND**`);
+          const closest = findClosestPaths(p, actualFiles);
+          if (closest.length > 0) {
+            lines.push(`  - Closest: ${closest.map(c => `\`${c}\``).join(", ")}`);
+          }
+        }
+      } else {
+        lines.push(`All paths valid.`);
+      }
+      lines.push(``);
+
+      // --- Prisma Schema ---
+      const resolvedSchemaPath = schemaPath
+        ?? (fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
+          ? path.join(projectDir, "prisma/schema.prisma")
+          : undefined);
+
+      if (resolvedSchemaPath) {
+        try {
+          const schema = parseSchema(path.resolve(resolvedSchemaPath));
+          const schemaAnalysis = analyzeSchema(planText, schema);
+          const schemaIssues = schemaAnalysis.hallucinations.length;
+          totalIssues += schemaIssues;
+
+          lines.push(`## Prisma Schema`);
+          lines.push(`**${schemaAnalysis.totalRefs}** refs — **${schemaIssues}** hallucinated`);
+          if (schemaIssues > 0) {
+            for (const h of schemaAnalysis.hallucinations) {
+              const suggestion = h.suggestion ? ` → \`${h.suggestion}\`` : "";
+              lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
+
+              if (h.hallucinationCategory === "hallucinated-model") {
+                const available = [...schema.accessorToModel.entries()]
+                  .map(([accessor, model]) => `\`${accessor}\` (${model})`)
+                  .join(", ");
+                lines.push(`  - Available models: ${available}`);
+              }
+              if (h.hallucinationCategory === "hallucinated-field" && h.modelAccessor) {
+                const modelName = schema.accessorToModel.get(h.modelAccessor);
+                const model = modelName ? schema.models.get(modelName) : undefined;
+                if (model) {
+                  const fields = [...model.fields.keys()].join("`, `");
+                  lines.push(`  - Fields on ${modelName}: \`${fields}\``);
+                }
+              }
+            }
+          } else {
+            lines.push(`All schema refs valid.`);
+          }
+
+          // Schema ground truth
+          lines.push(``);
+          lines.push(`**Schema:** ${[...schema.models.keys()].map(m => `\`${m}\``).join(", ")}${schema.enums.size > 0 ? ` | Enums: ${[...schema.enums].join(", ")}` : ""}`);
+          lines.push(``);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          lines.push(`## Prisma Schema`);
+          lines.push(`Error parsing schema: ${msg}`);
+          lines.push(``);
+        }
+      }
+
+      // --- SQL/Drizzle Schema ---
+      const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
+      if (sqlSchemaAnalysis.tablesIndexed > 0) {
+        const sqlIssues = sqlSchemaAnalysis.hallucinations.length;
+        totalIssues += sqlIssues;
+        const sqlSchema = buildSqlSchema(projectDir);
+
+        lines.push(`## SQL/Drizzle Schema`);
+        lines.push(`**${sqlSchemaAnalysis.tablesIndexed}** tables, **${sqlSchemaAnalysis.checkedRefs}** refs — **${sqlIssues}** hallucinated`);
+        if (sqlIssues > 0) {
+          for (const h of sqlSchemaAnalysis.hallucinations) {
+            const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
+            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+          }
+        } else {
+          lines.push(`All SQL refs valid.`);
+        }
+
+        lines.push(``);
+        lines.push(`**Tables:** ${[...sqlSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
+        lines.push(``);
+      }
+
+      // --- Imports ---
+      const importAnalysis = analyzeImports(planText, projectDir);
+      if (importAnalysis.checkedImports > 0) {
+        const importIssues = importAnalysis.hallucinations.length;
+        totalIssues += importIssues;
+
+        lines.push(`## Imports`);
+        lines.push(`**${importAnalysis.checkedImports}** checked — **${importIssues}** hallucinated`);
+        if (importIssues > 0) {
+          for (const h of importAnalysis.hallucinations) {
+            const reason = h.reason === "package-not-found" ? "not installed" : "subpath not exported";
+            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+            lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
+          }
+        } else {
+          lines.push(`All imports valid.`);
+        }
+        lines.push(``);
+      }
+
+      // --- Env ---
+      const envAnalysis = analyzeEnv(planText, projectDir);
+      if (envAnalysis.envFilesFound.length > 0 && envAnalysis.checkedRefs > 0) {
+        const envIssues = envAnalysis.hallucinations.length;
+        totalIssues += envIssues;
+
+        lines.push(`## Env Variables`);
+        lines.push(`**${envAnalysis.checkedRefs}** checked — **${envIssues}** hallucinated`);
+        if (envIssues > 0) {
+          for (const h of envAnalysis.hallucinations) {
+            const suggestion = h.suggestion ? ` → \`${h.suggestion}\`` : "";
+            lines.push(`- \`${h.varName}\`${suggestion}`);
+          }
+          const { vars } = parseEnvFiles(projectDir);
+          lines.push(`- Defined vars: ${[...vars].map(v => `\`${v}\``).join(", ")}`);
+        } else {
+          lines.push(`All env vars valid.`);
+        }
+        lines.push(``);
+      }
+
+      // --- Types ---
+      const typeAnalysis = analyzeTypes(planText, projectDir);
+      if (typeAnalysis.checkedRefs > 0) {
+        const typeIssues = typeAnalysis.hallucinations.length;
+        totalIssues += typeIssues;
+
+        lines.push(`## TypeScript Types`);
+        lines.push(`**${typeAnalysis.checkedRefs}** checked — **${typeIssues}** hallucinated`);
+        if (typeIssues > 0) {
+          for (const h of typeAnalysis.hallucinations) {
+            const category = h.hallucinationCategory === "hallucinated-type" ? "not found" : "member not found";
+            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+          }
+        } else {
+          lines.push(`All type refs valid.`);
+        }
+        lines.push(``);
+      }
+
+      // --- API Routes ---
+      const routeAnalysis = analyzeApiRoutes(planText, projectDir);
+      if (routeAnalysis.routesIndexed > 0) {
+        const routeIssues = routeAnalysis.hallucinations.length;
+        totalIssues += routeIssues;
+
+        lines.push(`## API Routes`);
+        lines.push(`**${routeAnalysis.routesIndexed}** routes indexed, **${routeAnalysis.checkedRefs}** refs — **${routeIssues}** hallucinated`);
+        if (routeIssues > 0) {
+          for (const h of routeAnalysis.hallucinations) {
+            const category = h.hallucinationCategory === "hallucinated-route" ? "not found" : "method not allowed";
+            const method = h.method ? `${h.method} ` : "";
+            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+            lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
+          }
+        } else {
+          lines.push(`All route refs valid.`);
+        }
+
+        const routeIndex = buildRouteIndex(projectDir);
+        lines.push(`**Routes:** ${[...routeIndex.entries()].map(([url, r]) => `\`${url}\` [${[...r.methods].join(",")}]`).join(", ")}`);
+        lines.push(``);
+      }
+
+      // --- Summary ---
+      lines.push(`---`);
+      if (totalIssues === 0) {
+        lines.push(`**All checks passed.** No hallucinated references found.`);
+      } else {
+        lines.push(`**${totalIssues} issue(s) found.** Fix the hallucinated references above using the ground truth provided.`);
       }
 
       return { content: [{ type: "text", text: lines.join("\n") }] };

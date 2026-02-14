@@ -1,13 +1,15 @@
 # Arthur
 
-Adversarial code reviewer for AI-generated plans and code. Catches hallucinated paths, wrong schema references, bad imports, undefined env vars, and intent drift before code gets written.
+Ground truth verification for AI-generated code. MCP server that catches hallucinated references before code gets written — deterministically, zero cost, no API key.
+
+**npm package:** `arthur-mcp` | **Install:** `claude mcp add arthur -- npx arthur-mcp`
 
 ## Architecture
 
 ```
 bin/
   codeverifier.ts   CLI entry point
-  arthur-mcp.ts     MCP server (stdio transport, 8 tools)
+  arthur-mcp.ts     MCP server (stdio transport, 10 tools)
 
 src/
   analysis/     Static analysis (path-checker, schema-checker, sql-schema-checker, import-checker, env-checker, type-checker, api-route-checker, formatter)
@@ -28,17 +30,19 @@ bench/
 
 ## MCP Server
 
-Eight tools:
-- `check_paths` — path validation against project tree (no API key)
-- `check_schema` — Prisma schema validation (no API key)
-- `check_sql_schema` — Drizzle/SQL schema validation (no API key)
-- `check_imports` — package import validation (no API key)
-- `check_env` — env variable validation (no API key)
-- `check_types` — TypeScript type validation (no API key)
-- `check_routes` — Next.js App Router route validation (no API key)
+Ten tools:
+- **`check_all`** — runs all 7 deterministic checkers in one call, returns comprehensive report with ground truth (no API key). **This is the primary tool.**
+- `check_paths` — path validation against project tree + closest matches (no API key)
+- `check_schema` — Prisma schema validation + full schema ground truth (no API key)
+- `check_sql_schema` — Drizzle/SQL schema validation + full table/column listing (no API key)
+- `check_imports` — package import validation + installed packages listing (no API key)
+- `check_env` — env variable validation + all defined vars (no API key)
+- `check_types` — TypeScript type validation + available types listing (no API key)
+- `check_routes` — Next.js App Router route validation + all routes listing (no API key)
 - `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY)
+- `update_session_context` / `get_session_context` — session persistence across context compression
 
-**Add to Claude Code:** `claude mcp add arthur -- node /path/to/arthur/dist/bin/arthur-mcp.js`
+**Install:** `claude mcp add arthur -- npx arthur-mcp`
 
 **Critical:** No `console.log()` in `arthur-mcp.ts` — stdout is JSON-RPC protocol. Use `console.error()` for debug output.
 
