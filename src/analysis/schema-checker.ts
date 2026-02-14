@@ -148,6 +148,35 @@ export interface SchemaAnalysis {
   };
 }
 
+/**
+ * Detect Prisma client variable names from code by looking for
+ * X.Y.method() where method is a known Prisma method.
+ * Handles plans that use `db.`, `client.`, `prismaClient.`, etc.
+ */
+function detectPrismaClientNames(codeText: string): Set<string> {
+  const names = new Set<string>();
+  const methodList = [...VALID_PRISMA_METHODS].join("|");
+  const pattern = new RegExp(`(\\w+)\\.(\\w+)\\.(${methodList})\\b`, "g");
+  for (const match of codeText.matchAll(pattern)) {
+    names.add(match[1]);
+  }
+  // Always include 'prisma' as the default
+  names.add("prisma");
+  return names;
+}
+
+/** Build a regex that matches any detected client name followed by .accessor.method */
+function buildAccessorRegex(clientNames: Set<string>): RegExp {
+  const escaped = [...clientNames].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`(?:${escaped.join("|")})\\.(\\w+)\\.(\\w+)`, "g");
+}
+
+/** Build a regex for findContextModel that matches any detected client name. */
+function buildClientDotRegex(clientNames: Set<string>): RegExp {
+  const escaped = [...clientNames].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`(?:${escaped.join("|")})\\.(\\w+)\\.`, "g");
+}
+
 /** Extract code blocks and inline code spans from markdown text. */
 function extractCodeRegions(text: string): string[] {
   const regions: string[] = [];
@@ -206,25 +235,30 @@ export function analyzeSchema(
   const codeRegions = extractCodeRegions(planText);
   const codeText = codeRegions.join("\n");
 
-  // 1. Extract prisma.model.method() references
-  const accessorMethodRegex = /prisma\.(\w+)\.(\w+)/g;
+  // Detect Prisma client variable names (prisma, db, client, etc.)
+  const clientNames = detectPrismaClientNames(codeText);
+
+  // 1. Extract client.model.method() references
+  const accessorMethodRegex = buildAccessorRegex(clientNames);
   for (const match of codeText.matchAll(accessorMethodRegex)) {
     const [raw, accessor, method] = match;
+    // Extract the client variable name from the raw match
+    const clientVar = raw.slice(0, raw.indexOf("."));
 
     // Check model accessor
     if (!schema.accessorToModel.has(accessor)) {
       const suggestion = suggestAccessor(accessor, schema);
       refs.push({
-        raw: `prisma.${accessor}`,
+        raw: `${clientVar}.${accessor}`,
         category: "model",
         modelAccessor: accessor,
         valid: false,
         hallucinationCategory: "hallucinated-model",
-        suggestion: suggestion ? `prisma.${suggestion}` : undefined,
+        suggestion: suggestion ? `${clientVar}.${suggestion}` : undefined,
       });
     } else {
       refs.push({
-        raw: `prisma.${accessor}`,
+        raw: `${clientVar}.${accessor}`,
         category: "model",
         modelAccessor: accessor,
         valid: true,
@@ -258,7 +292,7 @@ export function analyzeSchema(
   for (const match of codeText.matchAll(queryBlockRegex)) {
     const blockStart = match.index! + match[0].length;
     const topLevelKeys = extractTopLevelKeys(codeText, blockStart);
-    const contextModel = findContextModel(codeText, match.index!, schema);
+    const contextModel = findContextModel(codeText, match.index!, schema, clientNames);
 
     if (!contextModel) continue;
     const model = schema.models.get(contextModel);
@@ -300,7 +334,7 @@ export function analyzeSchema(
   for (const match of codeText.matchAll(includeRegex)) {
     const blockStart = match.index! + match[0].length;
     const topLevelKeys = extractTopLevelKeys(codeText, blockStart);
-    const contextModel = findContextModel(codeText, match.index!, schema);
+    const contextModel = findContextModel(codeText, match.index!, schema, clientNames);
 
     if (!contextModel) continue;
     const model = schema.models.get(contextModel);
@@ -437,10 +471,14 @@ function findContextModel(
   codeText: string,
   position: number,
   schema: PrismaSchema,
+  clientNames?: Set<string>,
 ): string | undefined {
-  // Look backwards from position for the nearest prisma.X reference
+  // Look backwards from position for the nearest client.X reference
   const preceding = codeText.slice(Math.max(0, position - 500), position);
-  const matches = [...preceding.matchAll(/prisma\.(\w+)\./g)];
+  const clientDotRegex = clientNames
+    ? buildClientDotRegex(clientNames)
+    : /prisma\.(\w+)\./g;
+  const matches = [...preceding.matchAll(clientDotRegex)];
   if (matches.length === 0) return undefined;
 
   const lastMatch = matches[matches.length - 1];

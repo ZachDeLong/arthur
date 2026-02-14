@@ -73,27 +73,48 @@ Eight tools available:
 
 ## Benchmark Results
 
-### Schema Hallucination (Opus 4.6)
+### Static Analysis vs Self-Review (Opus 4.6)
+
+**The main result.** 11 prompts across 4 fixtures, 5 checker categories. Opus generates plans with full README context, then:
+- **Arthur's static checkers** validate every reference against ground truth
+- **Self-review** (same model, adversarial prompt, full project context including schemas) tries to find the same errors
+
+| Category | Errors Found | Self-Review Detected | Self-Review Missed | Self-Review Detection Rate |
+|----------|-------------|---------------------|-------------------|--------------------------|
+| Path | 30 | 19 | 11 | 63% |
+| Schema (Prisma) | 19 | 19 | 0 | 100% |
+| SQL Schema (Drizzle) | 15 | 0 | 15 | 0% |
+| Import | 22 | 17 | 5 | 77% |
+| Env | 7 | 7 | 0 | 100% |
+| **Total** | **93** | **56** | **37** | **60%** |
+
+**Self-review missed 37 errors** despite having the full project tree, all schema files, and a maximally adversarial prompt. SQL schema references were a complete blind spot — 0% detection with the Drizzle schema file in context.
+
+Arthur's static checkers caught all 93 by definition (they define the ground truth). But the ground truth is objective — file paths exist or they don't, schema fields exist or they don't. The 37 errors self-review missed are verifiable facts about the project.
+
+2.2% false positive rate (2 minor SQL schema FPs out of 93 findings).
+
+### Schema Hallucination Detail (Opus 4.6)
 
 **Fixture:** Next.js + Prisma project with non-obvious naming (`Participant` not `User`, `displayIdentifier` not `username`, `participantEngagement` not `engagement`). Plans generated with README-only context — no schema file provided.
 
-| Prompt | Task | Schema Refs | Hallucinated | Rate | Static Detection | LLM Detection |
-|--------|------|------------|-------------|------|-----------------|---------------|
-| 06 | Analytics dashboard | 11 | 3 | 27.3% | 3/3 (100%) | 3/3 (100%) |
-| 07 | Recommendation engine | 18 | 4 | 22.2% | 4/4 (100%) | 3/4 (75%) |
-| 08 | CSV export | 7 | 1 | 14.3% | 1/1 (100%) | 1/1 (100%) |
-| **Avg** | | **12** | **2.7** | **21.3%** | **100%** | **91.7%** |
+| Prompt | Task | Schema Refs | Hallucinated | Rate |
+|--------|------|------------|-------------|------|
+| 06 | Analytics dashboard | 11 | 3 | 27.3% |
+| 07 | Recommendation engine | 18 | 4 | 22.2% |
+| 08 | CSV export | 7 | 1 | 14.3% |
+| **Avg** | | **12** | **2.7** | **21.3%** |
 
 Recurring hallucination: `prisma.engagement` (should be `prisma.participantEngagement`) appeared in **all 3 runs** — systematic bias, not random noise.
 
-### Path Hallucination (Opus 4.6)
+### Path Hallucination Detail (Opus 4.6)
 
-| Prompt | Extracted | Hallucinated | Rate | Static Detection | LLM Detection |
-|--------|-----------|-------------|------|-----------------|---------------|
-| 06 | 7 | 3 | 75% | 3/3 (100%) | 0/3 (0%) |
-| 07 | 4 | 3 | 75% | 3/3 (100%) | 2/3 (66.7%) |
-| 08 | 5 | 3 | 75% | 3/3 (100%) | 1/3 (33.3%) |
-| **Avg** | **5.3** | **3** | **75%** | **100%** | **33.3%** |
+| Prompt | Extracted | Hallucinated | Rate | LLM Detection |
+|--------|-----------|-------------|------|---------------|
+| 06 | 7 | 3 | 75% | 0% |
+| 07 | 4 | 3 | 75% | 66.7% |
+| 08 | 5 | 3 | 75% | 33.3% |
+| **Avg** | **5.3** | **3** | **75%** | **33.3%** |
 
 The LLM had the full file tree in context and still missed 2/3 of hallucinated paths. Static analysis: 100%, zero variance.
 
@@ -142,6 +163,9 @@ npm run build
 codeverifier init  # Set API key
 
 # Run benchmarks
-npm run bench:tier1 06    # Schema hallucination (fixture-c)
+npm run bench:big         # Static analysis vs self-review (all prompts)
+npm run bench:big -- 06   # Single prompt
+npm run bench:tier1       # Path + schema hallucination detection
 npm run bench:tier2       # Intent drift detection
+npm run bench:report      # Generate markdown report from results
 ```
