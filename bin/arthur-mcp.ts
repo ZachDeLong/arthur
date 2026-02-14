@@ -18,6 +18,8 @@
  *   update_session_context — record decisions/insights to survive context compression
  *   get_session_context    — read back session context after compression
  *
+ * Prisma schema auto-detected at prisma/schema.prisma (or schemaPath override).
+ *
  * CRITICAL: No console.log() — stdout is reserved for JSON-RPC protocol.
  * Use console.error() for debug output.
  */
@@ -112,14 +114,27 @@ server.tool(
 
 server.tool(
   "check_schema",
-  "Check Prisma schema references in a plan against a schema.prisma file. Catches hallucinated models, fields, methods, and relations. No API key required.",
+  "Check Prisma schema references in a plan against a schema.prisma file. Catches hallucinated models, fields, methods, and relations. Auto-detects prisma/schema.prisma if schemaPath not provided. No API key required.",
   {
     planText: z.string().describe("The plan text to check for Prisma schema references"),
-    schemaPath: z.string().describe("Absolute path to the schema.prisma file"),
+    projectDir: z.string().optional().describe("Absolute path to the project directory (for auto-detecting prisma/schema.prisma)"),
+    schemaPath: z.string().optional().describe("Absolute path to the schema.prisma file (overrides auto-detection)"),
   },
-  async ({ planText, schemaPath }) => {
+  async ({ planText, projectDir, schemaPath }) => {
     try {
-      const schema = parseSchema(schemaPath);
+      const resolvedPath = schemaPath
+        ?? (projectDir && fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
+          ? path.join(projectDir, "prisma/schema.prisma")
+          : undefined);
+
+      if (!resolvedPath) {
+        return {
+          content: [{ type: "text", text: "No schema found. Provide schemaPath or projectDir with prisma/schema.prisma." }],
+          isError: true,
+        };
+      }
+
+      const schema = parseSchema(resolvedPath);
       const analysis = analyzeSchema(planText, schema);
       const lines: string[] = [];
 
@@ -447,10 +462,16 @@ server.tool(
       // 2. Static analysis
       const pathAnalysis = analyzePaths(planText, projectDir);
 
+      // Auto-detect Prisma schema if not explicitly provided
+      const resolvedSchemaPath = schemaPath
+        ?? (fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
+          ? path.join(projectDir, "prisma/schema.prisma")
+          : undefined);
+
       let schemaAnalysis;
-      if (schemaPath) {
+      if (resolvedSchemaPath) {
         try {
-          const schema = parseSchema(path.resolve(schemaPath));
+          const schema = parseSchema(path.resolve(resolvedSchemaPath));
           schemaAnalysis = analyzeSchema(planText, schema);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
