@@ -22,6 +22,8 @@ import { generateSummary } from "./report.js";
 import { parseSchema, analyzeSchema } from "./schema-checker.js";
 import { runReport } from "./report-generator.js";
 import { runSelfReviewBenchmark } from "./self-review-runner.js";
+import { runBigBenchmark } from "./big-benchmark-runner.js";
+import { runBigReport } from "./big-benchmark-report.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_ROOT = path.resolve(__dirname, "..");
@@ -678,7 +680,13 @@ if (subcommand === "tier1" || args.length === 0) {
 } else if (subcommand === "self-review") {
   const promptIds = args.slice(1);
   runSelfReviewBenchmark(promptIds.length > 0 ? promptIds : undefined);
+} else if (subcommand === "big") {
+  const promptIds = args.slice(1);
+  runBigBenchmark(promptIds.length > 0 ? promptIds : undefined);
+} else if (subcommand === "big-report") {
+  const reportArgs = args.slice(1);
+  runBigReport(reportArgs);
 } else {
-  console.error("Usage: bench [tier1|tier2|tier3|all|report|self-review] [prompt-ids...]");
+  console.error("Usage: bench [tier1|tier2|tier3|all|report|self-review|big|big-report] [prompt-ids...]");
   process.exit(1);
 }

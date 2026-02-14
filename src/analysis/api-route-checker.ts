@@ -234,9 +234,27 @@ function suggestRoute(urlPath: string, index: Map<string, ApiRoute>): string | u
 
 // --- Main Analysis ---
 
+/** Extract route files the plan intends to create and add them to the index. */
+function addPlannedRoutes(planText: string, index: Map<string, ApiRoute>): void {
+  // Match file paths that look like route files: app/api/.../route.ts
+  // Common patterns: "Create: `src/app/api/.../route.ts`", "**Create** `src/app/...`"
+  const routeFileRegex = /(?:src\/)?app\/[^\s`'"]+\/route\.(?:ts|js|tsx|jsx)/g;
+  for (const match of planText.matchAll(routeFileRegex)) {
+    const filePath = match[0];
+    const urlPath = filePathToUrlPath(filePath);
+    if (urlPath && !index.has(urlPath)) {
+      // Add as planned route — assume all methods until file exists
+      index.set(urlPath, { urlPath, filePath, methods: new Set(["GET", "POST", "PUT", "DELETE", "PATCH"]) });
+    }
+  }
+}
+
 /** Analyze API route references in plan text against a project's Next.js App Router routes. */
 export function analyzeApiRoutes(planText: string, projectDir: string): ApiRouteAnalysis {
   const index = buildRouteIndex(projectDir);
+
+  // Add routes the plan intends to create (so they don't get flagged as hallucinated)
+  addPlannedRoutes(planText, index);
 
   // No App Router routes found — nothing to check against
   if (index.size === 0) {

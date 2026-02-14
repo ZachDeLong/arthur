@@ -63,6 +63,9 @@ Eight tools, two tiers:
 - `npm run bench:report` — generate publishable markdown report from existing results
 - `npm run bench:self-review` — run self-review vs Arthur comparison benchmark
 - `npm run bench:self-review -- 06 07 08` — run self-review on specific prompts
+- `npm run bench:big` — run big benchmark (all 7 checkers vs self-review, all prompts)
+- `npm run bench:big -- 06 09` — run big benchmark on specific prompts
+- `npm run bench:big:report` — regenerate report from latest big benchmark results
 - `npm run bench:tier3:setup` — clone target repo into workspaces
 - `npm run bench:tier3:verify -- <plan> <workspace>` — run Arthur verifier on a plan
 - `npm run bench:tier3:eval -- <arm> <workspace> <output-dir>` — evaluate post-refactoring
@@ -103,6 +106,22 @@ Directly compares self-review (same LLM checks its own plan) vs Arthur (fresh in
 - **Results**: `bench/results/self-review-<timestamp>/` — per-run JSON + comparison report
 - **Report generation**: `bench/harness/report-generator.ts` — aggregates all results into publishable markdown
 
+### Big Benchmark: Static Analysis vs Self-Review
+Measures what self-review misses. Static checkers run against LLM-generated plans to identify verifiable structural errors. Self-review (same model, adversarial prompt, full context) tries to independently find the same errors.
+
+- **Runner**: `bench/harness/big-benchmark-runner.ts` — generates plan, runs checkers, runs self-review, scores
+- **Ground truth**: `bench/harness/ground-truth.ts` — converts checker outputs to flat error list
+- **Detection**: `bench/harness/unified-detection-parser.ts` — parses self-review output for error detection
+- **Prompt**: `bench/prompts/big-benchmark-prompt.ts` — adversarial self-review prompt
+- **Report**: `bench/harness/big-benchmark-report.ts` — generates markdown from results
+- **Results**: `bench/results/big-<timestamp>/` — per-run JSON + summary + report
+- **Ship run (2026-02-14)**: 93 errors, 60% self-review detection, 37 errors missed. 5 categories (type checker disabled — 98% FP rate).
+- Run with: `npm run bench:big` or `npm run bench:big -- 06 07 08 09 10 11`
+
+**Type checker disabled in benchmark** — extracted PascalCase words from inline backticks, producing 40 FPs out of 41 flags. Needs structural fix: restrict to fenced code blocks, require syntactic type positions (after `:`, inside `<>`, after `extends`). The MCP tool `check_types` still works for individual use.
+
+**Next benchmark framing fix:** Drop the "100% static" column (tautological). Lead with "37 errors self-review missed despite having full context."
+
 ### Tier 3: Real-World Refactoring Verification
 Hybrid benchmark — automated setup + manual Claude Code sessions. Two arms (vanilla vs Arthur-assisted) run the same refactoring prompt on a real codebase. Automated scoring: build pass/fail, App.tsx reduction, files extracted, hallucinated imports.
 
@@ -119,12 +138,19 @@ Hybrid benchmark — automated setup + manual Claude Code sessions. Two arms (va
 
 ## Strategic Direction
 
-Arthur's value is **adversarial review**, not context management. "Clear context" handles memory degradation. Arthur handles blind spots — errors an LLM can't catch in its own work because it has author bias.
+Arthur's value is **breadth of automatic coverage**, not fresh eyes or context management. Self-review with an explicit adversarial prompt can match Arthur on any single error category — but no single prompt covers all categories simultaneously. Each static checker runs independently at 100% detection with zero attention budget competition. The more checkers Arthur has, the wider the gap vs any prompting approach. Academic backing: Los Alamos "Trinity Defense Architecture" (arXiv:2602.09947v1) — Theorem 3.3 proves training-based defenses alone cannot provide deterministic guarantees.
 
 **Proven results (T1/T2):**
 - Schema hallucination: 91.7% detection rate (100% static). Opus hallucinates `prisma.engagement` every time
 - Path hallucination: 100% static detection vs 0-33% LLM detection
 - Intent drift: ~90% detection rate (Sonnet 4.5 baseline)
+
+**Big benchmark (2026-02-14, ship numbers):**
+- 93 errors across 11 prompts, 4 fixtures (Opus 4.6). Self-review detected 60%. **37 errors missed.**
+- Per-category: sql_schema 0%, path 63%, import 77%, schema 100%, env 100%
+- Self-review has complete blind spots (0% on SQL schema with full schema in context)
+- 2 minor FPs remain (2.2% FP rate). Type checker disabled (98% FP rate).
+- Results at: `bench/results/big-2026-02-14T03-03-02/`
 
 **Self-review vs Arthur benchmark (implemented):**
 - Both arms get fresh context (no context degradation variable)
@@ -146,3 +172,7 @@ Arthur's value is **adversarial review**, not context management. "Clear context
 - ACT/SAT-style numeric extractions from LLMs may return decimals — round before storing.
 - **No `console.log()` in MCP server** — stdout is JSON-RPC. Use `console.error()`.
 - **Benchmark workspaces per-benchmark, not shared** — each benchmark creates its own vanilla/arthur-assisted pair at `~/.arthur-benchmarks/<name>/`
+- **Fixtures don't have node_modules** — import checker must fall back to package.json deps, not just node_modules. Already implemented.
+- **SQL FROM regex matches comments inside code blocks** — restricting to fenced code blocks isn't enough; comments (`// from the database`) still match. English stopword list handles known cases but isn't exhaustive.
+- **Type checker inline backticks = FP factory** — extracting PascalCase words from inline backtick spans catches prose headings and English words. Must restrict to fenced code blocks + syntactic positions only. Currently disabled in benchmark.
+- **"100% static detection" framing is tautological** — Arthur defines the ground truth then claims 100%. Use seeded fault methodology instead (externally-defined errors).

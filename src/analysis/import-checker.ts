@@ -240,6 +240,35 @@ function suggestPackage(packageName: string, nodeModulesDir: string): string | u
   return undefined;
 }
 
+// --- Package.json Dependency Check ---
+
+/** Cache for parsed package.json deps (per projectDir). */
+const depsCache = new Map<string, Set<string>>();
+
+/** Check if a package is listed in the project's package.json dependencies or devDependencies. */
+function isListedDependency(packageName: string, projectDir: string): boolean {
+  let allDeps = depsCache.get(projectDir);
+  if (!allDeps) {
+    allDeps = new Set<string>();
+    const pkgPath = path.join(projectDir, "package.json");
+    try {
+      const content = fs.readFileSync(pkgPath, "utf-8");
+      const pkg = JSON.parse(content);
+      for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
+        if (pkg[field] && typeof pkg[field] === "object") {
+          for (const dep of Object.keys(pkg[field])) {
+            allDeps.add(dep);
+          }
+        }
+      }
+    } catch {
+      // No package.json or parse error — can't validate
+    }
+    depsCache.set(projectDir, allDeps);
+  }
+  return allDeps.has(packageName);
+}
+
 // --- Main Analysis ---
 
 /** Analyze imports in plan text against a project's node_modules. */
@@ -261,9 +290,14 @@ export function analyzeImports(planText: string, projectDir: string): ImportAnal
     checkedImports++;
     const { packageName, subpath } = parsePackageName(source);
 
-    // Check if package exists
+    // Check if package exists in node_modules
     const pkgJsonPath = path.join(nodeModulesDir, packageName, "package.json");
     if (!fs.existsSync(pkgJsonPath)) {
+      // Fallback: check if it's listed in the project's package.json deps
+      if (isListedDependency(packageName, projectDir)) {
+        validImports++;
+        continue;
+      }
       const suggestion = suggestPackage(packageName, nodeModulesDir);
       hallucinations.push({
         raw: source,

@@ -285,6 +285,54 @@ export function buildTypeIndex(projectDir: string): TypeIndex {
   return index;
 }
 
+// --- Common Method Names (not type member access) ---
+
+/** Method names on built-in objects (Array, Map, Set, Promise, etc.) that shouldn't
+ *  be treated as type member accesses. Filters Items.map, Engagements.set, etc. */
+const COMMON_METHODS = new Set([
+  // Array
+  "map", "filter", "reduce", "forEach", "find", "some", "every", "includes",
+  "push", "pop", "shift", "unshift", "splice", "slice", "concat", "flat", "flatMap",
+  "sort", "reverse", "fill", "at", "indexOf", "lastIndexOf", "findIndex",
+  // Map / Set
+  "get", "set", "has", "delete", "clear", "entries", "values", "keys",
+  // Promise
+  "then", "catch", "finally", "resolve", "reject",
+  // Object
+  "toString", "valueOf", "toJSON", "assign", "freeze",
+  // Misc
+  "from", "of", "isArray", "parse", "stringify",
+  "log", "error", "warn", "info", "debug",
+  "join", "split", "replace", "match", "search", "trim",
+  "length", "size", "next", "return", "throw",
+  "addEventListener", "removeEventListener",
+  "createElement", "getElementById", "querySelector",
+  "groupBy", "apply", "call", "bind",
+]);
+
+// --- Common PascalCase English Words (not types) ---
+
+/** Words that appear PascalCase in markdown headings/prose but are never types.
+ *  Keeps false positives from plan headings like "## 3. Create the API Route" */
+const COMMON_WORDS = new Set([
+  // Action verbs
+  "Create", "Update", "Delete", "Get", "Set", "Add", "Remove", "Fetch",
+  "Post", "Put", "Patch", "List", "Find", "Search", "Sort", "Filter",
+  "Group", "Handle", "Process", "Parse", "Build", "Run", "Test", "Testing",
+  "Check", "Validate", "Verify", "Init", "Setup", "Start", "Stop",
+  "Deploy", "Install", "Enable", "Disable", "Configure", "Implement",
+  "Migrate", "Refactor", "Move", "Copy", "Rename", "Extract", "Merge",
+  "Integrate", "Define", "Register", "Mount", "Connect", "Initialize",
+  // Descriptors / prose words
+  "Top", "Bottom", "Left", "Right", "First", "Last", "Next", "Previous",
+  "Current", "Default", "Aggregate", "Calculate", "Compute", "Total",
+  "Average", "Each", "All", "Any", "Some", "None", "Every",
+  "Step", "Phase", "Stage", "Level", "Section", "Overview",
+  "Summary", "Details", "Description", "Implementation",
+  "Note", "Todo", "Fix", "Bug", "Feature", "Issue",
+  "This", "That", "Also", "Then", "Here", "There", "Where", "When",
+]);
+
 // --- Code Region Extraction ---
 
 /** Extract code regions (fenced code blocks + inline backtick spans) from plan text. */
@@ -310,13 +358,28 @@ function extractCodeRegions(text: string): string[] {
 
 /** Check if the plan signals intent to create a new type (not referencing existing). */
 function hasCreateSignal(typeName: string, planText: string): boolean {
-  const patterns = [
+  // Prose patterns: "create interface X", "define new type X", etc.
+  const prosePatterns = [
     new RegExp(`create\\s+(?:a\\s+)?(?:new\\s+)?(?:interface|type|enum|class)\\s+\`?${typeName}\`?`, "i"),
     new RegExp(`define\\s+(?:a\\s+)?(?:new\\s+)?(?:interface|type|enum|class)\\s+\`?${typeName}\`?`, "i"),
     new RegExp(`add\\s+(?:a\\s+)?(?:new\\s+)?(?:interface|type|enum|class)\\s+\`?${typeName}\`?`, "i"),
     new RegExp(`new\\s+(?:interface|type|enum|class)\\s+\`?${typeName}\`?`, "i"),
   ];
-  return patterns.some(p => p.test(planText));
+  if (prosePatterns.some(p => p.test(planText))) return true;
+
+  // Code block declarations: interface X {, type X =, enum X {, class X {
+  // Catches prop types like DateRangeFilterProps defined inside planned code blocks
+  const codePatterns = [
+    new RegExp(`(?:export\\s+)?interface\\s+${typeName}\\s*(?:extends|\\{)`, "m"),
+    new RegExp(`(?:export\\s+)?type\\s+${typeName}\\s*(?:<[^>]*>)?\\s*=`, "m"),
+    new RegExp(`(?:export\\s+)?(?:const\\s+)?enum\\s+${typeName}\\s*\\{`, "m"),
+    new RegExp(`(?:export\\s+)?(?:abstract\\s+)?class\\s+${typeName}\\s*(?:extends|implements|\\{)`, "m"),
+    // Function component declarations: function TierBreakdown( or export default function X(
+    new RegExp(`(?:export\\s+)?(?:default\\s+)?function\\s+${typeName}\\s*[(<]`, "m"),
+    // Const component declarations: const TierBreakdown: FC = or const TierBreakdown = (
+    new RegExp(`(?:export\\s+)?const\\s+${typeName}\\s*[:=]`, "m"),
+  ];
+  return codePatterns.some(p => p.test(planText));
 }
 
 // --- Type Reference Extraction ---
@@ -342,8 +405,9 @@ export function extractTypeRefs(planText: string): RawTypeRef[] {
     refs.push({ typeName, memberName, raw: raw ?? key });
   };
 
-  // PascalCase pattern: starts with uppercase, at least 2 chars, has lowercase
-  const isPascalCase = (s: string) => /^[A-Z][a-zA-Z0-9]+$/.test(s);
+  // PascalCase pattern: starts with uppercase, at least 2 chars, must contain at least one lowercase
+  // Filters all-caps acronyms like ISO, API, SQL that aren't type references
+  const isPascalCase = (s: string) => /^[A-Z][a-zA-Z0-9]+$/.test(s) && /[a-z]/.test(s);
 
   // 1. Type annotations: `: TypeName` or `as TypeName`
   for (const match of codeText.matchAll(/(?::|\bas)\s+([A-Z]\w+)/g)) {
@@ -360,10 +424,11 @@ export function extractTypeRefs(planText: string): RawTypeRef[] {
   }
 
   // 3. Member access: TypeName.member (PascalCase.camelCase/lowercase)
-  for (const match of codeText.matchAll(/([A-Z]\w+)\.([a-z]\w*)/g)) {
+  // Use \b to avoid matching mid-word (e.g., authorEngagements.set → "Engagements.set")
+  for (const match of codeText.matchAll(/\b([A-Z]\w+)\.([a-z]\w*)/g)) {
     const typeName = match[1];
     const memberName = match[2];
-    if (isPascalCase(typeName)) {
+    if (isPascalCase(typeName) && !COMMON_METHODS.has(memberName)) {
       add(typeName, memberName, `${typeName}.${memberName}`);
     }
   }
@@ -452,8 +517,8 @@ export function analyzeTypes(planText: string, projectDir: string): TypeAnalysis
   let membersHallucinated = 0;
 
   for (const ref of rawRefs) {
-    // Skip builtins and single-char generics
-    if (BUILTIN_TYPES.has(ref.typeName) || GENERIC_SINGLE.test(ref.typeName)) {
+    // Skip builtins, single-char generics, and common English words
+    if (BUILTIN_TYPES.has(ref.typeName) || GENERIC_SINGLE.test(ref.typeName) || COMMON_WORDS.has(ref.typeName)) {
       skippedRefs++;
       continue;
     }

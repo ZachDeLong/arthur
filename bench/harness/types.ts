@@ -1,11 +1,77 @@
 /** Prompt definition from prompts.json */
 export interface PromptDefinition {
   id: string;
-  fixture: "fixture-a" | "fixture-b" | "fixture-c";
+  fixture: "fixture-a" | "fixture-b" | "fixture-c" | "fixture-d";
   task: string;
   systemContext: string;
   allowedNewPaths: string[];
   schemaFile?: string;
+}
+
+// --- Big Benchmark: All 7 Checkers vs Self-Review ---
+
+/** All checker categories in the big benchmark. */
+export type CheckerCategory =
+  | "path"
+  | "schema"
+  | "sql_schema"
+  | "import"
+  | "env"
+  | "type"
+  | "route";
+
+/** A single ground-truth error found by a static checker. */
+export interface GroundTruthError {
+  category: CheckerCategory;
+  raw: string;
+  description: string;
+  suggestion?: string;
+}
+
+/** Detection result for a single ground-truth error in the big benchmark. */
+export interface ErrorDetection {
+  error: GroundTruthError;
+  detected: boolean;
+  method: "direct" | "sentiment" | "section" | null;
+}
+
+/** Result of a single prompt run in the big benchmark. */
+export interface BigBenchmarkRun {
+  promptId: string;
+  fixture: string;
+  task: string;
+  model: string;
+  generatedPlan: string;
+  groundTruth: GroundTruthError[];
+  selfReviewOutput: string;
+  detections: ErrorDetection[];
+  perCategory: Record<CheckerCategory, { errors: number; detected: number; rate: number }>;
+  overallDetectionRate: number;
+  inputTokens: number;
+  outputTokens: number;
+  timestamp: string;
+}
+
+/** Summary across all runs in the big benchmark. */
+export interface BigBenchmarkSummary {
+  totalRuns: number;
+  model: string;
+  totalErrors: number;
+  totalDetected: number;
+  overallDetectionRate: number;
+  perCategory: Record<CheckerCategory, { errors: number; detected: number; rate: number }>;
+  perFixture: Record<string, { errors: number; detected: number; rate: number }>;
+  perRun: Array<{
+    promptId: string;
+    fixture: string;
+    errors: number;
+    detected: number;
+    rate: number;
+  }>;
+  apiUsage: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+  };
 }
 
 // --- Tier 2: Intent Drift Detection ---

@@ -54,6 +54,19 @@ const SQL_KEYWORDS = new Set([
   "sum", "avg", "min", "max", "if", "returning", "with", "recursive",
 ]);
 
+// --- English Stopwords (not SQL table names) ---
+
+/** Common English words that appear after FROM/INTO in code block comments
+ *  and prose but are never SQL table names. Prevents false positives like
+ *  "from the database" or "from previous step" in comments. */
+const ENGLISH_STOPWORDS = new Set([
+  "the", "a", "an", "this", "that", "these", "those",
+  "it", "its", "here", "there", "where", "when", "which",
+  "each", "every", "all", "any", "some", "no", "not",
+  "previous", "next", "above", "below", "following",
+  "cache", "scratch", "step", "file", "memory", "disk",
+]);
+
 // --- Parser 1: Drizzle ---
 
 /** Extract tables from a Drizzle schema file. */
@@ -329,12 +342,15 @@ export function extractSqlRefs(planText: string, schema: SqlSchema): RawSqlRef[]
     }
   }
 
-  // --- SQL-style references ---
+  // --- SQL-style references (restricted to fenced code blocks) ---
 
   // SELECT ... FROM X / INSERT INTO X / UPDATE X SET / DELETE FROM X
-  for (const m of planText.matchAll(/\b(?:FROM|INTO|UPDATE|JOIN)\s+["'`]?(\w+)["'`]?/gi)) {
+  // Only search within fenced code blocks to avoid matching prose ("from the", "from previous")
+  // and JS import statements ("from 'express'")
+  const codeBlockText = extractFencedCodeBlocks(planText);
+  for (const m of codeBlockText.matchAll(/\b(?:FROM|INTO|UPDATE|JOIN)\s+["'`]?(\w+)["'`]?/gi)) {
     const name = m[1];
-    if (!SQL_KEYWORDS.has(name.toLowerCase())) {
+    if (!SQL_KEYWORDS.has(name.toLowerCase()) && name.length > 1 && !isJsImportContext(codeBlockText, m.index!) && !ENGLISH_STOPWORDS.has(name.toLowerCase())) {
       add(m[0], name);
     }
   }
@@ -399,6 +415,38 @@ function resolveTable(name: string, schema: SqlSchema): SqlTable | undefined {
   if (sqlName) return schema.tables.get(sqlName);
 
   return undefined;
+}
+
+// --- Code Block Extraction ---
+
+/** Extract only fenced code block contents from plan text.
+ *  Returns all code block bodies joined with newlines. */
+function extractFencedCodeBlocks(text: string): string {
+  const blocks: string[] = [];
+  const regex = /```[^\n]*\n([\s\S]*?)```/g;
+  for (const match of text.matchAll(regex)) {
+    blocks.push(match[1]);
+  }
+  return blocks.join("\n");
+}
+
+// --- Context Filtering ---
+
+/** Check if a FROM/INTO match at the given index is part of a JS import statement. */
+function isJsImportContext(text: string, matchIndex: number): boolean {
+  // Find the line containing this match
+  const lineStart = text.lastIndexOf("\n", matchIndex) + 1;
+  const lineEnd = text.indexOf("\n", matchIndex);
+  const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+
+  // JS import patterns: import X from 'Y', } from 'Y', require('Y')
+  if (/\bimport\b/.test(line)) return true;
+  if (/}\s*from\s+['"]/.test(line)) return true;
+  if (/\brequire\s*\(/.test(line)) return true;
+  // Bare `from 'something'` or `from "something"` (re-exports, dynamic imports)
+  if (/\bfrom\s+['"]/.test(line)) return true;
+
+  return false;
 }
 
 // --- Fuzzy Suggestions ---

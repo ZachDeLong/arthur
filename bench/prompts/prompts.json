@@ -80,5 +80,36 @@
       "src/components/Export*.tsx"
     ],
     "schemaFile": "prisma/schema.prisma"
+  },
+  {
+    "id": "09",
+    "fixture": "fixture-d",
+    "task": "Add a user analytics endpoint that returns engagement statistics per user: total posts, total interactions received across all their posts, average interactions per post, and their most popular post by interaction count. The query should join the users table with posts and interactions tables, grouping by user. Use Drizzle ORM for type-safe queries.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Drizzle ORM queries in your plan.",
+    "allowedNewPaths": [
+      "src/routes/analytics*.ts",
+      "src/services/analytics*.ts"
+    ]
+  },
+  {
+    "id": "10",
+    "fixture": "fixture-d",
+    "task": "Add a content feed endpoint that returns the latest posts with author details and interaction counts. Support pagination with cursor-based navigation and filtering by username. Each post should include: title, body, author username, author email, total interaction count, and creation timestamp. Use Drizzle ORM with proper joins and aggregation.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Drizzle ORM queries in your plan.",
+    "allowedNewPaths": [
+      "src/routes/feed*.ts",
+      "src/services/feed*.ts"
+    ]
+  },
+  {
+    "id": "11",
+    "fixture": "fixture-d",
+    "task": "Add a trending content system that identifies posts with the most interactions in the last 24 hours. Implement a database query that aggregates interactions by post, filters by timestamp, and returns the top 10 trending posts with their author usernames and interaction breakdowns by type (likes, comments, shares). Use Drizzle ORM and store results in a materialized cache table for performance.",
+    "systemContext": "You are a senior TypeScript engineer. Create a detailed implementation plan for the requested feature. Reference specific existing files to modify using 'Modify' or 'Update'. When proposing new files, use 'Create' or 'Add'. Include concrete file paths and Drizzle ORM queries in your plan.",
+    "allowedNewPaths": [
+      "src/routes/trending*.ts",
+      "src/services/trending*.ts",
+      "migrations/002_*.sql"
+    ]
   }
 ]
