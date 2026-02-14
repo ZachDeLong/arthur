@@ -35,6 +35,7 @@ import { getAllFiles } from "../src/context/tree.js";
 import {
   parseSchema,
   analyzeSchema,
+  type SchemaAnalysis,
 } from "../src/analysis/schema-checker.js";
 import { analyzeImports } from "../src/analysis/import-checker.js";
 import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
@@ -46,6 +47,7 @@ import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
 import { streamVerification } from "../src/verifier/client.js";
 import { loadConfig } from "../src/config/manager.js";
+import { logCatch } from "../src/logging/catches.js";
 
 const server = new McpServer({
   name: "arthur",
@@ -119,6 +121,18 @@ server.tool(
           lines.push(`- ... and ${analysis.validPaths.length - 10} more`);
         }
       }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_paths",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: { checked, hallucinated, items: analysis.hallucinatedPaths },
+          schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null,
+        },
+        totalChecked: checked,
+        totalHallucinated: hallucinated,
+      });
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
@@ -236,6 +250,19 @@ server.tool(
         lines.push(`- **Enums:** ${[...schema.enums].join(", ")}`);
       }
 
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_schema",
+        projectDir: path.basename(projectDir ?? resolvedPath),
+        findings: {
+          paths: null,
+          schema: { checked: totalRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
+          sqlSchema: null, imports: null, env: null, types: null, routes: null,
+        },
+        totalChecked: totalRefs,
+        totalHallucinated: hallucinations.length,
+      });
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -291,6 +318,19 @@ server.tool(
         }
       }
 
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_imports",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null, sqlSchema: null,
+          imports: { checked: checkedImports, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
+          env: null, types: null, routes: null,
+        },
+        totalChecked: checkedImports,
+        totalHallucinated: hallucinations.length,
+      });
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -342,6 +382,19 @@ server.tool(
         lines.push(`### Defined Env Variables`);
         lines.push([...vars].map(v => `\`${v}\``).join(", "));
       }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_env",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null, sqlSchema: null, imports: null,
+          env: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.varName) },
+          types: null, routes: null,
+        },
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
@@ -429,6 +482,19 @@ server.tool(
         lines.push(`**Breakdown:** ${parts.join(", ")}`);
       }
 
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_types",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null, sqlSchema: null, imports: null, env: null,
+          types: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
+          routes: null,
+        },
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -484,6 +550,18 @@ server.tool(
           lines.push(`- \`${urlPath}\` [${methods}] → \`${route.filePath}\``);
         }
       }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_routes",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null, sqlSchema: null, imports: null, env: null, types: null,
+          routes: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
+        },
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
@@ -572,6 +650,19 @@ server.tool(
         lines.push(`- **${tableName}**${varNote} [${table.source}]: ${cols}`);
       }
 
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_sql_schema",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null,
+          sqlSchema: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
+          imports: null, env: null, types: null, routes: null,
+        },
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -625,10 +716,13 @@ server.tool(
           ? path.join(projectDir, "prisma/schema.prisma")
           : undefined);
 
+      let schemaAnalysisResult: SchemaAnalysis | undefined;
+
       if (resolvedSchemaPath) {
         try {
           const schema = parseSchema(path.resolve(resolvedSchemaPath));
           const schemaAnalysis = analyzeSchema(planText, schema);
+          schemaAnalysisResult = schemaAnalysis;
           const schemaIssues = schemaAnalysis.hallucinations.length;
           totalIssues += schemaIssues;
 
@@ -778,6 +872,40 @@ server.tool(
         lines.push(`**Routes:** ${[...routeIndex.entries()].map(([url, r]) => `\`${url}\` [${[...r.methods].join(",")}]`).join(", ")}`);
         lines.push(``);
       }
+
+      // --- Log catches ---
+      const pathsChecked = pathAnalysis.extractedPaths.length;
+      const schemaChecked = schemaAnalysisResult?.totalRefs ?? 0;
+      const schemaHallucinated = schemaAnalysisResult?.hallucinations.length ?? 0;
+      const sqlChecked = sqlSchemaAnalysis.checkedRefs;
+      const sqlHallucinated = sqlSchemaAnalysis.hallucinations.length;
+      const importsChecked = importAnalysis.checkedImports;
+      const importsHallucinated = importAnalysis.hallucinations.length;
+      const envChecked = envAnalysis.checkedRefs;
+      const envHallucinated = envAnalysis.hallucinations.length;
+      const typesChecked = typeAnalysis.checkedRefs;
+      const typesHallucinated = typeAnalysis.hallucinations.length;
+      const routesChecked = routeAnalysis.checkedRefs;
+      const routesHallucinated = routeAnalysis.hallucinations.length;
+
+      const totalChecked = pathsChecked + schemaChecked + sqlChecked + importsChecked + envChecked + typesChecked + routesChecked;
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_all",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: { checked: pathsChecked, hallucinated: pathIssues, items: pathAnalysis.hallucinatedPaths },
+          schema: { checked: schemaChecked, hallucinated: schemaHallucinated, items: schemaAnalysisResult?.hallucinations.map(h => h.raw) ?? [] },
+          sqlSchema: { checked: sqlChecked, hallucinated: sqlHallucinated, items: sqlSchemaAnalysis.hallucinations.map(h => h.raw) },
+          imports: { checked: importsChecked, hallucinated: importsHallucinated, items: importAnalysis.hallucinations.map(h => h.raw) },
+          env: { checked: envChecked, hallucinated: envHallucinated, items: envAnalysis.hallucinations.map(h => h.varName) },
+          types: { checked: typesChecked, hallucinated: typesHallucinated, items: typeAnalysis.hallucinations.map(h => h.raw) },
+          routes: { checked: routesChecked, hallucinated: routesHallucinated, items: routeAnalysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
+        },
+        totalChecked,
+        totalHallucinated: totalIssues,
+      });
 
       // --- Summary ---
       lines.push(`---`);
