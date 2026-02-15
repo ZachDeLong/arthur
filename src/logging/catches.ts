@@ -27,6 +27,7 @@ export interface CatchEntry {
     env: FindingEntry | null;
     types: FindingEntry | null;
     routes: FindingEntry | null;
+    supabaseSchema: FindingEntry | null;
   };
   totalChecked: number;
   totalHallucinated: number;

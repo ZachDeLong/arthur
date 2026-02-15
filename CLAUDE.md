@@ -99,6 +99,17 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 - **Workspaces live at `~/.arthur-tier3-workspaces/`** — NOT inside `~/arthur/` (prevents CLAUDE.md contamination)
 - **Must commit workspace changes before eval** — `evaluate.ts` uses `git diff HEAD~1`
 
+## Future Checkers (Roadmap)
+
+Priority order based on hallucination severity (schema > routes > imports > types):
+
+1. **Express/Fastify route checker** — `app.get('/path', ...)` / `router.post('/path', ...)` patterns. Covers the majority of Node backends that aren't Next.js App Router.
+2. **Raw SQL migration scanner** — scan `/migrations` folders for CREATE TABLE statements. `sql-schema-checker.ts` already parses CREATE TABLE, just needs to find migration files.
+3. **Python import checker** — validate `import` / `from X import Y` against pip packages in `requirements.txt` / `pyproject.toml`.
+4. **Python type checker** — validate references to Python classes, dataclasses, Pydantic models.
+5. **Additional ORMs** — TypeORM, Sequelize, SQLAlchemy schema parsing.
+6. **SvelteKit/Remix route checker** — file-based routing similar to Next.js but different conventions.
+
 ## Gotchas
 
 - `.*` in JS regex doesn't cross newlines — use `[^#]*` or `[\s\S]*?` for multi-line section matches

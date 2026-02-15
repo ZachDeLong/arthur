@@ -6,6 +6,7 @@ import type { EnvAnalysis } from "./env-checker.js";
 import type { TypeAnalysis } from "./type-checker.js";
 import type { ApiRouteAnalysis } from "./api-route-checker.js";
 import type { SqlSchemaAnalysis } from "./sql-schema-checker.js";
+import type { SupabaseSchemaAnalysis } from "./supabase-schema-checker.js";
 
 /** Print static path analysis results to the console. */
 export function printPathAnalysis(analysis: PathAnalysis): void {
@@ -249,6 +250,7 @@ export function formatStaticFindings(
   typeAnalysis?: TypeAnalysis,
   apiRouteAnalysis?: ApiRouteAnalysis,
   sqlSchemaAnalysis?: SqlSchemaAnalysis,
+  supabaseSchemaAnalysis?: SupabaseSchemaAnalysis,
 ): string | undefined {
   const sections: string[] = [];
 
@@ -348,6 +350,23 @@ export function formatStaticFindings(
     ];
     for (const h of sqlSchemaAnalysis.hallucinations) {
       const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
+      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (supabaseSchemaAnalysis && supabaseSchemaAnalysis.hallucinations.length > 0) {
+    const lines = [
+      `### Supabase Schema Issues`,
+      ``,
+      `Static analysis found ${supabaseSchemaAnalysis.hallucinations.length} Supabase schema hallucination(s):`,
+      ``,
+    ];
+    for (const h of supabaseSchemaAnalysis.hallucinations) {
+      const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
+        : h.hallucinationCategory === "hallucinated-column" ? "column not found"
+        : "function not found";
       const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
       lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
     }

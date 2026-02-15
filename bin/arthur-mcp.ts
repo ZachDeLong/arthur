@@ -42,6 +42,7 @@ import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
 import { analyzeTypes, buildTypeIndex } from "../src/analysis/type-checker.js";
 import { analyzeApiRoutes, buildRouteIndex } from "../src/analysis/api-route-checker.js";
 import { analyzeSqlSchema, buildSqlSchema } from "../src/analysis/sql-schema-checker.js";
+import { analyzeSupabaseSchema, parseSupabaseSchema, findSupabaseTypesFile } from "../src/analysis/supabase-schema-checker.js";
 import { formatStaticFindings } from "../src/analysis/formatter.js";
 import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
@@ -128,7 +129,7 @@ server.tool(
         projectDir: path.basename(projectDir),
         findings: {
           paths: { checked, hallucinated, items: analysis.hallucinatedPaths },
-          schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null,
+          schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null, supabaseSchema: null,
         },
         totalChecked: checked,
         totalHallucinated: hallucinated,
@@ -257,7 +258,7 @@ server.tool(
         findings: {
           paths: null,
           schema: { checked: totalRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          sqlSchema: null, imports: null, env: null, types: null, routes: null,
+          sqlSchema: null, imports: null, env: null, types: null, routes: null, supabaseSchema: null,
         },
         totalChecked: totalRefs,
         totalHallucinated: hallucinations.length,
@@ -325,7 +326,7 @@ server.tool(
         findings: {
           paths: null, schema: null, sqlSchema: null,
           imports: { checked: checkedImports, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          env: null, types: null, routes: null,
+          env: null, types: null, routes: null, supabaseSchema: null,
         },
         totalChecked: checkedImports,
         totalHallucinated: hallucinations.length,
@@ -390,7 +391,7 @@ server.tool(
         findings: {
           paths: null, schema: null, sqlSchema: null, imports: null,
           env: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.varName) },
-          types: null, routes: null,
+          types: null, routes: null, supabaseSchema: null,
         },
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
@@ -489,7 +490,7 @@ server.tool(
         findings: {
           paths: null, schema: null, sqlSchema: null, imports: null, env: null,
           types: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          routes: null,
+          routes: null, supabaseSchema: null,
         },
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
@@ -558,6 +559,7 @@ server.tool(
         findings: {
           paths: null, schema: null, sqlSchema: null, imports: null, env: null, types: null,
           routes: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
+          supabaseSchema: null,
         },
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
@@ -657,7 +659,129 @@ server.tool(
         findings: {
           paths: null, schema: null,
           sqlSchema: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          imports: null, env: null, types: null, routes: null,
+          imports: null, env: null, types: null, routes: null, supabaseSchema: null,
+        },
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    }
+  },
+);
+
+// --- check_supabase_schema ---
+
+server.tool(
+  "check_supabase_schema",
+  "Check Supabase table, column, and function references in a plan against the project's generated database.types.ts file. Catches hallucinated tables, columns, and RPC functions. Auto-detects the types file. No API key required.",
+  {
+    planText: z.string().describe("The plan text to check for Supabase references (.from(), .select(), .eq(), .rpc(), etc.)"),
+    projectDir: z.string().describe("Absolute path to the project directory"),
+  },
+  async ({ planText, projectDir }) => {
+    try {
+      const analysis = analyzeSupabaseSchema(planText, projectDir);
+      const lines: string[] = [];
+
+      const { checkedRefs, validRefs, hallucinations, tablesIndexed, functionsIndexed, enumsIndexed, typesFilePath, byCategory } = analysis;
+
+      lines.push(`## Supabase Schema Analysis`);
+      lines.push(``);
+
+      if (tablesIndexed === 0 && !typesFilePath) {
+        lines.push(`No Supabase generated types file found in project.`);
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+
+      lines.push(`**Source:** \`${typesFilePath}\``);
+      lines.push(`**${tablesIndexed}** tables, **${functionsIndexed}** functions, **${enumsIndexed}** enums indexed`);
+      lines.push(`**${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+      if (hallucinations.length > 0) {
+        lines.push(``);
+        lines.push(`### Hallucinations`);
+
+        const fullPath = path.join(projectDir, typesFilePath!);
+        const schema = parseSupabaseSchema(fullPath);
+
+        for (const h of hallucinations) {
+          const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
+            : h.hallucinationCategory === "hallucinated-column" ? "column not found"
+            : "function not found";
+          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+          if (h.hallucinationCategory === "hallucinated-table") {
+            const tableNames = [...schema.tables.keys()].join("`, `");
+            lines.push(`  - Available tables: \`${tableNames}\``);
+          }
+
+          if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+            const table = schema.tables.get(h.tableName);
+            if (table) {
+              const cols = [...table.columns.entries()]
+                .map(([name, type]) => `\`${name}\` (${type})`)
+                .join(", ");
+              lines.push(`  - Columns on ${table.name}: ${cols}`);
+            }
+          }
+
+          if (h.hallucinationCategory === "hallucinated-function") {
+            const funcNames = [...schema.functions.keys()].join("`, `");
+            if (funcNames) lines.push(`  - Available functions: \`${funcNames}\``);
+          }
+        }
+      }
+
+      // Category breakdown
+      const parts: string[] = [];
+      if (byCategory.tables.total > 0) {
+        parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
+      }
+      if (byCategory.columns.total > 0) {
+        parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
+      }
+      if (byCategory.functions.total > 0) {
+        parts.push(`${byCategory.functions.total - byCategory.functions.hallucinated}/${byCategory.functions.total} functions`);
+      }
+      if (parts.length > 0) {
+        lines.push(``);
+        lines.push(`**Breakdown:** ${parts.join(", ")}`);
+      }
+
+      // Always include schema ground truth
+      if (typesFilePath) {
+        const fullPath = path.join(projectDir, typesFilePath);
+        const schema = parseSupabaseSchema(fullPath);
+
+        lines.push(``);
+        lines.push(`### Supabase Schema Ground Truth`);
+        for (const [tableName, table] of schema.tables) {
+          const cols = [...table.columns.entries()]
+            .map(([name, type]) => `${name} (${type})`)
+            .join(", ");
+          lines.push(`- **${tableName}**: ${cols}`);
+        }
+        if (schema.functions.size > 0) {
+          lines.push(``);
+          lines.push(`**Functions:** ${[...schema.functions.keys()].map(f => `\`${f}\``).join(", ")}`);
+        }
+        if (schema.enums.size > 0) {
+          lines.push(`**Enums:** ${[...schema.enums.entries()].map(([name, vals]) => `\`${name}\` (${vals.join(", ")})`).join(", ")}`);
+        }
+      }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_supabase_schema",
+        projectDir: path.basename(projectDir),
+        findings: {
+          paths: null, schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null,
+          supabaseSchema: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
         },
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
@@ -675,7 +799,7 @@ server.tool(
 
 server.tool(
   "check_all",
-  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, imports, env vars, TypeScript types, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
+  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, Supabase schema, imports, env vars, TypeScript types, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
   {
     planText: z.string().describe("The plan text to verify against the project"),
     projectDir: z.string().describe("Absolute path to the project directory"),
@@ -873,6 +997,44 @@ server.tool(
         lines.push(``);
       }
 
+      // --- Supabase Schema ---
+      const supabaseSchemaAnalysis = analyzeSupabaseSchema(planText, projectDir);
+      if (supabaseSchemaAnalysis.tablesIndexed > 0) {
+        const supabaseIssues = supabaseSchemaAnalysis.hallucinations.length;
+        totalIssues += supabaseIssues;
+
+        const supabaseFullPath = path.join(projectDir, supabaseSchemaAnalysis.typesFilePath!);
+        const supabaseSchema = parseSupabaseSchema(supabaseFullPath);
+
+        lines.push(`## Supabase Schema`);
+        lines.push(`**Source:** \`${supabaseSchemaAnalysis.typesFilePath}\``);
+        lines.push(`**${supabaseSchemaAnalysis.tablesIndexed}** tables, **${supabaseSchemaAnalysis.functionsIndexed}** functions, **${supabaseSchemaAnalysis.enumsIndexed}** enums indexed`);
+        lines.push(`**${supabaseSchemaAnalysis.checkedRefs}** refs checked — **${supabaseIssues}** hallucinated`);
+        if (supabaseIssues > 0) {
+          for (const h of supabaseSchemaAnalysis.hallucinations) {
+            const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
+              : h.hallucinationCategory === "hallucinated-column" ? "column not found"
+              : "function not found";
+            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+            if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+              const table = supabaseSchema.tables.get(h.tableName);
+              if (table) {
+                const cols = [...table.columns.keys()].join("`, `");
+                lines.push(`  - Columns on ${h.tableName}: \`${cols}\``);
+              }
+            }
+          }
+        } else {
+          lines.push(`All Supabase refs valid.`);
+        }
+
+        lines.push(``);
+        lines.push(`**Tables:** ${[...supabaseSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
+        lines.push(``);
+      }
+
       // --- Log catches ---
       const pathsChecked = pathAnalysis.extractedPaths.length;
       const schemaChecked = schemaAnalysisResult?.totalRefs ?? 0;
@@ -887,8 +1049,10 @@ server.tool(
       const typesHallucinated = typeAnalysis.hallucinations.length;
       const routesChecked = routeAnalysis.checkedRefs;
       const routesHallucinated = routeAnalysis.hallucinations.length;
+      const supabaseChecked = supabaseSchemaAnalysis.checkedRefs;
+      const supabaseHallucinated = supabaseSchemaAnalysis.hallucinations.length;
 
-      const totalChecked = pathsChecked + schemaChecked + sqlChecked + importsChecked + envChecked + typesChecked + routesChecked;
+      const totalChecked = pathsChecked + schemaChecked + sqlChecked + importsChecked + envChecked + typesChecked + routesChecked + supabaseChecked;
 
       logCatch({
         timestamp: new Date().toISOString(),
@@ -902,6 +1066,7 @@ server.tool(
           env: { checked: envChecked, hallucinated: envHallucinated, items: envAnalysis.hallucinations.map(h => h.varName) },
           types: { checked: typesChecked, hallucinated: typesHallucinated, items: typeAnalysis.hallucinations.map(h => h.raw) },
           routes: { checked: routesChecked, hallucinated: routesHallucinated, items: routeAnalysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
+          supabaseSchema: { checked: supabaseChecked, hallucinated: supabaseHallucinated, items: supabaseSchemaAnalysis.hallucinations.map(h => h.raw) },
         },
         totalChecked,
         totalHallucinated: totalIssues,
@@ -996,6 +1161,9 @@ server.tool(
       // 2f. SQL/Drizzle schema analysis
       const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
 
+      // 2g. Supabase schema analysis
+      const supabaseSchemaAnalysis = analyzeSupabaseSchema(planText, projectDir);
+
       // Format static findings for LLM context
       const hasPathIssues = pathAnalysis.hallucinatedPaths.length > 0;
       const hasSchemaIssues = schemaAnalysis && schemaAnalysis.hallucinations.length > 0;
@@ -1004,6 +1172,7 @@ server.tool(
       const hasTypeIssues = typeAnalysis.hallucinations.length > 0;
       const hasApiRouteIssues = apiRouteAnalysis.hallucinations.length > 0;
       const hasSqlSchemaIssues = sqlSchemaAnalysis.hallucinations.length > 0;
+      const hasSupabaseSchemaIssues = supabaseSchemaAnalysis.hallucinations.length > 0;
 
       const staticFindings = formatStaticFindings(
         hasPathIssues ? pathAnalysis : undefined,
@@ -1013,6 +1182,7 @@ server.tool(
         hasTypeIssues ? typeAnalysis : undefined,
         hasApiRouteIssues ? apiRouteAnalysis : undefined,
         hasSqlSchemaIssues ? sqlSchemaAnalysis : undefined,
+        hasSupabaseSchemaIssues ? supabaseSchemaAnalysis : undefined,
       );
 
       // 3. Build LLM prompt
