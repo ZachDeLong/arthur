@@ -1,7 +1,7 @@
 {
   "name": "arthur-mcp",
-  "version": "0.2.0",
-  "description": "Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, and API routes — deterministically, zero cost, no API key.",
+  "version": "0.4.0",
+  "description": "Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, API routes, Express/Fastify routes, and Supabase schema — deterministically, zero cost, no API key.",
   "type": "module",
   "bin": {
     "arthur-mcp": "dist/bin/arthur-mcp.js",
@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "tsc",
+    "publish:check": "npm pack --dry-run",
     "dev": "tsx bin/codeverifier.ts",
     "mcp": "tsx bin/arthur-mcp.ts",
     "test": "vitest run",
@@ -41,6 +42,9 @@
     "prisma",
     "drizzle",
     "nextjs",
+    "supabase",
+    "express",
+    "fastify",
     "ai-coding"
   ],
   "author": "ZachDeLong",

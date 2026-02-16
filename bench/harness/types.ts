@@ -18,7 +18,8 @@ export type CheckerCategory =
   | "import"
   | "env"
   | "type"
-  | "route";
+  | "route"
+  | "express_route";
 
 /** A single ground-truth error found by a static checker. */
 export interface GroundTruthError {

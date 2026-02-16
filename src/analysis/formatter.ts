@@ -7,6 +7,7 @@ import type { TypeAnalysis } from "./type-checker.js";
 import type { ApiRouteAnalysis } from "./api-route-checker.js";
 import type { SqlSchemaAnalysis } from "./sql-schema-checker.js";
 import type { SupabaseSchemaAnalysis } from "./supabase-schema-checker.js";
+import { getCheckers, type CheckerResult } from "./registry.js";
 
 /** Print static path analysis results to the console. */
 export function printPathAnalysis(analysis: PathAnalysis): void {
@@ -241,136 +242,20 @@ export function printSqlSchemaAnalysis(analysis: SqlSchemaAnalysis): void {
   console.log();
 }
 
-/** Format static analysis findings as a markdown section for LLM context. */
+/**
+ * Format static analysis findings as a markdown section for LLM context.
+ * Registry-driven: loops over all registered checkers and calls formatForFindings().
+ */
 export function formatStaticFindings(
-  pathAnalysis?: PathAnalysis,
-  schemaAnalysis?: SchemaAnalysis,
-  importAnalysis?: ImportAnalysis,
-  envAnalysis?: EnvAnalysis,
-  typeAnalysis?: TypeAnalysis,
-  apiRouteAnalysis?: ApiRouteAnalysis,
-  sqlSchemaAnalysis?: SqlSchemaAnalysis,
-  supabaseSchemaAnalysis?: SupabaseSchemaAnalysis,
+  results: Map<string, CheckerResult>,
 ): string | undefined {
   const sections: string[] = [];
 
-  if (pathAnalysis && pathAnalysis.hallucinatedPaths.length > 0) {
-    const lines = [
-      `### File Path Issues`,
-      ``,
-      `Static analysis found ${pathAnalysis.hallucinatedPaths.length} file path(s) that do not exist in the project:`,
-      ``,
-    ];
-    for (const p of pathAnalysis.hallucinatedPaths) {
-      lines.push(`- \`${p}\` — **NOT FOUND** in project tree`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (schemaAnalysis && schemaAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### Schema Issues`,
-      ``,
-      `Static analysis found ${schemaAnalysis.hallucinations.length} Prisma schema hallucination(s):`,
-      ``,
-    ];
-    for (const h of schemaAnalysis.hallucinations) {
-      const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
-      lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (importAnalysis && importAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### Import Issues`,
-      ``,
-      `Static analysis found ${importAnalysis.hallucinations.length} hallucinated import(s):`,
-      ``,
-    ];
-    for (const h of importAnalysis.hallucinations) {
-      const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
-      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (envAnalysis && envAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### Environment Variable Issues`,
-      ``,
-      `Static analysis found ${envAnalysis.hallucinations.length} env variable(s) not defined in project env files (${envAnalysis.envFilesFound.join(", ")}):`,
-      ``,
-    ];
-    for (const h of envAnalysis.hallucinations) {
-      const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
-      lines.push(`- \`${h.varName}\` — not in env files${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (typeAnalysis && typeAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### TypeScript Type Issues`,
-      ``,
-      `Static analysis found ${typeAnalysis.hallucinations.length} TypeScript type hallucination(s):`,
-      ``,
-    ];
-    for (const h of typeAnalysis.hallucinations) {
-      const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
-      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (apiRouteAnalysis && apiRouteAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### API Route Issues`,
-      ``,
-      `Static analysis found ${apiRouteAnalysis.hallucinations.length} API route hallucination(s):`,
-      ``,
-    ];
-    for (const h of apiRouteAnalysis.hallucinations) {
-      const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
-      const method = h.method ? `${h.method} ` : "";
-      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (sqlSchemaAnalysis && sqlSchemaAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### SQL Schema Issues`,
-      ``,
-      `Static analysis found ${sqlSchemaAnalysis.hallucinations.length} SQL/Drizzle schema hallucination(s):`,
-      ``,
-    ];
-    for (const h of sqlSchemaAnalysis.hallucinations) {
-      const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
-      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
-  }
-
-  if (supabaseSchemaAnalysis && supabaseSchemaAnalysis.hallucinations.length > 0) {
-    const lines = [
-      `### Supabase Schema Issues`,
-      ``,
-      `Static analysis found ${supabaseSchemaAnalysis.hallucinations.length} Supabase schema hallucination(s):`,
-      ``,
-    ];
-    for (const h of supabaseSchemaAnalysis.hallucinations) {
-      const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
-        : h.hallucinationCategory === "hallucinated-column" ? "column not found"
-        : "function not found";
-      const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-    }
-    sections.push(lines.join("\n"));
+  for (const checker of getCheckers()) {
+    const result = results.get(checker.id);
+    if (!result) continue;
+    const section = checker.formatForFindings(result);
+    if (section) sections.push(section);
   }
 
   if (sections.length === 0) return undefined;

@@ -1,0 +1,12 @@
+{
+  "name": "fixture-e",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "typescript": "^5.0.0"
+  }
+}

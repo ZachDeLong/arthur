@@ -153,6 +153,7 @@ function getSentimentPhrases(category: CheckerCategory): string[] {
     case "type":
       return TYPE_SENTIMENT;
     case "route":
+    case "express_route":
       return ROUTE_SENTIMENT;
   }
 }

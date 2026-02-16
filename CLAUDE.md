@@ -9,10 +9,12 @@ Ground truth verification for AI-generated code. MCP server that catches halluci
 ```
 bin/
   codeverifier.ts   CLI entry point
-  arthur-mcp.ts     MCP server (stdio transport, 10 tools)
+  arthur-mcp.ts     MCP server (stdio transport, 12 tools)
 
 src/
-  analysis/     Static analysis (path-checker, schema-checker, sql-schema-checker, import-checker, env-checker, type-checker, api-route-checker, formatter)
+  analysis/     Static analysis checkers + registry pattern
+    checkers/   Checker registration files (one per checker, auto-registered via barrel import)
+    registry.ts Checker registry (CheckerDefinition interface, registerChecker/getCheckers)
   commands/     CLI commands (verify, init)
   config/       Config management (global + project + env)
   context/      Project context builder (tree, file reader, token budget)
@@ -21,7 +23,7 @@ src/
   verifier/     Prompt construction, API streaming, output rendering
 
 bench/
-  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL)
+  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL, fixture-e: Express)
   harness/      Benchmark runner, scoring, detection parsing
   prompts/      Benchmark prompts + drift specs
   naive-prompt.ts   Frozen baseline prompt (DO NOT MODIFY)
@@ -30,15 +32,17 @@ bench/
 
 ## MCP Server
 
-Ten tools:
-- **`check_all`** — runs all 7 deterministic checkers in one call, returns comprehensive report with ground truth (no API key). **This is the primary tool.**
+Twelve tools (registry-driven — adding a new checker is a 2-file operation):
+- **`check_all`** — runs all 9 deterministic checkers in one call, returns comprehensive report with ground truth (no API key). **This is the primary tool.**
 - `check_paths` — path validation against project tree + closest matches (no API key)
 - `check_schema` — Prisma schema validation + full schema ground truth (no API key)
 - `check_sql_schema` — Drizzle/SQL schema validation + full table/column listing (no API key)
+- `check_supabase_schema` — Supabase `database.types.ts` validation: tables, columns, functions, enums (no API key)
 - `check_imports` — package import validation + installed packages listing (no API key)
 - `check_env` — env variable validation + all defined vars (no API key)
 - `check_types` — TypeScript type validation + available types listing (no API key)
 - `check_routes` — Next.js App Router route validation + all routes listing (no API key)
+- `check_express_routes` — Express/Fastify route validation with mount prefix resolution (no API key)
 - `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY)
 - `update_session_context` / `get_session_context` — session persistence across context compression
 
@@ -103,12 +107,22 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 
 Priority order based on hallucination severity (schema > routes > imports > types):
 
-1. **Express/Fastify route checker** — `app.get('/path', ...)` / `router.post('/path', ...)` patterns. Covers the majority of Node backends that aren't Next.js App Router.
+1. ~~**Express/Fastify route checker**~~ — **DONE** (v0.4.0). `check_express_routes` tool with mount prefix resolution.
 2. **Raw SQL migration scanner** — scan `/migrations` folders for CREATE TABLE statements. `sql-schema-checker.ts` already parses CREATE TABLE, just needs to find migration files.
 3. **Python import checker** — validate `import` / `from X import Y` against pip packages in `requirements.txt` / `pyproject.toml`.
 4. **Python type checker** — validate references to Python classes, dataclasses, Pydantic models.
 5. **Additional ORMs** — TypeORM, Sequelize, SQLAlchemy schema parsing.
 6. **SvelteKit/Remix route checker** — file-based routing similar to Next.js but different conventions.
+
+## Adding a New Checker
+
+With the registry pattern, adding a checker is a 2-file operation:
+
+1. Create `src/analysis/my-checker.ts` — the analysis logic (exports `analyzeMyThing()`)
+2. Create `src/analysis/checkers/my-checker.ts` — imports `registerChecker()`, wraps the analysis in a `CheckerDefinition`
+3. Add `import "./my-checker.js"` to `src/analysis/checkers/index.ts`
+
+The checker is automatically included in `check_all`, `verify_plan`, and catch logging.
 
 ## Gotchas
 

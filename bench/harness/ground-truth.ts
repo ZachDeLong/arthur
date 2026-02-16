@@ -13,6 +13,7 @@ import type { ImportAnalysis } from "../../src/analysis/import-checker.js";
 import type { EnvAnalysis } from "../../src/analysis/env-checker.js";
 import type { TypeAnalysis } from "../../src/analysis/type-checker.js";
 import type { ApiRouteAnalysis } from "../../src/analysis/api-route-checker.js";
+import type { ExpressRouteAnalysis } from "../../src/analysis/express-route-checker.js";
 
 export interface AllCheckerResults {
   paths?: PathAnalysis;
@@ -22,6 +23,7 @@ export interface AllCheckerResults {
   env?: EnvAnalysis;
   types?: TypeAnalysis;
   routes?: ApiRouteAnalysis;
+  expressRoutes?: ExpressRouteAnalysis;
 }
 
 /** Convert all checker outputs into a flat GroundTruthError array. */
@@ -104,6 +106,18 @@ export function extractGroundTruth(results: AllCheckerResults): GroundTruthError
     for (const h of results.routes.hallucinations) {
       errors.push({
         category: "route",
+        raw: h.raw,
+        description: `${h.hallucinationCategory}: ${h.urlPath}${h.method ? ` (${h.method})` : ""}`,
+        suggestion: h.suggestion,
+      });
+    }
+  }
+
+  // Express/Fastify route hallucinations
+  if (results.expressRoutes) {
+    for (const h of results.expressRoutes.hallucinations) {
+      errors.push({
+        category: "express_route",
         raw: h.raw,
         description: `${h.hallucinationCategory}: ${h.urlPath}${h.method ? ` (${h.method})` : ""}`,
         suggestion: h.suggestion,

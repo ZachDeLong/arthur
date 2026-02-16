@@ -14,6 +14,8 @@
  *   check_types            — deterministic TypeScript type validation (no API key)
  *   check_routes           — deterministic Next.js API route validation (no API key)
  *   check_sql_schema       — deterministic Drizzle/SQL schema validation (no API key)
+ *   check_supabase_schema  — deterministic Supabase schema validation (no API key)
+ *   check_all              — runs all deterministic checkers in one call (no API key)
  *   verify_plan            — full pipeline: static analysis + LLM review (requires ANTHROPIC_API_KEY)
  *   update_session_context — record decisions/insights to survive context compression
  *   get_session_context    — read back session context after compression
@@ -48,7 +50,11 @@ import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
 import { streamVerification } from "../src/verifier/client.js";
 import { loadConfig } from "../src/config/manager.js";
-import { logCatch } from "../src/logging/catches.js";
+import { logCatch, buildCatchFindings } from "../src/logging/catches.js";
+
+// Import registry + all checker registrations
+import { getCheckers } from "../src/analysis/registry.js";
+import "../src/analysis/checkers/index.js";
 
 const server = new McpServer({
   name: "arthur",
@@ -127,10 +133,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_paths",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: { checked, hallucinated, items: analysis.hallucinatedPaths },
-          schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("paths", checked, hallucinated, analysis.hallucinatedPaths),
         totalChecked: checked,
         totalHallucinated: hallucinated,
       });
@@ -255,11 +258,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_schema",
         projectDir: path.basename(projectDir ?? resolvedPath),
-        findings: {
-          paths: null,
-          schema: { checked: totalRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          sqlSchema: null, imports: null, env: null, types: null, routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("schema", totalRefs, hallucinations.length, hallucinations.map(h => h.raw)),
         totalChecked: totalRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -323,11 +322,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_imports",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null, sqlSchema: null,
-          imports: { checked: checkedImports, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          env: null, types: null, routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("imports", checkedImports, hallucinations.length, hallucinations.map(h => h.raw)),
         totalChecked: checkedImports,
         totalHallucinated: hallucinations.length,
       });
@@ -388,11 +383,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_env",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null, sqlSchema: null, imports: null,
-          env: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.varName) },
-          types: null, routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("env", checkedRefs, hallucinations.length, hallucinations.map(h => h.varName)),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -487,11 +478,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_types",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null, sqlSchema: null, imports: null, env: null,
-          types: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("types", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -556,11 +543,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_routes",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null, sqlSchema: null, imports: null, env: null, types: null,
-          routes: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
-          supabaseSchema: null,
-        },
+        findings: buildCatchFindings("routes", checkedRefs, hallucinations.length, hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim())),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -656,11 +639,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_sql_schema",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null,
-          sqlSchema: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-          imports: null, env: null, types: null, routes: null, supabaseSchema: null,
-        },
+        findings: buildCatchFindings("sqlSchema", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -779,10 +758,7 @@ server.tool(
         timestamp: new Date().toISOString(),
         tool: "check_supabase_schema",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: null, schema: null, sqlSchema: null, imports: null, env: null, types: null, routes: null,
-          supabaseSchema: { checked: checkedRefs, hallucinated: hallucinations.length, items: hallucinations.map(h => h.raw) },
-        },
+        findings: buildCatchFindings("supabaseSchema", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
       });
@@ -795,7 +771,83 @@ server.tool(
   },
 );
 
-// --- check_all ---
+// --- check_express_routes ---
+
+server.tool(
+  "check_express_routes",
+  "Check Express/Fastify route references in a plan against the project's route definitions. Catches hallucinated routes and invalid HTTP methods. Auto-detects Express or Fastify from package.json. No API key required.",
+  {
+    planText: z.string().describe("The plan text to check for route references"),
+    projectDir: z.string().describe("Absolute path to the project directory"),
+  },
+  async ({ planText, projectDir }) => {
+    try {
+      const { analyzeExpressRoutes, buildExpressRouteIndex } = await import("../src/analysis/express-route-checker.js");
+      const analysis = analyzeExpressRoutes(planText, projectDir);
+      const lines: string[] = [];
+
+      const { checkedRefs, validRefs, hallucinations, routesIndexed, framework } = analysis;
+
+      const frameworkLabel = framework === "both" ? "Express + Fastify"
+        : framework === "fastify" ? "Fastify"
+        : "Express";
+
+      lines.push(`## ${frameworkLabel} Route Analysis`);
+      lines.push(``);
+
+      if (framework === "none") {
+        lines.push(`No Express or Fastify dependency found in package.json.`);
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+
+      if (routesIndexed === 0) {
+        lines.push(`${frameworkLabel} detected but no route definitions found in source files.`);
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+
+      lines.push(`**${routesIndexed}** routes indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+      if (hallucinations.length > 0) {
+        lines.push(``);
+        lines.push(`### Hallucinated Routes`);
+        for (const h of hallucinations) {
+          const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
+          const method = h.method ? `${h.method} ` : "";
+          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+          lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
+        }
+      }
+
+      // Always include full route table as ground truth
+      const index = buildExpressRouteIndex(projectDir);
+      if (index.size > 0) {
+        lines.push(``);
+        lines.push(`### Available Routes`);
+        for (const [urlPath, routes] of index) {
+          const methods = [...new Set(routes.map(r => r.method))].join(", ");
+          const file = routes[0].filePath;
+          lines.push(`- \`${urlPath}\` [${methods}] → \`${file}\``);
+        }
+      }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_express_routes",
+        projectDir: path.basename(projectDir),
+        findings: buildCatchFindings("expressRoutes", checkedRefs, hallucinations.length, hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim())),
+        totalChecked: checkedRefs,
+        totalHallucinated: hallucinations.length,
+      });
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    }
+  },
+);
+
+// --- check_all (registry-driven) ---
 
 server.tool(
   "check_all",
@@ -809,270 +861,38 @@ server.tool(
     try {
       const lines: string[] = [];
       let totalIssues = 0;
+      let totalChecked = 0;
+      const findings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
+
+      const options: Record<string, string> = {};
+      if (schemaPath) options.schemaPath = schemaPath;
 
       lines.push(`# Arthur Verification Report`);
       lines.push(``);
 
-      // --- Paths ---
-      const pathAnalysis = analyzePaths(planText, projectDir);
-      const actualFiles = getAllFiles(projectDir);
-      const pathIssues = pathAnalysis.hallucinatedPaths.length;
-      totalIssues += pathIssues;
-
-      lines.push(`## File Paths`);
-      lines.push(`**${pathAnalysis.extractedPaths.length}** paths checked — **${pathIssues}** hallucinated | ${actualFiles.size} files indexed`);
-      if (pathIssues > 0) {
-        for (const p of pathAnalysis.hallucinatedPaths) {
-          lines.push(`- \`${p}\` — **NOT FOUND**`);
-          const closest = findClosestPaths(p, actualFiles);
-          if (closest.length > 0) {
-            lines.push(`  - Closest: ${closest.map(c => `\`${c}\``).join(", ")}`);
-          }
+      for (const checker of getCheckers()) {
+        const result = checker.run(planText, projectDir, options);
+        if (result.applicable) {
+          lines.push(...checker.formatForCheckAll(result, projectDir));
+          totalIssues += result.hallucinated;
+          totalChecked += result.checked;
         }
-      } else {
-        lines.push(`All paths valid.`);
-      }
-      lines.push(``);
-
-      // --- Prisma Schema ---
-      const resolvedSchemaPath = schemaPath
-        ?? (fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
-          ? path.join(projectDir, "prisma/schema.prisma")
-          : undefined);
-
-      let schemaAnalysisResult: SchemaAnalysis | undefined;
-
-      if (resolvedSchemaPath) {
-        try {
-          const schema = parseSchema(path.resolve(resolvedSchemaPath));
-          const schemaAnalysis = analyzeSchema(planText, schema);
-          schemaAnalysisResult = schemaAnalysis;
-          const schemaIssues = schemaAnalysis.hallucinations.length;
-          totalIssues += schemaIssues;
-
-          lines.push(`## Prisma Schema`);
-          lines.push(`**${schemaAnalysis.totalRefs}** refs — **${schemaIssues}** hallucinated`);
-          if (schemaIssues > 0) {
-            for (const h of schemaAnalysis.hallucinations) {
-              const suggestion = h.suggestion ? ` → \`${h.suggestion}\`` : "";
-              lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
-
-              if (h.hallucinationCategory === "hallucinated-model") {
-                const available = [...schema.accessorToModel.entries()]
-                  .map(([accessor, model]) => `\`${accessor}\` (${model})`)
-                  .join(", ");
-                lines.push(`  - Available models: ${available}`);
-              }
-              if (h.hallucinationCategory === "hallucinated-field" && h.modelAccessor) {
-                const modelName = schema.accessorToModel.get(h.modelAccessor);
-                const model = modelName ? schema.models.get(modelName) : undefined;
-                if (model) {
-                  const fields = [...model.fields.keys()].join("`, `");
-                  lines.push(`  - Fields on ${modelName}: \`${fields}\``);
-                }
-              }
-            }
-          } else {
-            lines.push(`All schema refs valid.`);
-          }
-
-          // Schema ground truth
-          lines.push(``);
-          lines.push(`**Schema:** ${[...schema.models.keys()].map(m => `\`${m}\``).join(", ")}${schema.enums.size > 0 ? ` | Enums: ${[...schema.enums].join(", ")}` : ""}`);
-          lines.push(``);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          lines.push(`## Prisma Schema`);
-          lines.push(`Error parsing schema: ${msg}`);
-          lines.push(``);
-        }
+        findings[checker.catchKey] = result.applicable
+          ? { checked: result.checked, hallucinated: result.hallucinated, items: result.catchItems }
+          : null;
       }
 
-      // --- SQL/Drizzle Schema ---
-      const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
-      if (sqlSchemaAnalysis.tablesIndexed > 0) {
-        const sqlIssues = sqlSchemaAnalysis.hallucinations.length;
-        totalIssues += sqlIssues;
-        const sqlSchema = buildSqlSchema(projectDir);
-
-        lines.push(`## SQL/Drizzle Schema`);
-        lines.push(`**${sqlSchemaAnalysis.tablesIndexed}** tables, **${sqlSchemaAnalysis.checkedRefs}** refs — **${sqlIssues}** hallucinated`);
-        if (sqlIssues > 0) {
-          for (const h of sqlSchemaAnalysis.hallucinations) {
-            const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
-            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-          }
-        } else {
-          lines.push(`All SQL refs valid.`);
-        }
-
-        lines.push(``);
-        lines.push(`**Tables:** ${[...sqlSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
-        lines.push(``);
-      }
-
-      // --- Imports ---
-      const importAnalysis = analyzeImports(planText, projectDir);
-      if (importAnalysis.checkedImports > 0) {
-        const importIssues = importAnalysis.hallucinations.length;
-        totalIssues += importIssues;
-
-        lines.push(`## Imports`);
-        lines.push(`**${importAnalysis.checkedImports}** checked — **${importIssues}** hallucinated`);
-        if (importIssues > 0) {
-          for (const h of importAnalysis.hallucinations) {
-            const reason = h.reason === "package-not-found" ? "not installed" : "subpath not exported";
-            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-            lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
-          }
-        } else {
-          lines.push(`All imports valid.`);
-        }
-        lines.push(``);
-      }
-
-      // --- Env ---
-      const envAnalysis = analyzeEnv(planText, projectDir);
-      if (envAnalysis.envFilesFound.length > 0 && envAnalysis.checkedRefs > 0) {
-        const envIssues = envAnalysis.hallucinations.length;
-        totalIssues += envIssues;
-
-        lines.push(`## Env Variables`);
-        lines.push(`**${envAnalysis.checkedRefs}** checked — **${envIssues}** hallucinated`);
-        if (envIssues > 0) {
-          for (const h of envAnalysis.hallucinations) {
-            const suggestion = h.suggestion ? ` → \`${h.suggestion}\`` : "";
-            lines.push(`- \`${h.varName}\`${suggestion}`);
-          }
-          const { vars } = parseEnvFiles(projectDir);
-          lines.push(`- Defined vars: ${[...vars].map(v => `\`${v}\``).join(", ")}`);
-        } else {
-          lines.push(`All env vars valid.`);
-        }
-        lines.push(``);
-      }
-
-      // --- Types ---
-      const typeAnalysis = analyzeTypes(planText, projectDir);
-      if (typeAnalysis.checkedRefs > 0) {
-        const typeIssues = typeAnalysis.hallucinations.length;
-        totalIssues += typeIssues;
-
-        lines.push(`## TypeScript Types`);
-        lines.push(`**${typeAnalysis.checkedRefs}** checked — **${typeIssues}** hallucinated`);
-        if (typeIssues > 0) {
-          for (const h of typeAnalysis.hallucinations) {
-            const category = h.hallucinationCategory === "hallucinated-type" ? "not found" : "member not found";
-            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-          }
-        } else {
-          lines.push(`All type refs valid.`);
-        }
-        lines.push(``);
-      }
-
-      // --- API Routes ---
-      const routeAnalysis = analyzeApiRoutes(planText, projectDir);
-      if (routeAnalysis.routesIndexed > 0) {
-        const routeIssues = routeAnalysis.hallucinations.length;
-        totalIssues += routeIssues;
-
-        lines.push(`## API Routes`);
-        lines.push(`**${routeAnalysis.routesIndexed}** routes indexed, **${routeAnalysis.checkedRefs}** refs — **${routeIssues}** hallucinated`);
-        if (routeIssues > 0) {
-          for (const h of routeAnalysis.hallucinations) {
-            const category = h.hallucinationCategory === "hallucinated-route" ? "not found" : "method not allowed";
-            const method = h.method ? `${h.method} ` : "";
-            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-            lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
-          }
-        } else {
-          lines.push(`All route refs valid.`);
-        }
-
-        const routeIndex = buildRouteIndex(projectDir);
-        lines.push(`**Routes:** ${[...routeIndex.entries()].map(([url, r]) => `\`${url}\` [${[...r.methods].join(",")}]`).join(", ")}`);
-        lines.push(``);
-      }
-
-      // --- Supabase Schema ---
-      const supabaseSchemaAnalysis = analyzeSupabaseSchema(planText, projectDir);
-      if (supabaseSchemaAnalysis.tablesIndexed > 0) {
-        const supabaseIssues = supabaseSchemaAnalysis.hallucinations.length;
-        totalIssues += supabaseIssues;
-
-        const supabaseFullPath = path.join(projectDir, supabaseSchemaAnalysis.typesFilePath!);
-        const supabaseSchema = parseSupabaseSchema(supabaseFullPath);
-
-        lines.push(`## Supabase Schema`);
-        lines.push(`**Source:** \`${supabaseSchemaAnalysis.typesFilePath}\``);
-        lines.push(`**${supabaseSchemaAnalysis.tablesIndexed}** tables, **${supabaseSchemaAnalysis.functionsIndexed}** functions, **${supabaseSchemaAnalysis.enumsIndexed}** enums indexed`);
-        lines.push(`**${supabaseSchemaAnalysis.checkedRefs}** refs checked — **${supabaseIssues}** hallucinated`);
-        if (supabaseIssues > 0) {
-          for (const h of supabaseSchemaAnalysis.hallucinations) {
-            const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
-              : h.hallucinationCategory === "hallucinated-column" ? "column not found"
-              : "function not found";
-            const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-            lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-
-            if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
-              const table = supabaseSchema.tables.get(h.tableName);
-              if (table) {
-                const cols = [...table.columns.keys()].join("`, `");
-                lines.push(`  - Columns on ${h.tableName}: \`${cols}\``);
-              }
-            }
-          }
-        } else {
-          lines.push(`All Supabase refs valid.`);
-        }
-
-        lines.push(``);
-        lines.push(`**Tables:** ${[...supabaseSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
-        lines.push(``);
-      }
-
-      // --- Log catches ---
-      const pathsChecked = pathAnalysis.extractedPaths.length;
-      const schemaChecked = schemaAnalysisResult?.totalRefs ?? 0;
-      const schemaHallucinated = schemaAnalysisResult?.hallucinations.length ?? 0;
-      const sqlChecked = sqlSchemaAnalysis.checkedRefs;
-      const sqlHallucinated = sqlSchemaAnalysis.hallucinations.length;
-      const importsChecked = importAnalysis.checkedImports;
-      const importsHallucinated = importAnalysis.hallucinations.length;
-      const envChecked = envAnalysis.checkedRefs;
-      const envHallucinated = envAnalysis.hallucinations.length;
-      const typesChecked = typeAnalysis.checkedRefs;
-      const typesHallucinated = typeAnalysis.hallucinations.length;
-      const routesChecked = routeAnalysis.checkedRefs;
-      const routesHallucinated = routeAnalysis.hallucinations.length;
-      const supabaseChecked = supabaseSchemaAnalysis.checkedRefs;
-      const supabaseHallucinated = supabaseSchemaAnalysis.hallucinations.length;
-
-      const totalChecked = pathsChecked + schemaChecked + sqlChecked + importsChecked + envChecked + typesChecked + routesChecked + supabaseChecked;
-
+      // Log catches
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_all",
         projectDir: path.basename(projectDir),
-        findings: {
-          paths: { checked: pathsChecked, hallucinated: pathIssues, items: pathAnalysis.hallucinatedPaths },
-          schema: { checked: schemaChecked, hallucinated: schemaHallucinated, items: schemaAnalysisResult?.hallucinations.map(h => h.raw) ?? [] },
-          sqlSchema: { checked: sqlChecked, hallucinated: sqlHallucinated, items: sqlSchemaAnalysis.hallucinations.map(h => h.raw) },
-          imports: { checked: importsChecked, hallucinated: importsHallucinated, items: importAnalysis.hallucinations.map(h => h.raw) },
-          env: { checked: envChecked, hallucinated: envHallucinated, items: envAnalysis.hallucinations.map(h => h.varName) },
-          types: { checked: typesChecked, hallucinated: typesHallucinated, items: typeAnalysis.hallucinations.map(h => h.raw) },
-          routes: { checked: routesChecked, hallucinated: routesHallucinated, items: routeAnalysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()) },
-          supabaseSchema: { checked: supabaseChecked, hallucinated: supabaseHallucinated, items: supabaseSchemaAnalysis.hallucinations.map(h => h.raw) },
-        },
+        findings,
         totalChecked,
         totalHallucinated: totalIssues,
       });
 
-      // --- Summary ---
+      // Summary
       lines.push(`---`);
       if (totalIssues === 0) {
         lines.push(`**All checks passed.** No hallucinated references found.`);
@@ -1126,70 +946,23 @@ server.tool(
         tokenBudget: config.tokenBudget,
       });
 
-      // 2. Static analysis
-      const pathAnalysis = analyzePaths(planText, projectDir);
+      // 2. Run all checkers via registry
+      const options: Record<string, string> = {};
+      if (schemaPath) options.schemaPath = schemaPath;
 
-      // Auto-detect Prisma schema if not explicitly provided
-      const resolvedSchemaPath = schemaPath
-        ?? (fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
-          ? path.join(projectDir, "prisma/schema.prisma")
-          : undefined);
-
-      let schemaAnalysis;
-      if (resolvedSchemaPath) {
-        try {
-          const schema = parseSchema(path.resolve(resolvedSchemaPath));
-          schemaAnalysis = analyzeSchema(planText, schema);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(`[arthur-mcp] Schema parse error: ${msg}`);
-        }
+      const results = new Map<string, import("../src/analysis/registry.js").CheckerResult>();
+      for (const checker of getCheckers()) {
+        results.set(checker.id, checker.run(planText, projectDir, options));
       }
 
-      // 2b. Import analysis
-      const importAnalysis = analyzeImports(planText, projectDir);
+      // 3. Format static findings for LLM context
+      const staticFindings = formatStaticFindings(results);
 
-      // 2c. Env analysis
-      const envAnalysis = analyzeEnv(planText, projectDir);
-
-      // 2d. Type analysis
-      const typeAnalysis = analyzeTypes(planText, projectDir);
-
-      // 2e. API route analysis
-      const apiRouteAnalysis = analyzeApiRoutes(planText, projectDir);
-
-      // 2f. SQL/Drizzle schema analysis
-      const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
-
-      // 2g. Supabase schema analysis
-      const supabaseSchemaAnalysis = analyzeSupabaseSchema(planText, projectDir);
-
-      // Format static findings for LLM context
-      const hasPathIssues = pathAnalysis.hallucinatedPaths.length > 0;
-      const hasSchemaIssues = schemaAnalysis && schemaAnalysis.hallucinations.length > 0;
-      const hasImportIssues = importAnalysis.hallucinations.length > 0;
-      const hasEnvIssues = envAnalysis.hallucinations.length > 0;
-      const hasTypeIssues = typeAnalysis.hallucinations.length > 0;
-      const hasApiRouteIssues = apiRouteAnalysis.hallucinations.length > 0;
-      const hasSqlSchemaIssues = sqlSchemaAnalysis.hallucinations.length > 0;
-      const hasSupabaseSchemaIssues = supabaseSchemaAnalysis.hallucinations.length > 0;
-
-      const staticFindings = formatStaticFindings(
-        hasPathIssues ? pathAnalysis : undefined,
-        hasSchemaIssues ? schemaAnalysis : undefined,
-        hasImportIssues ? importAnalysis : undefined,
-        hasEnvIssues ? envAnalysis : undefined,
-        hasTypeIssues ? typeAnalysis : undefined,
-        hasApiRouteIssues ? apiRouteAnalysis : undefined,
-        hasSqlSchemaIssues ? sqlSchemaAnalysis : undefined,
-        hasSupabaseSchemaIssues ? supabaseSchemaAnalysis : undefined,
-      );
-
-      // 3. Build LLM prompt
+      // 4. Build LLM prompt
       const systemPrompt = getSystemPrompt();
       const userMessage = buildUserMessage(context, staticFindings);
 
-      // 4. Stream verification (collect full output)
+      // 5. Stream verification (collect full output)
       let fullText = "";
       await streamVerification({
         apiKey,
@@ -1199,7 +972,7 @@ server.tool(
         onText: (text) => { fullText += text; },
       });
 
-      // 5. Assemble output: static findings + LLM review
+      // 6. Assemble output: static findings + LLM review
       const outputParts: string[] = [];
 
       if (staticFindings) {

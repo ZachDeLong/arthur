@@ -19,18 +19,19 @@ export interface CatchEntry {
   timestamp: string;
   tool: string;
   projectDir: string; // basename only — no full paths for privacy
-  findings: {
-    paths: FindingEntry | null;
-    schema: FindingEntry | null;
-    sqlSchema: FindingEntry | null;
-    imports: FindingEntry | null;
-    env: FindingEntry | null;
-    types: FindingEntry | null;
-    routes: FindingEntry | null;
-    supabaseSchema: FindingEntry | null;
-  };
+  findings: Record<string, FindingEntry | null>;
   totalChecked: number;
   totalHallucinated: number;
+}
+
+/** Build a single-checker findings record for individual tool logCatch calls. */
+export function buildCatchFindings(
+  catchKey: string,
+  checked: number,
+  hallucinated: number,
+  items: string[],
+): Record<string, FindingEntry | null> {
+  return { [catchKey]: { checked, hallucinated, items } };
 }
 
 const CATCHES_DIR = path.join(os.homedir(), ".arthur");

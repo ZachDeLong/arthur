@@ -23,6 +23,8 @@ import {
   printSqlSchemaAnalysis,
   formatStaticFindings,
 } from "../analysis/formatter.js";
+import { getCheckers, type CheckerResult } from "../analysis/registry.js";
+import "../analysis/checkers/index.js";
 import * as log from "../utils/logger.js";
 
 export interface VerifyOptions {
@@ -89,63 +91,56 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
   let staticFindings: string | undefined;
 
   if (options.static !== false) {
-    const pathAnalysis = analyzePaths(planText, projectDir);
+    // Run all checkers via registry
+    const checkerOptions: Record<string, string> = {};
+    if (options.schema) checkerOptions.schemaPath = path.resolve(projectDir, options.schema);
 
-    let schemaAnalysis;
-    if (options.schema) {
-      const schemaPath = path.resolve(projectDir, options.schema);
-      try {
-        const schema = parseSchema(schemaPath);
-        schemaAnalysis = analyzeSchema(planText, schema);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.warn(`Could not parse schema at ${options.schema}: ${msg}`);
-      }
+    const results = new Map<string, CheckerResult>();
+    for (const checker of getCheckers()) {
+      results.set(checker.id, checker.run(planText, projectDir, checkerOptions));
     }
 
-    // Import analysis
-    const importAnalysis = analyzeImports(planText, projectDir);
+    // Print to console using individual print functions (for pretty terminal output)
+    const pathResult = results.get("paths");
+    const schemaResult = results.get("schema");
+    const importsResult = results.get("imports");
+    const envResult = results.get("env");
+    const typesResult = results.get("types");
+    const routesResult = results.get("routes");
+    const sqlSchemaResult = results.get("sqlSchema");
 
-    // Env analysis
-    const envAnalysis = analyzeEnv(planText, projectDir);
+    let hasAnyIssues = false;
+    if (pathResult && pathResult.hallucinated > 0) {
+      printPathAnalysis(pathResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
+    if (schemaResult && schemaResult.applicable && schemaResult.hallucinated > 0) {
+      printSchemaAnalysis((schemaResult.rawAnalysis as any).analysis);
+      hasAnyIssues = true;
+    }
+    if (importsResult && importsResult.hallucinated > 0) {
+      printImportAnalysis(importsResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
+    if (envResult && envResult.hallucinated > 0) {
+      printEnvAnalysis(envResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
+    if (typesResult && typesResult.hallucinated > 0) {
+      printTypeAnalysis(typesResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
+    if (routesResult && routesResult.hallucinated > 0) {
+      printApiRouteAnalysis(routesResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
+    if (sqlSchemaResult && sqlSchemaResult.hallucinated > 0) {
+      printSqlSchemaAnalysis(sqlSchemaResult.rawAnalysis as any);
+      hasAnyIssues = true;
+    }
 
-    // Type analysis
-    const typeAnalysis = analyzeTypes(planText, projectDir);
-
-    // API route analysis
-    const apiRouteAnalysis = analyzeApiRoutes(planText, projectDir);
-
-    // SQL/Drizzle schema analysis
-    const sqlSchemaAnalysis = analyzeSqlSchema(planText, projectDir);
-
-    // Print to console immediately
-    const hasPathIssues = pathAnalysis.hallucinatedPaths.length > 0;
-    const hasSchemaIssues = schemaAnalysis && schemaAnalysis.hallucinations.length > 0;
-    const hasImportIssues = importAnalysis.hallucinations.length > 0;
-    const hasEnvIssues = envAnalysis.hallucinations.length > 0;
-    const hasTypeIssues = typeAnalysis.hallucinations.length > 0;
-    const hasApiRouteIssues = apiRouteAnalysis.hallucinations.length > 0;
-    const hasSqlSchemaIssues = sqlSchemaAnalysis.hallucinations.length > 0;
-
-    if (hasPathIssues || hasSchemaIssues || hasImportIssues || hasEnvIssues || hasTypeIssues || hasApiRouteIssues || hasSqlSchemaIssues) {
-      if (hasPathIssues) printPathAnalysis(pathAnalysis);
-      if (hasSchemaIssues) printSchemaAnalysis(schemaAnalysis!);
-      if (hasImportIssues) printImportAnalysis(importAnalysis);
-      if (hasEnvIssues) printEnvAnalysis(envAnalysis);
-      if (hasTypeIssues) printTypeAnalysis(typeAnalysis);
-      if (hasApiRouteIssues) printApiRouteAnalysis(apiRouteAnalysis);
-      if (hasSqlSchemaIssues) printSqlSchemaAnalysis(sqlSchemaAnalysis);
-
-      // Format for LLM context injection
-      staticFindings = formatStaticFindings(
-        hasPathIssues ? pathAnalysis : undefined,
-        hasSchemaIssues ? schemaAnalysis : undefined,
-        hasImportIssues ? importAnalysis : undefined,
-        hasEnvIssues ? envAnalysis : undefined,
-        hasTypeIssues ? typeAnalysis : undefined,
-        hasApiRouteIssues ? apiRouteAnalysis : undefined,
-        hasSqlSchemaIssues ? sqlSchemaAnalysis : undefined,
-      );
+    if (hasAnyIssues) {
+      staticFindings = formatStaticFindings(results);
     } else {
       log.success("Static analysis: no issues found");
     }
