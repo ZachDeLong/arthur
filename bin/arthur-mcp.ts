@@ -40,6 +40,7 @@ import {
   type SchemaAnalysis,
 } from "../src/analysis/schema-checker.js";
 import { analyzeImports } from "../src/analysis/import-checker.js";
+import { analyzePackageApi } from "../src/analysis/package-api-checker.js";
 import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
 import { analyzeTypes, buildTypeIndex } from "../src/analysis/type-checker.js";
 import { analyzeApiRoutes, buildRouteIndex } from "../src/analysis/api-route-checker.js";
@@ -838,6 +839,60 @@ server.tool(
         findings: buildCatchFindings("expressRoutes", checkedRefs, hallucinations.length, hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim())),
         totalChecked: checkedRefs,
         totalHallucinated: hallucinations.length,
+      });
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    }
+  },
+);
+
+// --- check_package_api ---
+
+server.tool(
+  "check_package_api",
+  "Check package API usage in a plan against real .d.ts type definitions in node_modules. Catches hallucinated named imports (e.g., import { parseEmail } from 'zod') and hallucinated member access (e.g., z.isEmail()). Experimental. No API key required.",
+  {
+    planText: z.string().describe("The plan text to check for package API references (import statements and member access)"),
+    projectDir: z.string().describe("Absolute path to the project directory (must have node_modules)"),
+  },
+  async ({ planText, projectDir }) => {
+    try {
+      const analysis = analyzePackageApi(planText, projectDir);
+      const lines: string[] = [];
+
+      lines.push(`## Package API Analysis`);
+      lines.push(``);
+
+      if (!analysis.applicable) {
+        lines.push(`No packages with type definitions found to validate against.`);
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+
+      lines.push(`**${analysis.checkedBindings}** named imports checked, **${analysis.checkedMembers}** member accesses checked — **${analysis.hallucinations.length}** hallucinated`);
+
+      if (analysis.hallucinations.length > 0) {
+        lines.push(``);
+        lines.push(`### Hallucinated API Usage`);
+        for (const h of analysis.hallucinations) {
+          const category = h.category === "hallucinated-named-import" ? "not exported" : "member not found";
+          const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
+          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+          if (h.availableExports) {
+            lines.push(`  - Available exports: ${h.availableExports}`);
+          }
+        }
+      }
+
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_package_api",
+        projectDir: path.basename(projectDir),
+        findings: buildCatchFindings("packageApi", analysis.checkedBindings + analysis.checkedMembers, analysis.hallucinations.length, analysis.hallucinations.map(h => h.raw)),
+        totalChecked: analysis.checkedBindings + analysis.checkedMembers,
+        totalHallucinated: analysis.hallucinations.length,
       });
 
       return { content: [{ type: "text", text: lines.join("\n") }] };

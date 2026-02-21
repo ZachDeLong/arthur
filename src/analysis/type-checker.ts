@@ -166,7 +166,7 @@ export function parseTypeDeclarations(content: string, sourceFile: string): Type
 }
 
 /** Parse members from interface/type object body. */
-function parseObjectMembers(body: string): Map<string, TypeMember> {
+export function parseObjectMembers(body: string): Map<string, TypeMember> {
   const members = new Map<string, TypeMember>();
   for (const line of body.split("\n")) {
     const trimmed = line.trim();
@@ -209,7 +209,7 @@ function parseEnumMembers(body: string): Map<string, TypeMember> {
 }
 
 /** Parse class members from body. */
-function parseClassMembers(body: string): Map<string, TypeMember> {
+export function parseClassMembers(body: string): Map<string, TypeMember> {
   const members = new Map<string, TypeMember>();
   for (const line of body.split("\n")) {
     const trimmed = line.trim();

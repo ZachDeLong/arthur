@@ -19,7 +19,9 @@ export type CheckerCategory =
   | "env"
   | "type"
   | "route"
-  | "express_route";
+  | "express_route"
+  | "supabase_schema"
+  | "package_api";
 
 /** A single ground-truth error found by a static checker. */
 export interface GroundTruthError {
@@ -337,5 +339,57 @@ export interface BenchmarkSummary {
     totalInputTokens: number;
     totalOutputTokens: number;
     totalCalls: number;
+  };
+}
+
+// --- Tier 4: Real Production Project Benchmark ---
+
+/** Task definition for Tier 4 benchmarks. */
+export interface Tier4Task {
+  id: string;
+  project: string;
+  projectDir: string;
+  task: string;
+  systemContext: string;
+  allowedNewPaths: string[];
+}
+
+/** Result of a single task run in Tier 4. */
+export interface Tier4Run {
+  taskId: string;
+  project: string;
+  task: string;
+  model: string;
+  generatedPlan: string;
+  groundTruth: GroundTruthError[];
+  selfReviewOutput: string;
+  detections: ErrorDetection[];
+  perCategory: Record<CheckerCategory, { errors: number; detected: number; rate: number }>;
+  overallDetectionRate: number;
+  inputTokens: number;
+  outputTokens: number;
+  timestamp: string;
+}
+
+/** Summary across all Tier 4 runs. */
+export interface Tier4Summary {
+  totalRuns: number;
+  model: string;
+  project: string;
+  totalErrors: number;
+  totalDetected: number;
+  overallDetectionRate: number;
+  arthurCaughtSelfReviewMissed: number;
+  perCategory: Record<CheckerCategory, { errors: number; detected: number; rate: number }>;
+  perTask: Array<{
+    taskId: string;
+    task: string;
+    errors: number;
+    detected: number;
+    rate: number;
+  }>;
+  apiUsage: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
   };
 }

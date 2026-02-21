@@ -138,6 +138,54 @@ const ROUTE_SENTIMENT = [
   "method not",
 ];
 
+const SUPABASE_SCHEMA_SENTIMENT = [
+  ...BASE_NEGATIVE_SENTIMENT,
+  "no such table",
+  "no such column",
+  "table does not",
+  "table doesn't",
+  "column does not",
+  "column doesn't",
+  "not in the schema",
+  "not a valid table",
+  "not a valid column",
+  "no field named",
+  "no table named",
+  "not in the database",
+  "not in supabase",
+  "schema does not",
+  "schema doesn't",
+  "the actual column",
+  "the actual table",
+  "the correct column",
+  "should use",
+  "no such function",
+  "function does not",
+  "rpc function",
+];
+
+const PACKAGE_API_SENTIMENT = [
+  ...BASE_NEGATIVE_SENTIMENT,
+  "not exported",
+  "no such export",
+  "not a named export",
+  "does not export",
+  "doesn't export",
+  "no export named",
+  "not available",
+  "not in the api",
+  "not a method",
+  "no such method",
+  "method does not",
+  "is not a function",
+  "no member named",
+  "not a valid import",
+  "the package exports",
+  "available exports",
+  "not installed",
+  "not a dependency",
+];
+
 /** Get the sentiment phrases for a given category. */
 function getSentimentPhrases(category: CheckerCategory): string[] {
   switch (category) {
@@ -155,6 +203,10 @@ function getSentimentPhrases(category: CheckerCategory): string[] {
     case "route":
     case "express_route":
       return ROUTE_SENTIMENT;
+    case "supabase_schema":
+      return SUPABASE_SCHEMA_SENTIMENT;
+    case "package_api":
+      return PACKAGE_API_SENTIMENT;
   }
 }
 
@@ -174,6 +226,8 @@ const WARNING_SECTIONS = [
   /#{1,4}\s*(?:environment|env|config).*(?:issues?|concerns?|problems?|errors?)/i,
   /#{1,4}\s*(?:type|interface|enum).*(?:issues?|concerns?|problems?|errors?)/i,
   /#{1,4}\s*(?:route|endpoint|api).*(?:issues?|concerns?|problems?|errors?)/i,
+  /#{1,4}\s*(?:supabase|database|table|column).*(?:issues?|concerns?|problems?|errors?)/i,
+  /#{1,4}\s*(?:package|export|api|method).*(?:issues?|concerns?|problems?|errors?)/i,
 ];
 
 // --- Search Term Builders ---
@@ -243,6 +297,26 @@ function buildSearchTerms(error: GroundTruthError): string[] {
       if (urlMatch) {
         terms.push(urlMatch[1]);
       }
+      break;
+    }
+    case "supabase_schema": {
+      terms.push(error.raw);
+      // For "table.column" refs, also search individual parts
+      if (error.raw.includes(".")) {
+        const parts = error.raw.split(".");
+        terms.push(parts[parts.length - 1]); // column name
+        terms.push(parts[0]); // table name
+      }
+      break;
+    }
+    case "package_api": {
+      terms.push(error.raw);
+      // For "package.method" or named import refs, try the identifier alone
+      if (error.raw.includes(".")) {
+        const parts = error.raw.split(".");
+        terms.push(parts[parts.length - 1]);
+      }
+      // For "{ exportName } from 'pkg'" style, the raw is usually just the export name
       break;
     }
   }

@@ -11,3 +11,4 @@ import "./types.js";
 import "./routes.js";
 import "./supabase-schema.js";
 import "./express-routes.js";
+import "./package-api.js";

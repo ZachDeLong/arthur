@@ -1,0 +1,107 @@
+[
+  {
+    "id": "01",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add email notification when a student saves a new college to their list. Use the Resend email service (already configured in Vercel env vars) to send a confirmation email to the student with the college name and tier rating. Include a link back to the college detail page.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/api/email-notify/route.ts",
+      "lib/email.ts",
+      "emails/college-saved.tsx"
+    ]
+  },
+  {
+    "id": "02",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add bulk import of extracurricular activities from a CSV file upload. Students should be able to upload a CSV with columns for activity name, category, hours per week, and description. Validate the CSV using Zod and insert all valid rows into the database. Show a preview before confirming the import.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/(dashboard)/profile/import/page.tsx",
+      "components/profile/CsvImporter.tsx",
+      "app/api/import-activities/route.ts",
+      "lib/csv-parser.ts"
+    ]
+  },
+  {
+    "id": "03",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add a counselor dashboard that shows all linked students' progress. Counselors should see a table of their students with columns for name, GPA, number of saved colleges, timeline completion percentage, and last active date. Include filters by grade level and a search by student name.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/(dashboard)/counselor/page.tsx",
+      "app/(dashboard)/counselor/layout.tsx",
+      "components/counselor/StudentTable.tsx",
+      "components/counselor/StudentFilters.tsx",
+      "hooks/useCounselorStudents.ts",
+      "app/api/counselor-students/route.ts"
+    ]
+  },
+  {
+    "id": "04",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add deadline reminders using a Vercel cron job that runs daily and checks for upcoming college application deadlines within the next 7 days. Send reminder notifications to students who have saved those colleges. Store reminder history to avoid duplicate notifications.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/api/cron/deadline-reminders/route.ts",
+      "lib/reminders.ts",
+      "vercel.json"
+    ]
+  },
+  {
+    "id": "05",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add essay draft storage with version history. Students can write and save essay drafts linked to specific colleges or the Common App. Each save creates a new version, and students can view previous versions and diff them. Store drafts in Supabase with full-text content.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/(dashboard)/essays/page.tsx",
+      "app/(dashboard)/essays/[id]/page.tsx",
+      "components/essays/EssayEditor.tsx",
+      "components/essays/VersionHistory.tsx",
+      "components/essays/VersionDiff.tsx",
+      "hooks/useEssays.ts",
+      "app/api/essays/route.ts",
+      "app/api/essays/[id]/route.ts"
+    ]
+  },
+  {
+    "id": "06",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add a side-by-side college comparison view. Students can select two colleges from their saved list and see them compared across all tier data columns including acceptance rate, SAT/ACT ranges, tuition, enrollment, and tier score. Use the college_tiers table data for the comparison grid.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/(dashboard)/colleges/compare/page.tsx",
+      "components/colleges/ComparisonGrid.tsx",
+      "components/colleges/CollegeSelector.tsx",
+      "hooks/useCollegeComparison.ts"
+    ]
+  },
+  {
+    "id": "07",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add OAuth login with Google as an alternative to email/password authentication. Configure Supabase Auth to support Google OAuth, add a 'Sign in with Google' button to the login page, and handle the OAuth callback. Ensure the profile is created on first Google sign-in.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/(auth)/callback/route.ts",
+      "components/auth/GoogleSignInButton.tsx"
+    ]
+  },
+  {
+    "id": "08",
+    "project": "counselor-sophie",
+    "projectDir": "C:\\Users\\zachd\\counselor-sophie",
+    "task": "Add AI-powered college recommendation explanations that persist to the database. When a student views their recommended colleges, generate a personalized explanation for why each college is a good fit based on their profile and activities. Cache the explanations in Supabase to avoid regenerating them. Use the Vercel AI SDK for streaming the explanation.",
+    "systemContext": "You are a senior Next.js/TypeScript engineer working on a college counseling app called CounselorSophie. Create a detailed implementation plan with concrete file paths, actual code snippets, real imports, and Supabase queries. Reference specific tables and columns from the database schema.",
+    "allowedNewPaths": [
+      "app/api/explain-recommendation/route.ts",
+      "components/colleges/RecommendationExplanation.tsx",
+      "hooks/useRecommendationExplanation.ts"
+    ]
+  }
+]

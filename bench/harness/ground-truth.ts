@@ -14,6 +14,8 @@ import type { EnvAnalysis } from "../../src/analysis/env-checker.js";
 import type { TypeAnalysis } from "../../src/analysis/type-checker.js";
 import type { ApiRouteAnalysis } from "../../src/analysis/api-route-checker.js";
 import type { ExpressRouteAnalysis } from "../../src/analysis/express-route-checker.js";
+import type { SupabaseSchemaAnalysis } from "../../src/analysis/supabase-schema-checker.js";
+import type { PackageApiAnalysis } from "../../src/analysis/package-api-checker.js";
 
 export interface AllCheckerResults {
   paths?: PathAnalysis;
@@ -24,6 +26,8 @@ export interface AllCheckerResults {
   types?: TypeAnalysis;
   routes?: ApiRouteAnalysis;
   expressRoutes?: ExpressRouteAnalysis;
+  supabaseSchema?: SupabaseSchemaAnalysis;
+  packageApi?: PackageApiAnalysis;
 }
 
 /** Convert all checker outputs into a flat GroundTruthError array. */
@@ -120,6 +124,30 @@ export function extractGroundTruth(results: AllCheckerResults): GroundTruthError
         category: "express_route",
         raw: h.raw,
         description: `${h.hallucinationCategory}: ${h.urlPath}${h.method ? ` (${h.method})` : ""}`,
+        suggestion: h.suggestion,
+      });
+    }
+  }
+
+  // Supabase schema hallucinations
+  if (results.supabaseSchema) {
+    for (const h of results.supabaseSchema.hallucinations) {
+      errors.push({
+        category: "supabase_schema",
+        raw: h.raw,
+        description: `${h.hallucinationCategory}: ${h.raw}`,
+        suggestion: h.suggestion,
+      });
+    }
+  }
+
+  // Package API hallucinations
+  if (results.packageApi) {
+    for (const h of results.packageApi.hallucinations) {
+      errors.push({
+        category: "package_api",
+        raw: h.raw,
+        description: `${h.category}: ${h.raw} (${h.packageName})`,
         suggestion: h.suggestion,
       });
     }

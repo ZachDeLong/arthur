@@ -25,6 +25,7 @@
     "bench:self-review": "tsx bench/harness/runner.ts self-review",
     "bench:big": "tsx bench/harness/runner.ts big",
     "bench:big:report": "tsx bench/harness/runner.ts big-report",
+    "bench:tier4": "tsx bench/harness/runner.ts tier4",
     "bench:tier3:setup": "tsx bench/tier3/scripts/setup.ts",
     "bench:tier3:verify": "tsx bench/tier3/scripts/verify-plan.ts",
     "bench:tier3:eval": "tsx bench/tier3/scripts/evaluate.ts",
