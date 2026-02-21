@@ -5,6 +5,7 @@ registerChecker({
   id: "types",
   displayName: "TypeScript Types",
   catchKey: "types",
+  experimental: true,
 
   run(planText, projectDir): CheckerResult {
     const analysis = analyzeTypes(planText, projectDir);

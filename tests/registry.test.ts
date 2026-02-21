@@ -4,7 +4,7 @@ import "../src/analysis/checkers/index.js";
 import { buildCatchFindings } from "../src/logging/catches.js";
 
 describe("Checker Registry", () => {
-  it("has all expected checkers registered", () => {
+  it("has all expected non-experimental checkers registered", () => {
     const checkers = getCheckers();
     const ids = checkers.map(c => c.id);
 
@@ -13,10 +13,19 @@ describe("Checker Registry", () => {
     expect(ids).toContain("sqlSchema");
     expect(ids).toContain("imports");
     expect(ids).toContain("env");
-    expect(ids).toContain("types");
     expect(ids).toContain("routes");
     expect(ids).toContain("supabaseSchema");
     expect(ids).toContain("expressRoutes");
+    // types is experimental — excluded by default
+    expect(ids).not.toContain("types");
+  });
+
+  it("includes experimental checkers when requested", () => {
+    const checkers = getCheckers({ includeExperimental: true });
+    const ids = checkers.map(c => c.id);
+
+    expect(ids).toContain("types");
+    expect(ids).toContain("paths");
   });
 
   it("getChecker returns correct checker by ID", () => {
@@ -34,7 +43,7 @@ describe("Checker Registry", () => {
   });
 
   it("each checker has required properties", () => {
-    for (const checker of getCheckers()) {
+    for (const checker of getCheckers({ includeExperimental: true })) {
       expect(checker.id).toBeTruthy();
       expect(checker.displayName).toBeTruthy();
       expect(checker.catchKey).toBeTruthy();

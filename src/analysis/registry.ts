@@ -26,6 +26,8 @@ export interface CheckerDefinition {
   displayName: string;
   /** Key used in the catches.jsonl findings record */
   catchKey: string;
+  /** Experimental checkers are excluded from check_all by default. */
+  experimental?: boolean;
 
   /** Run the checker and return a unified result. */
   run(planText: string, projectDir: string, options?: Record<string, string>): CheckerResult;
@@ -49,9 +51,10 @@ export function registerChecker(def: CheckerDefinition): void {
   checkerMap.set(def.id, def);
 }
 
-/** Get all registered checkers in registration order. */
-export function getCheckers(): readonly CheckerDefinition[] {
-  return checkers;
+/** Get registered checkers in registration order. Excludes experimental by default. */
+export function getCheckers(opts?: { includeExperimental?: boolean }): readonly CheckerDefinition[] {
+  if (opts?.includeExperimental) return checkers;
+  return checkers.filter(c => !c.experimental);
 }
 
 /** Get a specific checker by ID. */

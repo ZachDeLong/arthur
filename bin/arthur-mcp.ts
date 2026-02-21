@@ -54,6 +54,7 @@ import { logCatch, buildCatchFindings } from "../src/logging/catches.js";
 
 // Import registry + all checker registrations
 import { getCheckers } from "../src/analysis/registry.js";
+import { buildJsonReport } from "../src/analysis/finding-schema.js";
 import "../src/analysis/checkers/index.js";
 
 const server = new McpServer({
@@ -851,46 +852,59 @@ server.tool(
 
 server.tool(
   "check_all",
-  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, Supabase schema, imports, env vars, TypeScript types, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
+  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, Supabase schema, imports, env vars, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
   {
     planText: z.string().describe("The plan text to verify against the project"),
     projectDir: z.string().describe("Absolute path to the project directory"),
     schemaPath: z.string().optional().describe("Absolute path to schema.prisma (auto-detected if omitted)"),
+    format: z.enum(["text", "json"]).optional().default("text").describe("Output format: 'text' for markdown (default), 'json' for machine-readable ArthurReport"),
   },
-  async ({ planText, projectDir, schemaPath }) => {
+  async ({ planText, projectDir, schemaPath, format }) => {
     try {
-      const lines: string[] = [];
-      let totalIssues = 0;
-      let totalChecked = 0;
-      const findings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
-
       const options: Record<string, string> = {};
       if (schemaPath) options.schemaPath = schemaPath;
 
-      lines.push(`# Arthur Verification Report`);
-      lines.push(``);
+      // Run all non-experimental checkers and collect results
+      const checkerResults: { checker: import("../src/analysis/registry.js").CheckerDefinition; result: import("../src/analysis/registry.js").CheckerResult }[] = [];
+      const catchFindings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
 
       for (const checker of getCheckers()) {
         const result = checker.run(planText, projectDir, options);
-        if (result.applicable) {
-          lines.push(...checker.formatForCheckAll(result, projectDir));
-          totalIssues += result.hallucinated;
-          totalChecked += result.checked;
-        }
-        findings[checker.catchKey] = result.applicable
+        checkerResults.push({ checker, result });
+        catchFindings[checker.catchKey] = result.applicable
           ? { checked: result.checked, hallucinated: result.hallucinated, items: result.catchItems }
           : null;
       }
+
+      const totalChecked = checkerResults.reduce((sum, { result }) => sum + (result.applicable ? result.checked : 0), 0);
+      const totalIssues = checkerResults.reduce((sum, { result }) => sum + (result.applicable ? result.hallucinated : 0), 0);
 
       // Log catches
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_all",
         projectDir: path.basename(projectDir),
-        findings,
+        findings: catchFindings,
         totalChecked,
         totalHallucinated: totalIssues,
       });
+
+      // JSON output
+      if (format === "json") {
+        const report = buildJsonReport(checkerResults, projectDir);
+        return { content: [{ type: "text", text: JSON.stringify(report, null, 2) }] };
+      }
+
+      // Text (markdown) output — existing behavior
+      const lines: string[] = [];
+      lines.push(`# Arthur Verification Report`);
+      lines.push(``);
+
+      for (const { checker, result } of checkerResults) {
+        if (result.applicable) {
+          lines.push(...checker.formatForCheckAll(result, projectDir));
+        }
+      }
 
       // Summary
       lines.push(`---`);
