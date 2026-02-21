@@ -1,6 +1,6 @@
 {
   "name": "arthur-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, API routes, Express/Fastify routes, and Supabase schema — deterministically, zero cost, no API key.",
   "type": "module",
   "bin": {
