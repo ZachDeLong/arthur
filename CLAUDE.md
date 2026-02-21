@@ -78,6 +78,10 @@ cat plan.md | arthur check --project .
 - `npm run bench:tier2` — run Tier 2 (intent drift detection)
 - `npm run bench:report` — generate markdown report from existing results
 - `npm run bench:self-review` — run self-review vs Arthur comparison
+- `npm run bench:tier4` — full Tier 4 run (generate plans + score + report, requires API key)
+- `npm run bench:tier4 -- generate` — generate plans only (saves to bench/tier4/plans/)
+- `npm run bench:tier4 -- score` — score cached plans (Arthur vs self-review)
+- `npm run bench:tier4 -- report` — regenerate report from latest results
 - `npm run bench -- tier3` — print the full T3 workflow instructions
 - No tsconfig path aliases — use relative imports
 
@@ -113,6 +117,19 @@ Measures what self-review misses across all checker categories. Self-review gets
 - **Report**: `bench/harness/big-benchmark-report.ts`
 - Run with: `npm run bench:big` or `npm run bench:big -- 06 07 08 09 10 11`
 
+### Tier 4: Arthur vs Self-Review on Real Projects
+Tests Arthur against self-review on real LLM-generated plans with limited context. Self-review gets the SAME context as plan generation (CLAUDE.md only, no file tree), which is realistic.
+
+- **Runner**: `bench/tier4/tier4-runner.ts`
+- **Tasks**: `bench/tier4/tasks.json` (8 tasks against counselor-sophie)
+- **Prompts**: `bench/tier4/tier4-prompt.ts`
+- **Report**: `bench/tier4/tier4-report.ts`
+- **Cached plans**: `bench/tier4/plans/counselor-sophie/` (git-tracked, generated once)
+- **External project**: counselor-sophie at `C:\Users\zachd\counselor-sophie` (not copied into fixtures)
+- **sql_schema excluded**: false positives on English phrases matching SQL patterns
+- **package_api included**: validates named imports/member access against .d.ts files
+- Run with: `npm run bench:tier4` or individual modes (`generate`, `score`, `report`)
+
 ### Tier 3: Real-World Refactoring Verification
 Hybrid benchmark — automated setup + manual Claude Code sessions.
 
@@ -123,12 +140,13 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 
 Priority order based on hallucination severity (schema > routes > imports > types):
 
-1. ~~**Express/Fastify route checker**~~ — **DONE** (v0.4.0). `check_express_routes` tool with mount prefix resolution.
-2. **Raw SQL migration scanner** — scan `/migrations` folders for CREATE TABLE statements. `sql-schema-checker.ts` already parses CREATE TABLE, just needs to find migration files.
-3. **Python import checker** — validate `import` / `from X import Y` against pip packages in `requirements.txt` / `pyproject.toml`.
-4. **Python type checker** — validate references to Python classes, dataclasses, Pydantic models.
-5. **Additional ORMs** — TypeORM, Sequelize, SQLAlchemy schema parsing.
-6. **SvelteKit/Remix route checker** — file-based routing similar to Next.js but different conventions.
+1. ~~**Express/Fastify route checker**~~ -- **DONE** (v0.4.0). `check_express_routes` tool with mount prefix resolution.
+2. ~~**Package API checker**~~ -- **DONE** (v0.5.0). Validates named imports and member access against .d.ts type definitions. Known FP: React re-exports (useState, React.memo work via re-exports but aren't direct exports of react's main entry).
+3. **Raw SQL migration scanner** -- scan `/migrations` folders for CREATE TABLE statements. `sql-schema-checker.ts` already parses CREATE TABLE, just needs to find migration files.
+4. **Python import checker** -- validate `import` / `from X import Y` against pip packages in `requirements.txt` / `pyproject.toml`.
+5. **Python type checker** -- validate references to Python classes, dataclasses, Pydantic models.
+6. **Additional ORMs** -- TypeORM, Sequelize, SQLAlchemy schema parsing.
+7. **SvelteKit/Remix route checker** -- file-based routing similar to Next.js but different conventions.
 
 ## Adding a New Checker
 
