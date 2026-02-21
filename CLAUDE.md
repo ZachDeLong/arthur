@@ -8,14 +8,15 @@ Ground truth verification for AI-generated code. MCP server that catches halluci
 
 ```
 bin/
-  codeverifier.ts   CLI entry point
+  arthur.ts         Non-interactive CLI (arthur check — for CI pipelines)
+  codeverifier.ts   Interactive CLI (codeverifier verify — LLM review)
   arthur-mcp.ts     MCP server (stdio transport, 12 tools)
 
 src/
   analysis/     Static analysis checkers + registry pattern
     checkers/   Checker registration files (one per checker, auto-registered via barrel import)
     registry.ts Checker registry (CheckerDefinition interface, registerChecker/getCheckers)
-  commands/     CLI commands (verify, init)
+  commands/     CLI commands (check, verify, init)
   config/       Config management (global + project + env)
   context/      Project context builder (tree, file reader, token budget)
   plan/         Plan loading (file, stdin, interactive)
@@ -50,10 +51,25 @@ Twelve tools (registry-driven — adding a new checker is a 2-file operation):
 
 **Critical:** No `console.log()` in `arthur-mcp.ts` — stdout is JSON-RPC protocol. Use `console.error()` for debug output.
 
+## CLI (`arthur check`)
+
+Non-interactive CLI for CI pipelines. Runs all 9 deterministic checkers without an MCP host.
+
+```
+arthur check --plan plan.md --project . --format text|json --schema schema.prisma
+cat plan.md | arthur check --project .
+```
+
+- **Plan input:** `--plan <file>`, `--stdin`, or auto-detect piped stdin. Never falls through to interactive mode.
+- **Output:** `text` (compact colored table, default) or `json` (full `ArthurReport` from `finding-schema.ts`).
+- **Exit codes:** 0 = clean, 1 = findings or error.
+- **Dev:** `npm run arthur -- check --plan plan.md --project .`
+
 ## Build & Run
 
 - `npm run build` — compile TypeScript (also verifies types)
-- `npm run dev` — run CLI via tsx
+- `npm run arthur` — run non-interactive CLI via tsx
+- `npm run dev` — run interactive CLI via tsx
 - `npm run mcp` — run MCP server via tsx (for development)
 - `npm run bench:big` — run big benchmark (static analysis vs self-review, all prompts)
 - `npm run bench:big -- 06 09` — run big benchmark on specific prompts
@@ -122,7 +138,7 @@ With the registry pattern, adding a checker is a 2-file operation:
 2. Create `src/analysis/checkers/my-checker.ts` — imports `registerChecker()`, wraps the analysis in a `CheckerDefinition`
 3. Add `import "./my-checker.js"` to `src/analysis/checkers/index.ts`
 
-The checker is automatically included in `check_all`, `verify_plan`, and catch logging.
+The checker is automatically included in `check_all`, `arthur check`, `verify_plan`, and catch logging.
 
 ## Gotchas
 
