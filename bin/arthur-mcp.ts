@@ -51,10 +51,11 @@ import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
 import { streamVerification } from "../src/verifier/client.js";
 import { loadConfig } from "../src/config/manager.js";
+import { resolveArthurCheckPolicy } from "../src/config/arthur-check.js";
 import { logCatch, buildCatchFindings } from "../src/logging/catches.js";
+import { evaluateCoverageGate, runAllCheckers } from "../src/analysis/run-all.js";
 
-// Import registry + all checker registrations
-import { getCheckers } from "../src/analysis/registry.js";
+// Import checker registrations
 import { buildJsonReport } from "../src/analysis/finding-schema.js";
 import "../src/analysis/checkers/index.js";
 
@@ -907,32 +908,55 @@ server.tool(
 
 server.tool(
   "check_all",
-  "Run ALL deterministic checks against a plan in a single call: paths, Prisma schema, SQL/Drizzle schema, Supabase schema, imports, env vars, and API routes. Returns a comprehensive report with ground truth context for every finding. Auto-detects which checkers are relevant. No API key required. This is the recommended tool — use this instead of calling individual checkers.",
+  "Run Arthur's full static verification pass in one call. By default this runs stable deterministic checkers (paths, schema, SQL/Drizzle, Supabase, imports, env vars, routes). Optional strict mode enables experimental checkers and enforces coverage thresholds. Returns ground truth context for every finding. No API key required.",
   {
     planText: z.string().describe("The plan text to verify against the project"),
     projectDir: z.string().describe("Absolute path to the project directory"),
     schemaPath: z.string().optional().describe("Absolute path to schema.prisma (auto-detected if omitted)"),
     format: z.enum(["text", "json"]).optional().default("text").describe("Output format: 'text' for markdown (default), 'json' for machine-readable ArthurReport"),
+    includeExperimental: z.boolean().optional().describe("Include experimental checkers (TypeScript Types + Package API). Defaults to project config or false."),
+    strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate if checked refs are below threshold."),
+    minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold: minimum refs that must be checked."),
+    coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode. Defaults to project config or warn."),
   },
-  async ({ planText, projectDir, schemaPath, format }) => {
+  async ({
+    planText,
+    projectDir,
+    schemaPath,
+    format,
+    includeExperimental,
+    strict,
+    minCheckedRefs,
+    coverageMode,
+  }) => {
     try {
-      const options: Record<string, string> = {};
-      if (schemaPath) options.schemaPath = schemaPath;
+      const checkerOptions: Record<string, string> = {};
+      if (schemaPath) checkerOptions.schemaPath = schemaPath;
 
-      // Run all non-experimental checkers and collect results
-      const checkerResults: { checker: import("../src/analysis/registry.js").CheckerDefinition; result: import("../src/analysis/registry.js").CheckerResult }[] = [];
+      const policy = resolveArthurCheckPolicy(projectDir, {
+        includeExperimental,
+        strict,
+        minCheckedRefs,
+        coverageMode,
+      });
+
+      const summary = runAllCheckers(planText, projectDir, {
+        includeExperimental: policy.includeExperimental,
+        checkerOptions,
+      });
+      const coverageGate = evaluateCoverageGate(
+        summary.totalChecked,
+        policy.minCheckedRefs,
+        policy.coverageMode,
+      );
+
       const catchFindings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
 
-      for (const checker of getCheckers()) {
-        const result = checker.run(planText, projectDir, options);
-        checkerResults.push({ checker, result });
+      for (const { checker, result } of summary.checkerResults) {
         catchFindings[checker.catchKey] = result.applicable
           ? { checked: result.checked, hallucinated: result.hallucinated, items: result.catchItems }
           : null;
       }
-
-      const totalChecked = checkerResults.reduce((sum, { result }) => sum + (result.applicable ? result.checked : 0), 0);
-      const totalIssues = checkerResults.reduce((sum, { result }) => sum + (result.applicable ? result.hallucinated : 0), 0);
 
       // Log catches
       logCatch({
@@ -940,36 +964,80 @@ server.tool(
         tool: "check_all",
         projectDir: path.basename(projectDir),
         findings: catchFindings,
-        totalChecked,
-        totalHallucinated: totalIssues,
+        totalChecked: summary.totalChecked,
+        totalHallucinated: summary.totalFindings,
       });
 
       // JSON output
       if (format === "json") {
-        const report = buildJsonReport(checkerResults, projectDir);
-        return { content: [{ type: "text", text: JSON.stringify(report, null, 2) }] };
+        const report = buildJsonReport(summary.checkerResults, projectDir);
+        const payload = {
+          ...report,
+          meta: {
+            includeExperimental: policy.includeExperimental,
+            coverageGate,
+            skippedCheckers: summary.skippedCheckers.map((s) => ({
+              checker: s.checker.id,
+              displayName: s.checker.displayName,
+              reason: s.reason,
+            })),
+          },
+        };
+        return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
       }
 
       // Text (markdown) output — existing behavior
       const lines: string[] = [];
       lines.push(`# Arthur Verification Report`);
       lines.push(``);
+      lines.push(`**Experimental checkers:** ${policy.includeExperimental ? "enabled" : "disabled"}`);
+      lines.push(``);
 
-      for (const { checker, result } of checkerResults) {
+      for (const { checker, result } of summary.checkerResults) {
         if (result.applicable) {
           lines.push(...checker.formatForCheckAll(result, projectDir));
         }
       }
 
-      // Summary
-      lines.push(`---`);
-      if (totalIssues === 0) {
-        lines.push(`**All checks passed.** No hallucinated references found.`);
-      } else {
-        lines.push(`**${totalIssues} issue(s) found.** Fix the hallucinated references above using the ground truth provided.`);
+      if (summary.skippedCheckers.length > 0) {
+        lines.push(`## Skipped / Not Applicable`);
+        for (const skipped of summary.skippedCheckers) {
+          lines.push(`- **${skipped.checker.displayName}** — ${skipped.reason}`);
+        }
+        lines.push(``);
       }
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      lines.push(`## Coverage Gate`);
+      lines.push(`- Mode: \`${coverageGate.mode}\``);
+      lines.push(`- Minimum checked refs: **${coverageGate.minCheckedRefs}**`);
+      lines.push(`- Total checked refs: **${summary.totalChecked}**`);
+      if (coverageGate.triggered) {
+        const level = coverageGate.mode === "fail" ? "FAILED" : "WARNING";
+        lines.push(`- Status: **${level}** — ${coverageGate.message}`);
+      } else if (coverageGate.mode === "off") {
+        lines.push(`- Status: disabled`);
+      } else {
+        lines.push(`- Status: pass`);
+      }
+      lines.push(``);
+
+      // Summary
+      lines.push(`---`);
+      if (summary.totalFindings === 0 && coverageGate.mode === "fail" && coverageGate.triggered) {
+        lines.push(`**0 issues found, but coverage gate failed.** Increase plan specificity or lower threshold.`);
+      } else if (summary.totalFindings === 0 && coverageGate.triggered) {
+        lines.push(`**0 issues found, but coverage is low.** Increase plan specificity for stronger validation.`);
+      } else if (summary.totalFindings === 0) {
+        lines.push(`**All checks passed.** No hallucinated references found.`);
+      } else {
+        lines.push(`**${summary.totalFindings} issue(s) found.** Fix the hallucinated references above using the ground truth provided.`);
+      }
+
+      const coverageFailed = coverageGate.mode === "fail" && coverageGate.triggered;
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        ...(coverageFailed ? { isError: true } : {}),
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -988,8 +1056,22 @@ server.tool(
     prompt: z.string().optional().describe("Original user request (for intent alignment checking)"),
     schemaPath: z.string().optional().describe("Absolute path to schema.prisma for Prisma schema validation"),
     model: z.string().optional().describe("Claude model to use (default: from config or claude-sonnet-4-5-20250929)"),
+    includeExperimental: z.boolean().optional().describe("Include experimental checkers (TypeScript Types + Package API). Defaults to project config or false."),
+    strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate if checked refs are below threshold."),
+    minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold: minimum refs that must be checked."),
+    coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode. Defaults to project config or warn."),
   },
-  async ({ planText, projectDir, prompt, schemaPath, model }) => {
+  async ({
+    planText,
+    projectDir,
+    prompt,
+    schemaPath,
+    model,
+    includeExperimental,
+    strict,
+    minCheckedRefs,
+    coverageMode,
+  }) => {
     try {
       // Load config for API key and model default
       const config = loadConfig(projectDir);
@@ -1006,6 +1088,12 @@ server.tool(
       }
 
       const resolvedModel = model ?? config.model;
+      const checkPolicy = resolveArthurCheckPolicy(projectDir, {
+        includeExperimental,
+        strict,
+        minCheckedRefs,
+        coverageMode,
+      });
 
       // 1. Build context
       const context = buildContext({
@@ -1020,12 +1108,35 @@ server.tool(
       if (schemaPath) options.schemaPath = schemaPath;
 
       const results = new Map<string, import("../src/analysis/registry.js").CheckerResult>();
-      for (const checker of getCheckers()) {
-        results.set(checker.id, checker.run(planText, projectDir, options));
+      const checkSummary = runAllCheckers(planText, projectDir, {
+        includeExperimental: checkPolicy.includeExperimental,
+        checkerOptions: options,
+      });
+      for (const { checker, result } of checkSummary.checkerResults) {
+        results.set(checker.id, result);
       }
 
       // 3. Format static findings for LLM context
-      const staticFindings = formatStaticFindings(results);
+      const coverageGate = evaluateCoverageGate(
+        checkSummary.totalChecked,
+        checkPolicy.minCheckedRefs,
+        checkPolicy.coverageMode,
+      );
+
+      let staticFindings = formatStaticFindings(results, {
+        checkers: checkSummary.checkerResults.map(({ checker }) => checker),
+      });
+      if (coverageGate.triggered) {
+        const coverageSection = [
+          `### Coverage Gate`,
+          ``,
+          `${coverageGate.mode === "fail" ? "FAIL" : "WARNING"}: ${coverageGate.message}`,
+          `Increase plan specificity so static checkers can validate more references.`,
+        ].join("\n");
+        staticFindings = staticFindings
+          ? `${staticFindings}\n\n${coverageSection}`
+          : coverageSection;
+      }
 
       // 4. Build LLM prompt
       const systemPrompt = getSystemPrompt();

@@ -1,6 +1,6 @@
 # Arthur
 
-Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, and API routes before code gets written. Deterministic, zero cost, no API key.
+Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, routes, and package API usage before code gets written. Deterministic, zero cost, no API key.
 
 ## The Problem
 
@@ -121,11 +121,17 @@ Fix all hallucinated references using the ground truth provided in the response 
 
 ### `check_all` (recommended)
 
-Runs all 9 checkers in a single call. Returns a comprehensive report with ground truth context for every finding.
+Runs all stable checkers in a single call (paths, Prisma, SQL/Drizzle, Supabase, imports, env, Next.js routes, Express/Fastify routes). Returns a comprehensive report with ground truth context for every finding.
+
+By default, experimental checkers (`TypeScript Types`, `Package API`) are excluded. Enable them with `includeExperimental: true` or `strict: true`.
 
 ```
 check_all(planText, projectDir)
 ```
+
+`check_all` now also reports:
+- Which checkers were skipped/not applicable (and why)
+- A coverage gate (`minCheckedRefs`) so “all checks passed” is not returned for near-empty plans
 
 ### Individual Checkers
 
@@ -137,15 +143,17 @@ check_all(planText, projectDir)
 | `check_supabase_schema` | Wrong Supabase tables, columns, functions | `database.types.ts` |
 | `check_imports` | Non-existent packages, invalid subpaths | `node_modules` + `package.json` |
 | `check_env` | Undefined environment variables | `.env*` files |
-| `check_types` | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
+| `check_types` *(experimental)* | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
 | `check_routes` | Non-existent API routes, wrong methods | Next.js App Router `route.ts` files |
 | `check_express_routes` | Wrong Express/Fastify routes | Express/Fastify route registrations |
+| `check_package_api` *(experimental)* | Hallucinated named imports/member access in package APIs | Package `.d.ts` exports in `node_modules` |
 
 All checkers auto-detect. If a project has no Prisma schema, that checker silently returns nothing.
 
 ### `verify_plan` (optional, requires API key)
 
 Full pipeline: all static checks + LLM review by a separate Claude instance. Requires `ANTHROPIC_API_KEY`.
+Supports the same checker policy options as `check_all`: `includeExperimental`, `strict`, `minCheckedRefs`, and `coverageMode`.
 
 ## CLI (alternative to MCP)
 
@@ -154,10 +162,26 @@ npm install -g arthur-mcp
 
 # Static analysis only (no API key needed)
 arthur check --plan plan.md --project ./my-app
+arthur check --plan plan.md --project ./my-app --strict
+arthur check --plan plan.md --project ./my-app --include-experimental --min-checked-refs 5 --coverage-mode warn
 
 # Full verification (static + LLM review)
 codeverifier verify --plan plan.md --project ./my-app
 ```
+
+### Per-project defaults
+
+Create `.arthur/config.json` in a repo to set defaults:
+
+```json
+{
+  "includeExperimental": true,
+  "minCheckedRefs": 5,
+  "coverageMode": "warn"
+}
+```
+
+`strict` mode overrides defaults by forcing experimental checkers on and defaulting coverage mode to `fail` (with min refs defaulting to 5 unless set explicitly).
 
 ## Development
 

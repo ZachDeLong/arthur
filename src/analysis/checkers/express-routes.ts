@@ -8,6 +8,9 @@ registerChecker({
 
   run(planText, projectDir): CheckerResult {
     const analysis = analyzeExpressRoutes(planText, projectDir);
+    const notApplicableReason = analysis.framework === "none"
+      ? "Express/Fastify not detected in package.json"
+      : "No Express/Fastify routes indexed";
     return {
       checkerId: "expressRoutes",
       checked: analysis.checkedRefs,
@@ -19,6 +22,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()),
       applicable: analysis.routesIndexed > 0,
+      notApplicableReason: analysis.routesIndexed > 0 ? undefined : notApplicableReason,
       rawAnalysis: analysis,
     };
   },

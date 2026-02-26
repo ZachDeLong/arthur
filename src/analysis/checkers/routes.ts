@@ -19,6 +19,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()),
       applicable: analysis.routesIndexed > 0,
+      notApplicableReason: analysis.routesIndexed > 0 ? undefined : "No Next.js App Router route files found",
       rawAnalysis: analysis,
     };
   },

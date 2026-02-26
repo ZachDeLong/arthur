@@ -7,7 +7,7 @@ import type { TypeAnalysis } from "./type-checker.js";
 import type { ApiRouteAnalysis } from "./api-route-checker.js";
 import type { SqlSchemaAnalysis } from "./sql-schema-checker.js";
 import type { SupabaseSchemaAnalysis } from "./supabase-schema-checker.js";
-import { getCheckers, type CheckerResult } from "./registry.js";
+import { getCheckers, type CheckerDefinition, type CheckerResult } from "./registry.js";
 
 /** Print static path analysis results to the console. */
 export function printPathAnalysis(analysis: PathAnalysis): void {
@@ -248,10 +248,16 @@ export function printSqlSchemaAnalysis(analysis: SqlSchemaAnalysis): void {
  */
 export function formatStaticFindings(
   results: Map<string, CheckerResult>,
+  opts?: {
+    includeExperimental?: boolean;
+    checkers?: readonly Pick<CheckerDefinition, "id" | "formatForFindings">[];
+  },
 ): string | undefined {
   const sections: string[] = [];
+  const checkers = opts?.checkers
+    ?? getCheckers({ includeExperimental: opts?.includeExperimental });
 
-  for (const checker of getCheckers()) {
+  for (const checker of checkers) {
     const result = results.get(checker.id);
     if (!result) continue;
     const section = checker.formatForFindings(result);

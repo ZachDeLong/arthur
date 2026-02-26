@@ -9,6 +9,9 @@ registerChecker({
   run(planText, projectDir): CheckerResult {
     const analysis = analyzeEnv(planText, projectDir);
     const applicable = analysis.envFilesFound.length > 0 && analysis.checkedRefs > 0;
+    const notApplicableReason = analysis.envFilesFound.length === 0
+      ? "No .env* files found in project"
+      : "No env var refs found in plan";
     return {
       checkerId: "env",
       checked: analysis.checkedRefs,
@@ -20,6 +23,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => h.varName),
       applicable,
+      notApplicableReason: applicable ? undefined : notApplicableReason,
       rawAnalysis: analysis,
     };
   },

@@ -22,6 +22,7 @@ registerChecker({
         hallucinations: [],
         catchItems: [],
         applicable: false,
+        notApplicableReason: "No readable prisma/schema.prisma found",
         rawAnalysis: undefined,
       };
     }
@@ -50,6 +51,7 @@ registerChecker({
         hallucinations: [],
         catchItems: [],
         applicable: false,
+        notApplicableReason: "Failed to parse Prisma schema",
         rawAnalysis: undefined,
       };
     }

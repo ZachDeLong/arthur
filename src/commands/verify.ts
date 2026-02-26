@@ -1,5 +1,6 @@
 import path from "node:path";
 import { loadConfig } from "../config/manager.js";
+import { resolveArthurCheckPolicy } from "../config/arthur-check.js";
 import { loadPlan } from "../plan/loader.js";
 import { buildContext } from "../context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../verifier/prompt.js";
@@ -23,7 +24,8 @@ import {
   printSqlSchemaAnalysis,
   formatStaticFindings,
 } from "../analysis/formatter.js";
-import { getCheckers, type CheckerResult } from "../analysis/registry.js";
+import { evaluateCoverageGate, runAllCheckers } from "../analysis/run-all.js";
+import { type CheckerResult } from "../analysis/registry.js";
 import "../analysis/checkers/index.js";
 import * as log from "../utils/logger.js";
 
@@ -94,54 +96,84 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
     // Run all checkers via registry
     const checkerOptions: Record<string, string> = {};
     if (options.schema) checkerOptions.schemaPath = path.resolve(projectDir, options.schema);
+    const checkPolicy = resolveArthurCheckPolicy(projectDir);
 
     const results = new Map<string, CheckerResult>();
-    for (const checker of getCheckers()) {
-      results.set(checker.id, checker.run(planText, projectDir, checkerOptions));
+    const checkSummary = runAllCheckers(planText, projectDir, {
+      includeExperimental: checkPolicy.includeExperimental,
+      checkerOptions,
+    });
+    for (const { checker, result } of checkSummary.checkerResults) {
+      results.set(checker.id, result);
     }
 
-    // Print to console using individual print functions (for pretty terminal output)
-    const pathResult = results.get("paths");
-    const schemaResult = results.get("schema");
-    const importsResult = results.get("imports");
-    const envResult = results.get("env");
-    const typesResult = results.get("types");
-    const routesResult = results.get("routes");
-    const sqlSchemaResult = results.get("sqlSchema");
-
+    // Print checker issues to console
     let hasAnyIssues = false;
-    if (pathResult && pathResult.hallucinated > 0) {
-      printPathAnalysis(pathResult.rawAnalysis as any);
+    for (const { checker, result } of checkSummary.checkerResults) {
+      if (!result.applicable || result.hallucinated === 0) continue;
       hasAnyIssues = true;
-    }
-    if (schemaResult && schemaResult.applicable && schemaResult.hallucinated > 0) {
-      printSchemaAnalysis((schemaResult.rawAnalysis as any).analysis);
-      hasAnyIssues = true;
-    }
-    if (importsResult && importsResult.hallucinated > 0) {
-      printImportAnalysis(importsResult.rawAnalysis as any);
-      hasAnyIssues = true;
-    }
-    if (envResult && envResult.hallucinated > 0) {
-      printEnvAnalysis(envResult.rawAnalysis as any);
-      hasAnyIssues = true;
-    }
-    if (typesResult && typesResult.hallucinated > 0) {
-      printTypeAnalysis(typesResult.rawAnalysis as any);
-      hasAnyIssues = true;
-    }
-    if (routesResult && routesResult.hallucinated > 0) {
-      printApiRouteAnalysis(routesResult.rawAnalysis as any);
-      hasAnyIssues = true;
-    }
-    if (sqlSchemaResult && sqlSchemaResult.hallucinated > 0) {
-      printSqlSchemaAnalysis(sqlSchemaResult.rawAnalysis as any);
-      hasAnyIssues = true;
+
+      if (checker.id === "paths") {
+        printPathAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+      if (checker.id === "schema") {
+        printSchemaAnalysis((result.rawAnalysis as any).analysis);
+        continue;
+      }
+      if (checker.id === "imports") {
+        printImportAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+      if (checker.id === "env") {
+        printEnvAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+      if (checker.id === "types") {
+        printTypeAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+      if (checker.id === "routes") {
+        printApiRouteAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+      if (checker.id === "sqlSchema") {
+        printSqlSchemaAnalysis(result.rawAnalysis as any);
+        continue;
+      }
+
+      // Fallback for checkers without dedicated terminal printer functions.
+      log.heading(`Static Analysis: ${checker.displayName}`);
+      log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
+      for (const finding of result.hallucinations) {
+        const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
+        log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+      }
     }
 
-    if (hasAnyIssues) {
-      staticFindings = formatStaticFindings(results);
-    } else {
+    staticFindings = hasAnyIssues
+      ? formatStaticFindings(results, {
+        checkers: checkSummary.checkerResults.map(({ checker }) => checker),
+      })
+      : undefined;
+
+    const coverageGate = evaluateCoverageGate(
+      checkSummary.totalChecked,
+      checkPolicy.minCheckedRefs,
+      checkPolicy.coverageMode,
+    );
+    if (coverageGate.triggered) {
+      const prefix = coverageGate.mode === "fail" ? "Static coverage gate failed" : "Static coverage warning";
+      log.warn(`${prefix}: ${coverageGate.message}`);
+      const coverageSection = [
+        `### Coverage Gate`,
+        ``,
+        `${coverageGate.mode === "fail" ? "FAIL" : "WARNING"}: ${coverageGate.message}`,
+      ].join("\n");
+      staticFindings = staticFindings
+        ? `${staticFindings}\n\n${coverageSection}`
+        : coverageSection;
+    } else if (!hasAnyIssues) {
       log.success("Static analysis: no issues found");
     }
   }

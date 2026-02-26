@@ -15,6 +15,8 @@ export interface CheckerResult {
   hallucinations: { raw: string; category: string; suggestion?: string }[];
   catchItems: string[];
   applicable: boolean;
+  /** Optional reason when checker is not applicable for this plan/project. */
+  notApplicableReason?: string;
   rawAnalysis: unknown;
 }
 

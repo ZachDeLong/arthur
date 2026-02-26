@@ -1,8 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
-import { getCheckers } from "../analysis/registry.js";
 import { buildJsonReport } from "../analysis/finding-schema.js";
+import {
+  evaluateCoverageGate,
+  runAllCheckers,
+  type CheckerRun,
+  type CoverageGateResult,
+  type SkippedChecker,
+} from "../analysis/run-all.js";
+import {
+  resolveArthurCheckPolicy,
+  type CoverageMode,
+} from "../config/arthur-check.js";
 import "../analysis/checkers/index.js";
 
 export interface CheckOptions {
@@ -11,6 +21,10 @@ export interface CheckOptions {
   project?: string;
   format?: "text" | "json";
   schema?: string;
+  includeExperimental?: boolean;
+  strict?: boolean;
+  minCheckedRefs?: number;
+  coverageMode?: CoverageMode;
 }
 
 /** Load plan text from file or stdin (never interactive). */
@@ -40,18 +54,19 @@ async function loadPlanText(opts: CheckOptions): Promise<string | null> {
 
 /** Format checker results as a compact CI-friendly table. */
 function formatTextOutput(
-  checkerResults: { checker: { displayName: string }; result: { applicable: boolean; checked: number; hallucinated: number; hallucinations: { raw: string; suggestion?: string }[] } }[],
+  checkerResults: CheckerRun[],
+  skippedCheckers: SkippedChecker[],
+  coverageGate: CoverageGateResult,
+  includeExperimental: boolean,
 ): string {
   const lines: string[] = [];
   lines.push("");
   lines.push(chalk.bold("Arthur Verification Report"));
   lines.push("");
-
-  const skipped: string[] = [];
+  lines.push(chalk.dim(`  Experimental checkers: ${includeExperimental ? "enabled" : "disabled"}`));
 
   for (const { checker, result } of checkerResults) {
     if (!result.applicable) {
-      skipped.push(checker.displayName);
       continue;
     }
 
@@ -72,18 +87,40 @@ function formatTextOutput(
     }
   }
 
-  if (skipped.length > 0) {
+  if (skippedCheckers.length > 0) {
     lines.push("");
-    lines.push(chalk.dim(`  Skipped: ${skipped.join(", ")}`));
+    lines.push(chalk.dim("  Skipped / not applicable:"));
+    for (const skipped of skippedCheckers) {
+      lines.push(chalk.dim(`    - ${skipped.checker.displayName}: ${skipped.reason}`));
+    }
   }
 
-  const totalFindings = checkerResults.reduce(
-    (sum, { result }) => sum + (result.applicable ? result.hallucinated : 0),
-    0,
-  );
+  if (coverageGate.mode === "off") {
+    lines.push("");
+    lines.push(chalk.dim("  Coverage gate: off"));
+  } else if (coverageGate.triggered) {
+    lines.push("");
+    const message = `  Coverage gate ${coverageGate.mode.toUpperCase()} (min ${coverageGate.minCheckedRefs}) — ${coverageGate.message}`;
+    if (coverageGate.mode === "fail") {
+      lines.push(chalk.red(message));
+    } else {
+      lines.push(chalk.yellow(message));
+    }
+  } else {
+    lines.push("");
+    lines.push(chalk.green(`  Coverage gate ${coverageGate.mode} (min ${coverageGate.minCheckedRefs}) — pass`));
+  }
+
+  const totalFindings = checkerResults
+    .filter(({ result }) => result.applicable)
+    .reduce((sum, { result }) => sum + result.hallucinated, 0);
 
   lines.push("");
-  if (totalFindings === 0) {
+  if (totalFindings === 0 && coverageGate.mode === "fail" && coverageGate.triggered) {
+    lines.push(chalk.red("  0 finding(s), but coverage gate failed."));
+  } else if (totalFindings === 0 && coverageGate.triggered) {
+    lines.push(chalk.yellow("  0 finding(s), but coverage is low."));
+  } else if (totalFindings === 0) {
     lines.push(chalk.green("  0 finding(s). All references verified."));
   } else {
     lines.push(chalk.red(`  ${totalFindings} finding(s). Fix the hallucinated references above.`));
@@ -114,6 +151,10 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
       console.error("  --project <dir>    Project directory (default: cwd)");
       console.error("  --format text|json Output format (default: text)");
       console.error("  --schema <file>    Path to Prisma schema file");
+      console.error("  --include-experimental  Include experimental checkers");
+      console.error("  --strict           Enable strict mode (includes experimental + coverage fail)");
+      console.error("  --min-checked-refs <n> Minimum refs that must be checked");
+      console.error("  --coverage-mode <mode> Coverage gate: off|warn|fail");
     }
     return 1;
   }
@@ -128,26 +169,48 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
   // 3. Run checkers
   const options: Record<string, string> = {};
   if (opts.schema) options.schemaPath = opts.schema;
-
-  const checkerResults: { checker: ReturnType<typeof getCheckers>[number]; result: ReturnType<ReturnType<typeof getCheckers>[number]["run"]> }[] = [];
-
-  for (const checker of getCheckers()) {
-    const result = checker.run(planText, projectDir, options);
-    checkerResults.push({ checker, result });
-  }
+  const policy = resolveArthurCheckPolicy(projectDir, {
+    includeExperimental: opts.includeExperimental,
+    strict: opts.strict,
+    minCheckedRefs: opts.minCheckedRefs,
+    coverageMode: opts.coverageMode,
+  });
+  const summary = runAllCheckers(planText, projectDir, {
+    includeExperimental: policy.includeExperimental,
+    checkerOptions: options,
+  });
+  const coverageGate = evaluateCoverageGate(
+    summary.totalChecked,
+    policy.minCheckedRefs,
+    policy.coverageMode,
+  );
 
   // 4. Output
   if (opts.format === "json") {
-    const report = buildJsonReport(checkerResults, projectDir);
-    console.log(JSON.stringify(report, null, 2));
+    const report = buildJsonReport(summary.checkerResults, projectDir);
+    const payload = {
+      ...report,
+      meta: {
+        includeExperimental: policy.includeExperimental,
+        coverageGate,
+        skippedCheckers: summary.skippedCheckers.map((s) => ({
+          checker: s.checker.id,
+          displayName: s.checker.displayName,
+          reason: s.reason,
+        })),
+      },
+    };
+    console.log(JSON.stringify(payload, null, 2));
   } else {
-    console.log(formatTextOutput(checkerResults));
+    console.log(formatTextOutput(
+      summary.checkerResults,
+      summary.skippedCheckers,
+      coverageGate,
+      policy.includeExperimental,
+    ));
   }
 
   // 5. Exit code
-  const totalFindings = checkerResults.reduce(
-    (sum, { result }) => sum + (result.applicable ? result.hallucinated : 0),
-    0,
-  );
-  return totalFindings > 0 ? 1 : 0;
+  const coverageFailed = coverageGate.mode === "fail" && coverageGate.triggered;
+  return summary.totalFindings > 0 || coverageFailed ? 1 : 0;
 }

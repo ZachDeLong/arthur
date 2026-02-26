@@ -151,7 +151,7 @@ describe("runCheck — text output details", () => {
       const output = (console.log as ReturnType<typeof vi.fn>).mock.calls
         .map(c => c[0])
         .join("\n");
-      expect(output).toContain("Skipped:");
+      expect(output).toContain("Skipped / not applicable:");
     } finally {
       fs.unlinkSync(tmpFile);
     }
@@ -168,6 +168,85 @@ describe("runCheck — text output details", () => {
         .join("\n");
       expect(output).toContain("src/nonexistent/fake-file.ts");
       expect(output).toContain("finding");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+});
+
+describe("runCheck — coverage gate", () => {
+  it("warns on low coverage by default without failing", async () => {
+    const tmpFile = path.join(os.tmpdir(), `arthur-test-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, "Implement a complete reading stats feature.\n");
+
+    try {
+      const code = await runCheck({ plan: tmpFile, project: fixtureA, format: "text" });
+      expect(code).toBe(0);
+
+      const output = (console.log as ReturnType<typeof vi.fn>).mock.calls
+        .map(c => c[0])
+        .join("\n");
+      expect(output).toContain("Coverage gate WARN");
+      expect(output).toContain("coverage is low");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("fails on low coverage in strict mode", async () => {
+    const tmpFile = path.join(os.tmpdir(), `arthur-test-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, "Implement a complete reading stats feature.\n");
+
+    try {
+      const code = await runCheck({ plan: tmpFile, project: fixtureA, format: "text", strict: true });
+      expect(code).toBe(1);
+
+      const output = (console.log as ReturnType<typeof vi.fn>).mock.calls
+        .map(c => c[0])
+        .join("\n");
+      expect(output).toContain("Coverage gate FAIL");
+      expect(output).toContain("coverage gate failed");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+});
+
+describe("runCheck — experimental checker selection", () => {
+  it("keeps experimental checkers disabled by default", async () => {
+    const tmpFile = path.join(os.tmpdir(), `arthur-test-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, "```ts\nimport { NextRequest } from 'next';\n```\n");
+
+    try {
+      await runCheck({ plan: tmpFile, project: fixtureC, format: "json" });
+      const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const report = JSON.parse(output);
+      const ids = report.summary.checkerResults.map((c: { checker: string }) => c.checker);
+
+      expect(ids).not.toContain("types");
+      expect(ids).not.toContain("packageApi");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("includes experimental checkers when enabled", async () => {
+    const tmpFile = path.join(os.tmpdir(), `arthur-test-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, "```ts\nimport { NextRequest } from 'next';\n```\n");
+
+    try {
+      await runCheck({
+        plan: tmpFile,
+        project: fixtureC,
+        format: "json",
+        includeExperimental: true,
+      });
+      const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const report = JSON.parse(output);
+      const ids = report.summary.checkerResults.map((c: { checker: string }) => c.checker);
+
+      expect(ids).toContain("types");
+      expect(ids).toContain("packageApi");
     } finally {
       fs.unlinkSync(tmpFile);
     }

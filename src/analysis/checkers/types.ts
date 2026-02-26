@@ -20,6 +20,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => h.raw),
       applicable: analysis.checkedRefs > 0,
+      notApplicableReason: analysis.checkedRefs > 0 ? undefined : "No TypeScript type/member refs found in plan",
       rawAnalysis: analysis,
     };
   },

@@ -20,6 +20,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => h.raw),
       applicable: analysis.applicable,
+      notApplicableReason: analysis.applicable ? undefined : "No package API refs could be validated",
       rawAnalysis: analysis,
     };
   },

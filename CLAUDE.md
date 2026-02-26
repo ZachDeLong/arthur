@@ -34,7 +34,7 @@ bench/
 ## MCP Server
 
 Twelve tools (registry-driven — adding a new checker is a 2-file operation):
-- **`check_all`** — runs all 9 deterministic checkers in one call, returns comprehensive report with ground truth (no API key). **This is the primary tool.**
+- **`check_all`** — runs stable deterministic checkers in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool.**
 - `check_paths` — path validation against project tree + closest matches (no API key)
 - `check_schema` — Prisma schema validation + full schema ground truth (no API key)
 - `check_sql_schema` — Drizzle/SQL schema validation + full table/column listing (no API key)
@@ -44,7 +44,7 @@ Twelve tools (registry-driven — adding a new checker is a 2-file operation):
 - `check_types` — TypeScript type validation + available types listing (no API key)
 - `check_routes` — Next.js App Router route validation + all routes listing (no API key)
 - `check_express_routes` — Express/Fastify route validation with mount prefix resolution (no API key)
-- `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY)
+- `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY). Accepts `includeExperimental` / `strict` / `minCheckedRefs` / `coverageMode` like `check_all`.
 - `update_session_context` / `get_session_context` — session persistence across context compression
 
 **Install:** `claude mcp add arthur -- npx arthur-mcp`
@@ -53,15 +53,18 @@ Twelve tools (registry-driven — adding a new checker is a 2-file operation):
 
 ## CLI (`arthur check`)
 
-Non-interactive CLI for CI pipelines. Runs all 9 deterministic checkers without an MCP host.
+Non-interactive CLI for CI pipelines. Runs stable deterministic checkers by default without an MCP host.
 
 ```
-arthur check --plan plan.md --project . --format text|json --schema schema.prisma
+arthur check --plan plan.md --project . --format text|json --schema schema.prisma --strict
 cat plan.md | arthur check --project .
 ```
 
 - **Plan input:** `--plan <file>`, `--stdin`, or auto-detect piped stdin. Never falls through to interactive mode.
 - **Output:** `text` (compact colored table, default) or `json` (full `ArthurReport` from `finding-schema.ts`).
+- **Experimental checkers:** `--include-experimental` enables `types` + `packageApi`.
+- **Coverage gate:** `--min-checked-refs <n>` + `--coverage-mode off|warn|fail` prevents false confidence from low-reference plans.
+- **Strict mode:** `--strict` enables experimental checkers and defaults coverage mode to `fail`.
 - **Exit codes:** 0 = clean, 1 = findings or error.
 - **Dev:** `npm run arthur -- check --plan plan.md --project .`
 
@@ -127,7 +130,7 @@ Tests Arthur against self-review on real LLM-generated plans with limited contex
 - **Cached plans**: `bench/tier4/plans/counselor-sophie/` (git-tracked, generated once)
 - **External project**: counselor-sophie at `C:\Users\zachd\counselor-sophie` (not copied into fixtures)
 - **sql_schema excluded**: false positives on English phrases matching SQL patterns
-- **package_api included**: validates named imports/member access against .d.ts files
+- **package_api included in strict/experimental modes**: validates named imports/member access against .d.ts files
 - Run with: `npm run bench:tier4` or individual modes (`generate`, `score`, `report`)
 
 ### Tier 3: Real-World Refactoring Verification
@@ -136,17 +139,42 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 - **Workspaces live at `~/.arthur-tier3-workspaces/`** — NOT inside `~/arthur/` (prevents CLAUDE.md contamination)
 - **Must commit workspace changes before eval** — `evaluate.ts` uses `git diff HEAD~1`
 
-## Future Checkers (Roadmap)
+## Roadmap
 
-Priority order based on hallucination severity (schema > routes > imports > types):
+Arthur's core pivot: from plan verifier to **automatic static analysis for AI-generated code**. Static checkers (100% detection, zero cost) are the product. LLM review is opt-in.
 
-1. ~~**Express/Fastify route checker**~~ -- **DONE** (v0.4.0). `check_express_routes` tool with mount prefix resolution.
-2. ~~**Package API checker**~~ -- **DONE** (v0.5.0). Validates named imports and member access against .d.ts type definitions. Known FP: React re-exports (useState, React.memo work via re-exports but aren't direct exports of react's main entry).
-3. **Raw SQL migration scanner** -- scan `/migrations` folders for CREATE TABLE statements. `sql-schema-checker.ts` already parses CREATE TABLE, just needs to find migration files.
-4. **Python import checker** -- validate `import` / `from X import Y` against pip packages in `requirements.txt` / `pyproject.toml`.
-5. **Python type checker** -- validate references to Python classes, dataclasses, Pydantic models.
-6. **Additional ORMs** -- TypeORM, Sequelize, SQLAlchemy schema parsing.
-7. **SvelteKit/Remix route checker** -- file-based routing similar to Next.js but different conventions.
+### Phase 1: `check --diff` (code input, not just plans)
+- `arthur check --diff HEAD --strict .` — extract changed file paths from git, read actual source, run checkers
+- `arthur check --diff --staged --strict .` — same but for staged files
+- `arthur check --diff origin/main --strict .` — CI mode, check everything since branch point
+- **Per-checker source adapters** — each checker gets a `plan` vs `source` input mode. Don't feed raw source through plan extractors (different patterns: no backticks, bare imports, etc.)
+- **Spike imports first** (lowest risk, highest value), then expand checker-by-checker (env, routes, schema)
+- Checkers without source mode yet return `skipReason: "source mode not implemented yet"`
+
+### Phase 2: Hooks (make Arthur invisible)
+- `arthur hooks install` — writes pre-commit hook that runs `arthur check --diff --staged --strict .`
+- Optional post-edit hook for Claude Code integration (fires when Claude writes files)
+- Goal: Arthur runs automatically, no CLAUDE.md instructions needed, no hoping Claude cooperates
+
+### Phase 3: Precision gates
+- Per-checker `enabled` / `warn` / `fail` severity levels
+- Noisy checkers (`types` at 98% FP, `packageApi` React re-exports) stay disabled until precision improves
+- Small golden test corpus for regression detection — ensure precision doesn't silently degrade
+
+### Phase 4: Standalone CI tool
+- One command in CI: `arthur check --diff origin/main --strict .`
+- Exit code 1 on findings or low coverage
+- JSON output for CI integrations
+- Arthur becomes useful beyond MCP/Claude Code — any AI coding tool, any CI pipeline
+
+### Demoted (still available, not the focus)
+- `verify_plan` — LLM review is opt-in only. Static is default. Benchmarks showed static: 100% detection vs LLM: 60-83%
+- Session context tools — context compression is a Claude Code problem, not Arthur's
+- New language support (Python, etc.) — go deep on JS/TS before going wide
+
+### Completed checkers
+- ~~Express/Fastify route checker~~ (v0.4.0)
+- ~~Package API checker~~ (v0.5.0) — known FP: React re-exports
 
 ## Adding a New Checker
 
@@ -156,7 +184,8 @@ With the registry pattern, adding a checker is a 2-file operation:
 2. Create `src/analysis/checkers/my-checker.ts` — imports `registerChecker()`, wraps the analysis in a `CheckerDefinition`
 3. Add `import "./my-checker.js"` to `src/analysis/checkers/index.ts`
 
-The checker is automatically included in `check_all`, `arthur check`, `verify_plan`, and catch logging.
+Stable checkers are automatically included in `check_all`, `arthur check`, `verify_plan`, and catch logging.
+Experimental checkers are included when `includeExperimental`/`strict` is enabled (CLI flags or `.arthur/config.json`).
 
 ## Gotchas
 

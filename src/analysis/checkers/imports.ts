@@ -19,6 +19,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => h.raw),
       applicable: analysis.checkedImports > 0,
+      notApplicableReason: analysis.checkedImports > 0 ? undefined : "No package import refs found in plan",
       rawAnalysis: analysis,
     };
   },

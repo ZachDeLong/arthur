@@ -20,6 +20,7 @@ registerChecker({
       })),
       catchItems: analysis.hallucinations.map(h => h.raw),
       applicable: analysis.tablesIndexed > 0,
+      notApplicableReason: analysis.tablesIndexed > 0 ? undefined : "No Supabase generated types file found",
       rawAnalysis: analysis,
     };
   },
