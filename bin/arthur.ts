@@ -12,7 +12,7 @@ program
 
 program
   .command("check")
-  .description("Run all deterministic checkers against a plan")
+  .description("Run all deterministic checkers against a plan or code diff")
   .option("--plan <file>", "Path to plan file")
   .option("--stdin", "Read plan from stdin")
   .option("--diff <ref>", "Check code changes from git diff against <ref> (e.g., HEAD, origin/main)")

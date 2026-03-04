@@ -141,7 +141,7 @@ function formatTextOutput(
 export async function runCheck(opts: CheckOptions): Promise<number> {
   // 1. Mutual exclusion
   if (opts.diff && opts.plan) {
-    console.error(chalk.red("Cannot use --diff and --plan together."));
+    console.error(chalk.red("Error: Cannot use --diff and --plan together."));
     return 1;
   }
 
@@ -157,12 +157,18 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
 
   if (opts.diff) {
     // Diff mode — resolve changed files from git
-    const files = resolveDiffFiles(projectDir, opts.diff, { staged: opts.staged });
-    if (files.length === 0) {
-      console.log("No changed source files found in diff.");
-      return 0;
+    try {
+      const files = resolveDiffFiles(projectDir, opts.diff, { staged: opts.staged });
+      if (files.length === 0) {
+        console.log(chalk.green("No changed source files found in diff."));
+        return 0;
+      }
+      input = { mode: "source", text: files.map(f => f.content).join("\n"), files };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(chalk.red(`Error resolving diff: ${msg}`));
+      return 1;
     }
-    input = { mode: "source", text: files.map(f => f.content).join("\n"), files };
   } else {
     // Plan mode — load plan text
     const planText = await loadPlanText(opts);
