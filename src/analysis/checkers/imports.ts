@@ -5,34 +5,25 @@ registerChecker({
   id: "imports",
   displayName: "Imports",
   catchKey: "imports",
+  supportsSourceMode: true,
 
   run(input: CheckerInput, projectDir): CheckerResult {
-    if (input.mode === "source") {
-      return {
-        checkerId: "imports",
-        checked: 0,
-        hallucinated: 0,
-        hallucinations: [],
-        catchItems: [],
-        applicable: false,
-        notApplicableReason: "source mode not implemented for this checker",
-        rawAnalysis: null,
-      };
-    }
+    const analysis = input.mode === "source" && input.files
+      ? analyzeImports(input.files, projectDir, { mode: "source" })
+      : analyzeImports(input.text, projectDir);
 
-    const analysis = analyzeImports(input.text, projectDir);
     return {
       checkerId: "imports",
       checked: analysis.checkedImports,
       hallucinated: analysis.hallucinations.length,
       hallucinations: analysis.hallucinations.map(h => ({
-        raw: h.raw,
+        raw: h.file ? `${h.raw} (in ${h.file})` : h.raw,
         category: h.reason ?? "unknown",
         suggestion: h.suggestion,
       })),
       catchItems: analysis.hallucinations.map(h => h.raw),
       applicable: analysis.checkedImports > 0,
-      notApplicableReason: analysis.checkedImports > 0 ? undefined : "No package import refs found in plan",
+      notApplicableReason: analysis.checkedImports > 0 ? undefined : "No package import refs found",
       rawAnalysis: analysis,
     };
   },

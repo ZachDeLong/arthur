@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { DiffFile } from "../diff/resolver.js";
 
 // --- Types ---
 
@@ -10,6 +11,7 @@ export interface ImportRef {
   valid: boolean;
   reason?: string;       // 'package-not-found', 'subpath-not-exported'
   suggestion?: string;   // Fuzzy match
+  file?: string;         // Source file path (source mode only)
 }
 
 export interface ImportAnalysis {
@@ -271,8 +273,154 @@ function isListedDependency(packageName: string, projectDir: string): boolean {
 
 // --- Main Analysis ---
 
-/** Analyze imports in plan text against a project's node_modules. */
-export function analyzeImports(planText: string, projectDir: string): ImportAnalysis {
+/**
+ * Validate a single import source against a project's node_modules / package.json.
+ * Returns an ImportRef if hallucinated, or null if valid/skipped.
+ * Mutates counters via the provided callback.
+ */
+function validateImportSource(
+  source: string,
+  projectDir: string,
+  nodeModulesDir: string,
+  filePath?: string,
+): { ref: ImportRef | null; skipped: boolean } {
+  if (shouldSkip(source)) {
+    return { ref: null, skipped: true };
+  }
+
+  const { packageName, subpath } = parsePackageName(source);
+
+  // Check if package exists in node_modules
+  const pkgJsonPath = path.join(nodeModulesDir, packageName, "package.json");
+  if (!fs.existsSync(pkgJsonPath)) {
+    // Fallback: check if it's listed in the project's package.json deps
+    if (isListedDependency(packageName, projectDir)) {
+      return { ref: null, skipped: false };
+    }
+    const suggestion = suggestPackage(packageName, nodeModulesDir);
+    return {
+      ref: {
+        raw: source,
+        packageName,
+        subpath,
+        valid: false,
+        reason: "package-not-found",
+        suggestion,
+        file: filePath,
+      },
+      skipped: false,
+    };
+  }
+
+  // Package exists — check subpath if present
+  if (subpath) {
+    try {
+      const validSubpaths = resolvePackageExports(pkgJsonPath);
+
+      if (validSubpaths !== null) {
+        // Package has exports field — validate subpath
+        if (!matchSubpath(subpath, validSubpaths)) {
+          // List available exports as suggestion
+          const available = [...validSubpaths]
+            .filter(s => s !== ".")
+            .map(s => s.replace(/^\.\//, ""))
+            .slice(0, 5);
+          const suggestion = available.length > 0
+            ? `available: ${available.join(", ")}`
+            : undefined;
+
+          return {
+            ref: {
+              raw: source,
+              packageName,
+              subpath,
+              valid: false,
+              reason: "subpath-not-exported",
+              suggestion,
+              file: filePath,
+            },
+            skipped: false,
+          };
+        }
+      }
+      // No exports field (legacy) — can't validate subpaths, assume valid
+    } catch {
+      // Parse error on package.json — skip subpath validation
+    }
+  }
+
+  return { ref: null, skipped: false };
+}
+
+/** Analyze imports from DiffFile[] (source mode) — per-file attribution. */
+function analyzeImportsFromFiles(files: DiffFile[], projectDir: string): ImportAnalysis {
+  const nodeModulesDir = path.join(projectDir, "node_modules");
+  const hallucinations: ImportRef[] = [];
+  let totalImports = 0;
+  let skippedImports = 0;
+  let checkedImports = 0;
+  let validImports = 0;
+
+  // Cache validation results by package source to avoid redundant fs lookups
+  const validatedPackages = new Map<string, { ref: ImportRef | null; skipped: boolean }>();
+
+  for (const diffFile of files) {
+    const sources = extractImports(diffFile.content);
+    totalImports += sources.length;
+
+    for (const source of sources) {
+      // Check cache first
+      let result = validatedPackages.get(source);
+      if (!result) {
+        result = validateImportSource(source, projectDir, nodeModulesDir);
+        validatedPackages.set(source, result);
+      }
+
+      if (result.skipped) {
+        skippedImports++;
+        continue;
+      }
+
+      checkedImports++;
+
+      if (result.ref) {
+        // Hallucinated — create per-file entry with file attribution
+        hallucinations.push({
+          ...result.ref,
+          file: diffFile.path,
+        });
+      } else {
+        validImports++;
+      }
+    }
+  }
+
+  const denominator = checkedImports;
+  const hallucinationRate = denominator > 0 ? hallucinations.length / denominator : 0;
+
+  return {
+    totalImports,
+    checkedImports,
+    validImports,
+    hallucinations,
+    hallucinationRate,
+    skippedImports,
+  };
+}
+
+/** Analyze imports in plan text or source files against a project's node_modules. */
+export function analyzeImports(
+  input: string | DiffFile[],
+  projectDir: string,
+  options?: { mode?: "plan" | "source" },
+): ImportAnalysis {
+  // Source mode: iterate DiffFile[] with per-file attribution
+  if (options?.mode === "source" && Array.isArray(input)) {
+    return analyzeImportsFromFiles(input as DiffFile[], projectDir);
+  }
+
+  // Plan mode (default): extract from plan text string
+  const planText = input as string;
   const allSources = extractImports(planText);
   const nodeModulesDir = path.join(projectDir, "node_modules");
 
@@ -282,69 +430,20 @@ export function analyzeImports(planText: string, projectDir: string): ImportAnal
   let validImports = 0;
 
   for (const source of allSources) {
-    if (shouldSkip(source)) {
+    const result = validateImportSource(source, projectDir, nodeModulesDir);
+
+    if (result.skipped) {
       skippedImports++;
       continue;
     }
 
     checkedImports++;
-    const { packageName, subpath } = parsePackageName(source);
 
-    // Check if package exists in node_modules
-    const pkgJsonPath = path.join(nodeModulesDir, packageName, "package.json");
-    if (!fs.existsSync(pkgJsonPath)) {
-      // Fallback: check if it's listed in the project's package.json deps
-      if (isListedDependency(packageName, projectDir)) {
-        validImports++;
-        continue;
-      }
-      const suggestion = suggestPackage(packageName, nodeModulesDir);
-      hallucinations.push({
-        raw: source,
-        packageName,
-        subpath,
-        valid: false,
-        reason: "package-not-found",
-        suggestion,
-      });
-      continue;
+    if (result.ref) {
+      hallucinations.push(result.ref);
+    } else {
+      validImports++;
     }
-
-    // Package exists — check subpath if present
-    if (subpath) {
-      try {
-        const validSubpaths = resolvePackageExports(pkgJsonPath);
-
-        if (validSubpaths !== null) {
-          // Package has exports field — validate subpath
-          if (!matchSubpath(subpath, validSubpaths)) {
-            // List available exports as suggestion
-            const available = [...validSubpaths]
-              .filter(s => s !== ".")
-              .map(s => s.replace(/^\.\//, ""))
-              .slice(0, 5);
-            const suggestion = available.length > 0
-              ? `available: ${available.join(", ")}`
-              : undefined;
-
-            hallucinations.push({
-              raw: source,
-              packageName,
-              subpath,
-              valid: false,
-              reason: "subpath-not-exported",
-              suggestion,
-            });
-            continue;
-          }
-        }
-        // No exports field (legacy) — can't validate subpaths, assume valid
-      } catch {
-        // Parse error on package.json — skip subpath validation
-      }
-    }
-
-    validImports++;
   }
 
   const denominator = checkedImports;
