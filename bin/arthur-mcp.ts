@@ -16,6 +16,7 @@
  *   check_sql_schema       — deterministic Drizzle/SQL schema validation (no API key)
  *   check_supabase_schema  — deterministic Supabase schema validation (no API key)
  *   check_all              — runs all deterministic checkers in one call (no API key)
+ *   check_diff             — validates actual code changes from a git diff (no API key)
  *   verify_plan            — full pipeline: static analysis + LLM review (requires ANTHROPIC_API_KEY)
  *   update_session_context — record decisions/insights to survive context compression
  *   get_session_context    — read back session context after compression
@@ -58,6 +59,9 @@ import { evaluateCoverageGate, runAllCheckers } from "../src/analysis/run-all.js
 // Import checker registrations
 import { buildJsonReport } from "../src/analysis/finding-schema.js";
 import "../src/analysis/checkers/index.js";
+
+import { resolveDiffFiles } from "../src/diff/resolver.js";
+import type { CheckerInput } from "../src/analysis/registry.js";
 
 const server = new McpServer({
   name: "arthur",
@@ -1041,6 +1045,143 @@ server.tool(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    }
+  },
+);
+
+// --- check_diff (source code verification via git diff) ---
+
+server.tool(
+  "check_diff",
+  "Validate actual code changes from a git diff against project ground truth. Catches hallucinated imports in source files that were added or modified. Only checkers with source-mode support are run (currently: imports). No API key required.",
+  {
+    projectDir: z.string().describe("Absolute path to the project directory (must be a git repo)"),
+    diffRef: z.string().optional().default("HEAD").describe("Git ref to diff against: HEAD (default), origin/main, HEAD~3, etc."),
+    staged: z.boolean().optional().default(false).describe("Check only staged changes (for pre-commit hooks)"),
+    format: z.enum(["text", "json"]).optional().default("text").describe("Output format: 'text' for markdown (default), 'json' for machine-readable ArthurReport"),
+    includeExperimental: z.boolean().optional().describe("Include experimental checkers (if they support source mode)."),
+    strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate."),
+    minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold."),
+    coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode."),
+  },
+  async ({ projectDir, diffRef, staged, format, includeExperimental, strict, minCheckedRefs, coverageMode }) => {
+    try {
+      const files = resolveDiffFiles(projectDir, diffRef, { staged });
+
+      if (files.length === 0) {
+        return { content: [{ type: "text" as const, text: "No changed source files found in diff." }] };
+      }
+
+      const text = files.map(f => f.content).join("\n");
+      const input: CheckerInput = { mode: "source", text, files };
+
+      const policy = resolveArthurCheckPolicy(projectDir, {
+        includeExperimental,
+        strict,
+        minCheckedRefs,
+        coverageMode,
+      });
+
+      const summary = runAllCheckers(input, projectDir, {
+        includeExperimental: policy.includeExperimental,
+      });
+      const coverageGate = evaluateCoverageGate(
+        summary.totalChecked,
+        policy.minCheckedRefs,
+        policy.coverageMode,
+      );
+
+      // Log catches
+      const catchFindings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
+      for (const { checker, result } of summary.checkerResults) {
+        catchFindings[checker.catchKey] = result.applicable
+          ? { checked: result.checked, hallucinated: result.hallucinated, items: result.catchItems }
+          : null;
+      }
+      logCatch({
+        timestamp: new Date().toISOString(),
+        tool: "check_diff",
+        projectDir: path.basename(projectDir),
+        findings: catchFindings,
+        totalChecked: summary.totalChecked,
+        totalHallucinated: summary.totalFindings,
+      });
+
+      // JSON output
+      if (format === "json") {
+        const report = buildJsonReport(summary.checkerResults, projectDir);
+        const payload = {
+          ...report,
+          meta: {
+            mode: "diff",
+            diffRef,
+            staged,
+            filesChecked: files.length,
+            includeExperimental: policy.includeExperimental,
+            coverageGate,
+            skippedCheckers: summary.skippedCheckers.map((s) => ({
+              checker: s.checker.id,
+              displayName: s.checker.displayName,
+              reason: s.reason,
+            })),
+          },
+        };
+        return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
+      }
+
+      // Text (markdown) output
+      const lines: string[] = [];
+      lines.push(`# Arthur Diff Report`);
+      lines.push(``);
+      lines.push(`**Mode:** diff (${staged ? "staged" : diffRef})`);
+      lines.push(`**Files checked:** ${files.length}`);
+      lines.push(`**Experimental checkers:** ${policy.includeExperimental ? "enabled" : "disabled"}`);
+      lines.push(``);
+
+      for (const { checker, result } of summary.checkerResults) {
+        if (result.applicable) {
+          lines.push(...checker.formatForCheckAll(result, projectDir));
+        }
+      }
+
+      if (summary.skippedCheckers.length > 0) {
+        lines.push(`## Skipped / Not Applicable`);
+        for (const skipped of summary.skippedCheckers) {
+          lines.push(`- **${skipped.checker.displayName}** — ${skipped.reason}`);
+        }
+        lines.push(``);
+      }
+
+      // Coverage gate
+      lines.push(`## Coverage Gate`);
+      lines.push(`- Mode: \`${coverageGate.mode}\``);
+      lines.push(`- Minimum checked refs: **${coverageGate.minCheckedRefs}**`);
+      lines.push(`- Total checked refs: **${summary.totalChecked}**`);
+      if (coverageGate.triggered) {
+        const level = coverageGate.mode === "fail" ? "FAILED" : "WARNING";
+        lines.push(`- Status: **${level}** — ${coverageGate.message}`);
+      } else if (coverageGate.mode === "off") {
+        lines.push(`- Status: disabled`);
+      } else {
+        lines.push(`- Status: pass`);
+      }
+      lines.push(``);
+
+      lines.push(`---`);
+      if (summary.totalFindings === 0) {
+        lines.push(`**All checks passed.** No issues found in changed files.`);
+      } else {
+        lines.push(`**${summary.totalFindings} issue(s) found.** Fix the references above.`);
+      }
+
+      const coverageFailed = coverageGate.mode === "fail" && coverageGate.triggered;
+      return {
+        content: [{ type: "text" as const, text: lines.join("\n") }],
+        ...(coverageFailed ? { isError: true } : {}),
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true };
     }
   },
 );
