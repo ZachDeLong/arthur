@@ -33,28 +33,28 @@ afterEach(() => {
 });
 
 describe("resolveDiffFiles", () => {
-  it("detects new staged .ts files vs HEAD", async () => {
+  it("detects new staged .ts files vs HEAD", () => {
     writeFile("src/foo.ts", 'export const foo = "bar";\n');
     git("add src/foo.ts");
     git('commit -m "add foo"');
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD~1");
+    const files = resolveDiffFiles(tmpDir, "HEAD~1");
     expect(files).toHaveLength(1);
     expect(files[0].path).toBe("src/foo.ts");
     expect(files[0].content).toBe('export const foo = "bar";\n');
   });
 
-  it("detects staged files with --staged option", async () => {
+  it("detects staged files with --staged option", () => {
     writeFile("lib/utils.tsx", "export default function() { return <div/>; }\n");
     git("add lib/utils.tsx");
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD", { staged: true });
+    const files = resolveDiffFiles(tmpDir, "HEAD", { staged: true });
     expect(files).toHaveLength(1);
     expect(files[0].path).toBe("lib/utils.tsx");
     expect(files[0].content).toContain("export default function");
   });
 
-  it("filters to supported extensions only (ignores .md, .json)", async () => {
+  it("filters to supported extensions only (ignores .md, .json)", () => {
     writeFile("docs/notes.md", "# Notes\n");
     writeFile("config.json", '{"key": "value"}\n');
     writeFile("src/app.ts", "console.log('app');\n");
@@ -66,7 +66,7 @@ describe("resolveDiffFiles", () => {
     git("add .");
     git('commit -m "add files"');
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD~1");
+    const files = resolveDiffFiles(tmpDir, "HEAD~1");
     const paths = files.map(f => f.path).sort();
 
     expect(paths).toEqual([
@@ -82,7 +82,7 @@ describe("resolveDiffFiles", () => {
     expect(paths).not.toContain("config.json");
   });
 
-  it("handles modified files", async () => {
+  it("handles modified files", () => {
     writeFile("src/mod.ts", "const x = 1;\n");
     git("add .");
     git('commit -m "add mod"');
@@ -91,40 +91,40 @@ describe("resolveDiffFiles", () => {
     git("add .");
     git('commit -m "modify mod"');
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD~1");
+    const files = resolveDiffFiles(tmpDir, "HEAD~1");
     expect(files).toHaveLength(1);
     expect(files[0].path).toBe("src/mod.ts");
     expect(files[0].content).toBe("const x = 2;\n");
   });
 
-  it("returns empty array when no changes", async () => {
+  it("returns empty array when no changes", () => {
     // No staged changes, so --staged against HEAD returns nothing
-    const files = await resolveDiffFiles(tmpDir, "HEAD", { staged: true });
+    const files = resolveDiffFiles(tmpDir, "HEAD", { staged: true });
     expect(files).toEqual([]);
   });
 
-  it("throws on non-git directory", async () => {
+  it("throws on non-git directory", () => {
     const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-nongit-"));
     try {
-      await expect(resolveDiffFiles(nonGitDir, "HEAD")).rejects.toThrow();
+      expect(() => resolveDiffFiles(nonGitDir, "HEAD")).toThrow();
     } finally {
       fs.rmSync(nonGitDir, { recursive: true, force: true });
     }
   });
 
-  it("supports diff against a branch ref", async () => {
+  it("supports diff against a branch ref", () => {
     // Create a branch, add a file, diff against main
     git("checkout -b feature");
     writeFile("src/feature.ts", "export const feat = true;\n");
     git("add .");
     git('commit -m "feature commit"');
 
-    const files = await resolveDiffFiles(tmpDir, "master");
+    const files = resolveDiffFiles(tmpDir, "master");
     expect(files).toHaveLength(1);
     expect(files[0].path).toBe("src/feature.ts");
   });
 
-  it("skips deleted files (--diff-filter=ACMR excludes D)", async () => {
+  it("skips deleted files (--diff-filter=ACMR excludes D)", () => {
     writeFile("src/keep.ts", "export const keep = 1;\n");
     writeFile("src/remove.ts", "export const remove = 1;\n");
     git("add .");
@@ -135,13 +135,13 @@ describe("resolveDiffFiles", () => {
     git("add .");
     git('commit -m "delete remove.ts"');
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD~1");
+    const files = resolveDiffFiles(tmpDir, "HEAD~1");
     const paths = files.map(f => f.path);
     // remove.ts was Deleted — excluded by --diff-filter=ACMR
     expect(paths).not.toContain("src/remove.ts");
   });
 
-  it("skips files that no longer exist on disk", async () => {
+  it("skips files that no longer exist on disk", () => {
     // File appears in git diff but was deleted after the diff ref
     writeFile("src/ghost.ts", "export const ghost = 1;\n");
     writeFile("src/real.ts", "export const real = 1;\n");
@@ -151,7 +151,7 @@ describe("resolveDiffFiles", () => {
     // Delete ghost.ts from disk but don't commit (simulates a file that git reports but doesn't exist)
     fs.unlinkSync(path.join(tmpDir, "src/ghost.ts"));
 
-    const files = await resolveDiffFiles(tmpDir, "HEAD~1");
+    const files = resolveDiffFiles(tmpDir, "HEAD~1");
     const paths = files.map(f => f.path);
     expect(paths).not.toContain("src/ghost.ts");
     expect(paths).toContain("src/real.ts");

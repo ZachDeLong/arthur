@@ -20,11 +20,11 @@ export interface ResolveDiffOptions {
   staged?: boolean;
 }
 
-export async function resolveDiffFiles(
+export function resolveDiffFiles(
   projectDir: string,
   diffRef: string,
   options?: ResolveDiffOptions,
-): Promise<DiffFile[]> {
+): DiffFile[] {
   const args = ["diff", "--name-only", "--diff-filter=ACMR"];
 
   if (options?.staged) {
@@ -54,7 +54,7 @@ export async function resolveDiffFiles(
   const results: DiffFile[] = [];
 
   for (const filePath of filePaths) {
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     if (!SUPPORTED_EXTENSIONS.has(ext)) {
       continue;
     }
