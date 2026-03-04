@@ -275,8 +275,7 @@ function isListedDependency(packageName: string, projectDir: string): boolean {
 
 /**
  * Validate a single import source against a project's node_modules / package.json.
- * Returns an ImportRef if hallucinated, or null if valid/skipped.
- * Mutates counters via the provided callback.
+ * Returns { ref, skipped } — ref is an ImportRef if hallucinated, null if valid.
  */
 function validateImportSource(
   source: string,

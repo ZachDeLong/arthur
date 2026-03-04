@@ -40,7 +40,8 @@ registerChecker({
       for (const h of analysis.hallucinations) {
         const reason = h.reason === "package-not-found" ? "not installed" : "subpath not exported";
         const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-        lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
+        const fileContext = h.file ? ` (in ${h.file})` : "";
+        lines.push(`- \`${h.raw}\`${fileContext} — ${reason}${suggestion}`);
       }
     } else {
       lines.push(`All imports valid.`);
@@ -63,7 +64,8 @@ registerChecker({
     for (const h of analysis.hallucinations) {
       const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
       const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-      lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
+      const fileContext = h.file ? ` (in ${h.file})` : "";
+      lines.push(`- \`${h.raw}\`${fileContext} — ${reason}${suggestion}`);
     }
     return lines.join("\n");
   },
