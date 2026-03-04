@@ -10,12 +10,13 @@ Ground truth verification for AI-generated code. MCP server that catches halluci
 bin/
   arthur.ts         Non-interactive CLI (arthur check — for CI pipelines)
   codeverifier.ts   Interactive CLI (codeverifier verify — LLM review)
-  arthur-mcp.ts     MCP server (stdio transport, 12 tools)
+  arthur-mcp.ts     MCP server (stdio transport, 13 tools)
 
 src/
   analysis/     Static analysis checkers + registry pattern
     checkers/   Checker registration files (one per checker, auto-registered via barrel import)
     registry.ts Checker registry (CheckerDefinition interface, registerChecker/getCheckers)
+  diff/         Git diff resolver (resolveDiffFiles, DiffFile type)
   commands/     CLI commands (check, verify, init)
   config/       Config management (global + project + env)
   context/      Project context builder (tree, file reader, token budget)
@@ -33,8 +34,9 @@ bench/
 
 ## MCP Server
 
-Twelve tools (registry-driven — adding a new checker is a 2-file operation):
-- **`check_all`** — runs stable deterministic checkers in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool.**
+Thirteen tools (registry-driven — adding a new checker is a 2-file operation):
+- **`check_all`** — runs stable deterministic checkers against a plan in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool for plan verification.**
+- **`check_diff`** — validates actual code changes from a git diff against project ground truth (no API key). Runs source-mode checkers (currently: imports) on files added/modified since the given ref. **Use this after writing code.**
 - `check_paths` — path validation against project tree + closest matches (no API key)
 - `check_schema` — Prisma schema validation + full schema ground truth (no API key)
 - `check_sql_schema` — Drizzle/SQL schema validation + full table/column listing (no API key)
@@ -56,11 +58,18 @@ Twelve tools (registry-driven — adding a new checker is a 2-file operation):
 Non-interactive CLI for CI pipelines. Runs stable deterministic checkers by default without an MCP host.
 
 ```
+# Plan mode (verify a plan before implementation)
 arthur check --plan plan.md --project . --format text|json --schema schema.prisma --strict
 cat plan.md | arthur check --project .
+
+# Diff mode (verify actual code changes)
+arthur check --diff HEAD --project .              # all uncommitted changes
+arthur check --diff HEAD --staged --project .     # staged only (pre-commit)
+arthur check --diff origin/main --project .       # CI: everything since branch point
 ```
 
 - **Plan input:** `--plan <file>`, `--stdin`, or auto-detect piped stdin. Never falls through to interactive mode.
+- **Diff input:** `--diff <ref>` resolves changed `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs` files from git diff. `--staged` checks staged files only. `--diff` and `--plan` are mutually exclusive.
 - **Output:** `text` (compact colored table, default) or `json` (full `ArthurReport` from `finding-schema.ts`).
 - **Experimental checkers:** `--include-experimental` enables `types` + `packageApi`.
 - **Coverage gate:** `--min-checked-refs <n>` + `--coverage-mode off|warn|fail` prevents false confidence from low-reference plans.
@@ -144,12 +153,13 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 Arthur's core pivot: from plan verifier to **automatic static analysis for AI-generated code**. Static checkers (100% detection, zero cost) are the product. LLM review is opt-in.
 
 ### Phase 1: `check --diff` (code input, not just plans)
-- `arthur check --diff HEAD --strict .` — extract changed file paths from git, read actual source, run checkers
-- `arthur check --diff --staged --strict .` — same but for staged files
-- `arthur check --diff origin/main --strict .` — CI mode, check everything since branch point
-- **Per-checker source adapters** — each checker gets a `plan` vs `source` input mode. Don't feed raw source through plan extractors (different patterns: no backticks, bare imports, etc.)
-- **Spike imports first** (lowest risk, highest value), then expand checker-by-checker (env, routes, schema)
-- Checkers without source mode yet return `skipReason: "source mode not implemented yet"`
+- [x] `CheckerInput` abstraction — checkers accept `{ mode: "plan" | "source", text, files? }` instead of raw planText
+- [x] `src/diff/resolver.ts` — git diff plumbing, returns `DiffFile[]` filtered to JS/TS extensions
+- [x] `arthur check --diff HEAD --strict .` — CLI support for diff mode
+- [x] `arthur check --diff --staged --strict .` — staged files for pre-commit
+- [x] `check_diff` MCP tool — source-mode counterpart to `check_all`
+- [x] Import checker source mode — validates imports from actual source files with per-file attribution
+- [ ] Expand source mode to other checkers (env, routes, schema) — each checker needs its own source adapter
 
 ### Phase 2: Hooks (make Arthur invisible)
 - `arthur hooks install` — writes pre-commit hook that runs `arthur check --diff --staged --strict .`
