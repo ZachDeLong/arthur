@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -270,5 +271,71 @@ describe("runCheck — schema passthrough", () => {
     } finally {
       fs.unlinkSync(tmpFile);
     }
+  });
+});
+
+describe("runCheck — diff mode", () => {
+  let repoDir: string;
+
+  beforeEach(() => {
+    repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-check-diff-"));
+    execSync("git init", { cwd: repoDir });
+    execSync('git config user.name "Test"', { cwd: repoDir });
+    execSync('git config user.email "test@test.com"', { cwd: repoDir });
+    fs.writeFileSync(path.join(repoDir, "index.ts"), 'export const x = 1;\n');
+    fs.writeFileSync(path.join(repoDir, "package.json"), JSON.stringify({
+      name: "test", dependencies: { "chalk": "^5.0.0" },
+    }));
+    execSync("git add -A", { cwd: repoDir });
+    execSync('git commit -m "init"', { cwd: repoDir });
+  });
+
+  afterEach(() => {
+    fs.rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  it("returns 0 when diff has valid imports", async () => {
+    fs.writeFileSync(path.join(repoDir, "app.ts"), 'import chalk from "chalk";\n');
+    execSync("git add app.ts", { cwd: repoDir });
+    const code = await runCheck({ diff: "HEAD", project: repoDir });
+    expect(code).toBe(0);
+  });
+
+  it("returns 1 when diff has hallucinated imports", async () => {
+    fs.writeFileSync(path.join(repoDir, "app.ts"), 'import banana from "nonexistent-banana-pkg";\n');
+    execSync("git add app.ts", { cwd: repoDir });
+    const code = await runCheck({ diff: "HEAD", project: repoDir });
+    expect(code).toBe(1);
+  });
+
+  it("errors when --diff and --plan both provided", async () => {
+    const code = await runCheck({ diff: "HEAD", plan: "plan.md", project: repoDir });
+    expect(code).toBe(1);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Cannot use --diff and --plan together"),
+    );
+  });
+
+  it("supports --staged flag", async () => {
+    fs.writeFileSync(path.join(repoDir, "staged.ts"), 'import chalk from "chalk";\n');
+    execSync("git add staged.ts", { cwd: repoDir });
+    const code = await runCheck({ diff: "HEAD", staged: true, project: repoDir });
+    expect(code).toBe(0);
+  });
+
+  it("returns 0 when no changed files in diff", async () => {
+    const code = await runCheck({ diff: "HEAD", project: repoDir });
+    expect(code).toBe(0);
+  });
+
+  it("json format works in diff mode", async () => {
+    fs.writeFileSync(path.join(repoDir, "app.ts"), 'import banana from "nonexistent-banana-pkg";\n');
+    execSync("git add app.ts", { cwd: repoDir });
+    const code = await runCheck({ diff: "HEAD", project: repoDir, format: "json" });
+    expect(code).toBe(1);
+    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const report = JSON.parse(output);
+    expect(report.schemaVersion).toBe("1.0");
+    expect(report.summary.totalFindings).toBeGreaterThan(0);
   });
 });

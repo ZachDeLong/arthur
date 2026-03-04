@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import { buildJsonReport } from "../analysis/finding-schema.js";
+import type { CheckerInput } from "../analysis/registry.js";
 import {
   evaluateCoverageGate,
   runAllCheckers,
@@ -13,11 +14,14 @@ import {
   resolveArthurCheckPolicy,
   type CoverageMode,
 } from "../config/arthur-check.js";
+import { resolveDiffFiles } from "../diff/resolver.js";
 import "../analysis/checkers/index.js";
 
 export interface CheckOptions {
   plan?: string;
   stdin?: boolean;
+  diff?: string;
+  staged?: boolean;
   project?: string;
   format?: "text" | "json";
   schema?: string;
@@ -135,27 +139,9 @@ function formatTextOutput(
  * Returns 0 (clean) or 1 (findings or error).
  */
 export async function runCheck(opts: CheckOptions): Promise<number> {
-  // 1. Load plan
-  const planText = await loadPlanText(opts);
-  if (!planText) {
-    if (!opts.plan && !opts.stdin && process.stdin.isTTY) {
-      console.error(chalk.red("Error: no plan provided."));
-      console.error("");
-      console.error("Usage:");
-      console.error("  arthur check --plan <file> [--project <dir>]");
-      console.error("  cat plan.md | arthur check [--project <dir>]");
-      console.error("");
-      console.error("Options:");
-      console.error("  --plan <file>      Path to plan file");
-      console.error("  --stdin            Read plan from stdin");
-      console.error("  --project <dir>    Project directory (default: cwd)");
-      console.error("  --format text|json Output format (default: text)");
-      console.error("  --schema <file>    Path to Prisma schema file");
-      console.error("  --include-experimental  Include experimental checkers");
-      console.error("  --strict           Enable strict mode (includes experimental + coverage fail)");
-      console.error("  --min-checked-refs <n> Minimum refs that must be checked");
-      console.error("  --coverage-mode <mode> Coverage gate: off|warn|fail");
-    }
+  // 1. Mutual exclusion
+  if (opts.diff && opts.plan) {
+    console.error(chalk.red("Cannot use --diff and --plan together."));
     return 1;
   }
 
@@ -166,7 +152,45 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     return 1;
   }
 
-  // 3. Run checkers
+  // 3. Build CheckerInput
+  let input: CheckerInput;
+
+  if (opts.diff) {
+    // Diff mode — resolve changed files from git
+    const files = resolveDiffFiles(projectDir, opts.diff, { staged: opts.staged });
+    if (files.length === 0) {
+      console.log("No changed source files found in diff.");
+      return 0;
+    }
+    input = { mode: "source", text: files.map(f => f.content).join("\n"), files };
+  } else {
+    // Plan mode — load plan text
+    const planText = await loadPlanText(opts);
+    if (!planText) {
+      if (!opts.plan && !opts.stdin && process.stdin.isTTY) {
+        console.error(chalk.red("Error: no plan provided."));
+        console.error("");
+        console.error("Usage:");
+        console.error("  arthur check --plan <file> [--project <dir>]");
+        console.error("  cat plan.md | arthur check [--project <dir>]");
+        console.error("");
+        console.error("Options:");
+        console.error("  --plan <file>      Path to plan file");
+        console.error("  --stdin            Read plan from stdin");
+        console.error("  --project <dir>    Project directory (default: cwd)");
+        console.error("  --format text|json Output format (default: text)");
+        console.error("  --schema <file>    Path to Prisma schema file");
+        console.error("  --include-experimental  Include experimental checkers");
+        console.error("  --strict           Enable strict mode (includes experimental + coverage fail)");
+        console.error("  --min-checked-refs <n> Minimum refs that must be checked");
+        console.error("  --coverage-mode <mode> Coverage gate: off|warn|fail");
+      }
+      return 1;
+    }
+    input = { mode: "plan", text: planText };
+  }
+
+  // 4. Run checkers
   const options: Record<string, string> = {};
   if (opts.schema) options.schemaPath = opts.schema;
   const policy = resolveArthurCheckPolicy(projectDir, {
@@ -175,7 +199,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     minCheckedRefs: opts.minCheckedRefs,
     coverageMode: opts.coverageMode,
   });
-  const summary = runAllCheckers({ mode: "plan", text: planText }, projectDir, {
+  const summary = runAllCheckers(input, projectDir, {
     includeExperimental: policy.includeExperimental,
     checkerOptions: options,
   });
@@ -185,7 +209,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     policy.coverageMode,
   );
 
-  // 4. Output
+  // 5. Output
   if (opts.format === "json") {
     const report = buildJsonReport(summary.checkerResults, projectDir);
     const payload = {
@@ -210,7 +234,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     ));
   }
 
-  // 5. Exit code
+  // 6. Exit code
   const coverageFailed = coverageGate.mode === "fail" && coverageGate.triggered;
   return summary.totalFindings > 0 || coverageFailed ? 1 : 0;
 }

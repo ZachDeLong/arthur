@@ -15,6 +15,8 @@ program
   .description("Run all deterministic checkers against a plan")
   .option("--plan <file>", "Path to plan file")
   .option("--stdin", "Read plan from stdin")
+  .option("--diff <ref>", "Check code changes from git diff against <ref> (e.g., HEAD, origin/main)")
+  .option("--staged", "With --diff, check only staged changes")
   .option("--project <dir>", "Project directory (default: cwd)")
   .option("--format <format>", "Output format: text or json (default: text)")
   .option("--schema <file>", "Path to Prisma schema file")
