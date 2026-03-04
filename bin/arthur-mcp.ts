@@ -940,7 +940,7 @@ server.tool(
         coverageMode,
       });
 
-      const summary = runAllCheckers(planText, projectDir, {
+      const summary = runAllCheckers({ mode: "plan", text: planText }, projectDir, {
         includeExperimental: policy.includeExperimental,
         checkerOptions,
       });
@@ -1108,7 +1108,7 @@ server.tool(
       if (schemaPath) options.schemaPath = schemaPath;
 
       const results = new Map<string, import("../src/analysis/registry.js").CheckerResult>();
-      const checkSummary = runAllCheckers(planText, projectDir, {
+      const checkSummary = runAllCheckers({ mode: "plan", text: planText }, projectDir, {
         includeExperimental: checkPolicy.includeExperimental,
         checkerOptions: options,
       });

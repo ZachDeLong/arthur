@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzePaths, findClosestPaths, getDirectoryContext } from "../path-checker.js";
 import { getAllFiles } from "../../context/tree.js";
 import type { PathAnalysis } from "../path-checker.js";
@@ -8,8 +8,21 @@ registerChecker({
   displayName: "File Paths",
   catchKey: "paths",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzePaths(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "paths",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzePaths(input.text, projectDir);
     return {
       checkerId: "paths",
       checked: analysis.extractedPaths.length,

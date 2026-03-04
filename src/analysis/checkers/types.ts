@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeTypes, type TypeAnalysis } from "../type-checker.js";
 
 registerChecker({
@@ -7,8 +7,21 @@ registerChecker({
   catchKey: "types",
   experimental: true,
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeTypes(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "types",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeTypes(input.text, projectDir);
     return {
       checkerId: "types",
       checked: analysis.checkedRefs,

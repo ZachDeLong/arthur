@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCheckers, getChecker } from "../src/analysis/registry.js";
+import { getCheckers, getChecker, type CheckerInput } from "../src/analysis/registry.js";
 import "../src/analysis/checkers/index.js";
 import { buildCatchFindings } from "../src/logging/catches.js";
 
@@ -67,5 +67,23 @@ describe("buildCatchFindings", () => {
     expect(findings).toEqual({
       imports: { checked: 5, hallucinated: 0, items: [] },
     });
+  });
+});
+
+describe("CheckerInput source mode", () => {
+  it("all checkers handle source mode without crashing", () => {
+    const input: CheckerInput = {
+      mode: "source",
+      text: 'import express from "express";\n',
+      files: [{ path: "src/index.ts", content: 'import express from "express";\n' }],
+    };
+
+    for (const checker of getCheckers({ includeExperimental: true })) {
+      const result = checker.run(input, ".");
+      if (!checker.supportsSourceMode) {
+        expect(result.applicable).toBe(false);
+        expect(result.notApplicableReason).toContain("source mode");
+      }
+    }
   });
 });

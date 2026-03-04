@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeApiRoutes, buildRouteIndex, type ApiRouteAnalysis } from "../api-route-checker.js";
 
 registerChecker({
@@ -6,8 +6,21 @@ registerChecker({
   displayName: "API Routes",
   catchKey: "routes",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeApiRoutes(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "routes",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeApiRoutes(input.text, projectDir);
     return {
       checkerId: "routes",
       checked: analysis.checkedRefs,

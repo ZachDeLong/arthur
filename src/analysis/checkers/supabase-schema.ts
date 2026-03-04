@@ -1,5 +1,5 @@
 import path from "node:path";
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeSupabaseSchema, parseSupabaseSchema, type SupabaseSchemaAnalysis } from "../supabase-schema-checker.js";
 
 registerChecker({
@@ -7,8 +7,21 @@ registerChecker({
   displayName: "Supabase Schema",
   catchKey: "supabaseSchema",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeSupabaseSchema(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "supabaseSchema",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeSupabaseSchema(input.text, projectDir);
     return {
       checkerId: "supabaseSchema",
       checked: analysis.checkedRefs,

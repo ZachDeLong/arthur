@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeImports, type ImportAnalysis } from "../import-checker.js";
 
 registerChecker({
@@ -6,8 +6,21 @@ registerChecker({
   displayName: "Imports",
   catchKey: "imports",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeImports(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "imports",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeImports(input.text, projectDir);
     return {
       checkerId: "imports",
       checked: analysis.checkedImports,

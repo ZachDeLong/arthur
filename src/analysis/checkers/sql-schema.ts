@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeSqlSchema, buildSqlSchema, type SqlSchemaAnalysis } from "../sql-schema-checker.js";
 
 registerChecker({
@@ -6,8 +6,21 @@ registerChecker({
   displayName: "SQL/Drizzle Schema",
   catchKey: "sqlSchema",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeSqlSchema(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "sqlSchema",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeSqlSchema(input.text, projectDir);
     return {
       checkerId: "sqlSchema",
       checked: analysis.checkedRefs,

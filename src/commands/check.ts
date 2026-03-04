@@ -175,7 +175,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     minCheckedRefs: opts.minCheckedRefs,
     coverageMode: opts.coverageMode,
   });
-  const summary = runAllCheckers(planText, projectDir, {
+  const summary = runAllCheckers({ mode: "plan", text: planText }, projectDir, {
     includeExperimental: policy.includeExperimental,
     checkerOptions: options,
   });

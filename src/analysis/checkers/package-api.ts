@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzePackageApi, type PackageApiAnalysis } from "../package-api-checker.js";
 
 registerChecker({
@@ -7,8 +7,21 @@ registerChecker({
   catchKey: "packageApi",
   experimental: true,
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzePackageApi(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "packageApi",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzePackageApi(input.text, projectDir);
     return {
       checkerId: "packageApi",
       checked: analysis.checkedBindings + analysis.checkedMembers,

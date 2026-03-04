@@ -1,5 +1,5 @@
 import type { CoverageMode } from "../config/arthur-check.js";
-import { getCheckers, type CheckerDefinition, type CheckerResult } from "./registry.js";
+import { getCheckers, type CheckerDefinition, type CheckerInput, type CheckerResult } from "./registry.js";
 
 export interface CheckerRun {
   checker: CheckerDefinition;
@@ -71,7 +71,7 @@ function inferSkipReason(
 
 /** Run all selected checkers and return rollup totals + skipped checker details. */
 export function runAllCheckers(
-  planText: string,
+  input: CheckerInput,
   projectDir: string,
   options: RunAllOptions = {},
 ): CheckerRunSummary {
@@ -83,7 +83,7 @@ export function runAllCheckers(
   for (const checker of getCheckers({
     includeExperimental: options.includeExperimental,
   })) {
-    const result = checker.run(planText, projectDir, options.checkerOptions);
+    const result = checker.run(input, projectDir, options.checkerOptions);
     checkerResults.push({ checker, result });
 
     if (result.applicable) {

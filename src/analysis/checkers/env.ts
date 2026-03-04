@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeEnv, parseEnvFiles, type EnvAnalysis } from "../env-checker.js";
 
 registerChecker({
@@ -6,8 +6,21 @@ registerChecker({
   displayName: "Env Variables",
   catchKey: "env",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeEnv(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "env",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeEnv(input.text, projectDir);
     const applicable = analysis.envFilesFound.length > 0 && analysis.checkedRefs > 0;
     const notApplicableReason = analysis.envFilesFound.length === 0
       ? "No .env* files found in project"

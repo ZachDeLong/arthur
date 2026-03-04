@@ -5,7 +5,16 @@
  * loops over `getCheckers()` instead of calling each checker individually.
  */
 
+import type { DiffFile } from "../diff/resolver.js";
+
 // --- Core Types ---
+
+/** Input passed to every checker's `run()` method. */
+export interface CheckerInput {
+  mode: "plan" | "source";
+  text: string;
+  files?: DiffFile[];
+}
 
 /** Unified result returned by every checker's `run()` method. */
 export interface CheckerResult {
@@ -30,9 +39,11 @@ export interface CheckerDefinition {
   catchKey: string;
   /** Experimental checkers are excluded from check_all by default. */
   experimental?: boolean;
+  /** Whether this checker supports source mode (diff input). */
+  supportsSourceMode?: boolean;
 
   /** Run the checker and return a unified result. */
-  run(planText: string, projectDir: string, options?: Record<string, string>): CheckerResult;
+  run(input: CheckerInput, projectDir: string, options?: Record<string, string>): CheckerResult;
   /** Format result for the `check_all` combined report. */
   formatForCheckAll(result: CheckerResult, projectDir: string): string[];
   /** Format result for the `verify_plan` static findings section (LLM context). */

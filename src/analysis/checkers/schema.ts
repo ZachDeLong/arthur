@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { parseSchema, analyzeSchema, type SchemaAnalysis } from "../schema-checker.js";
 
 registerChecker({
@@ -8,7 +8,19 @@ registerChecker({
   displayName: "Prisma Schema",
   catchKey: "schema",
 
-  run(planText, projectDir, options): CheckerResult {
+  run(input: CheckerInput, projectDir, options): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "schema",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
     const schemaPath = options?.schemaPath
       ?? (fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
         ? path.join(projectDir, "prisma/schema.prisma")
@@ -29,7 +41,7 @@ registerChecker({
 
     try {
       const schema = parseSchema(path.resolve(schemaPath));
-      const analysis = analyzeSchema(planText, schema);
+      const analysis = analyzeSchema(input.text, schema);
       return {
         checkerId: "schema",
         checked: analysis.totalRefs,

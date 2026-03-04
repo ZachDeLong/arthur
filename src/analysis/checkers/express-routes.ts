@@ -1,4 +1,4 @@
-import { registerChecker, type CheckerResult } from "../registry.js";
+import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeExpressRoutes, buildExpressRouteIndex, type ExpressRouteAnalysis } from "../express-route-checker.js";
 
 registerChecker({
@@ -6,8 +6,21 @@ registerChecker({
   displayName: "Express/Fastify Routes",
   catchKey: "expressRoutes",
 
-  run(planText, projectDir): CheckerResult {
-    const analysis = analyzeExpressRoutes(planText, projectDir);
+  run(input: CheckerInput, projectDir): CheckerResult {
+    if (input.mode === "source") {
+      return {
+        checkerId: "expressRoutes",
+        checked: 0,
+        hallucinated: 0,
+        hallucinations: [],
+        catchItems: [],
+        applicable: false,
+        notApplicableReason: "source mode not implemented for this checker",
+        rawAnalysis: null,
+      };
+    }
+
+    const analysis = analyzeExpressRoutes(input.text, projectDir);
     const notApplicableReason = analysis.framework === "none"
       ? "Express/Fastify not detected in package.json"
       : "No Express/Fastify routes indexed";
