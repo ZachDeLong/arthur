@@ -99,7 +99,7 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
     const checkPolicy = resolveArthurCheckPolicy(projectDir);
 
     const results = new Map<string, CheckerResult>();
-    const checkSummary = runAllCheckers(planText, projectDir, {
+    const checkSummary = runAllCheckers({ mode: "plan", text: planText }, projectDir, {
       includeExperimental: checkPolicy.includeExperimental,
       checkerOptions,
     });
