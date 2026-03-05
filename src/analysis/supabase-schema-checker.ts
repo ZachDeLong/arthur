@@ -277,7 +277,7 @@ interface RawSupabaseRef {
  * Only looks within the same "chain" — stops at blank lines, which indicate
  * a different query/code block. Returns undefined if no confident match.
  */
-function findNearestFrom(planText: string, position: number): string | undefined {
+export function findNearestFrom(planText: string, position: number): string | undefined {
   // Look back up to 500 chars but stop at blank lines (query boundary)
   const start = Math.max(0, position - 500);
   const beforeText = planText.slice(start, position);
@@ -286,9 +286,14 @@ function findNearestFrom(planText: string, position: number): string | undefined
   const lastBlankLine = beforeText.lastIndexOf("\n\n");
   const searchText = lastBlankLine >= 0 ? beforeText.slice(lastBlankLine) : beforeText;
 
-  // Find the last .from('X') in this chunk
-  const fromMatch = searchText.match(/\.from\(\s*["'](\w+)["']\s*\)(?!.*\.from\()/);
-  return fromMatch ? fromMatch[1] : undefined;
+  // Find ALL .from() calls and take the last one
+  const fromRegex = /\.from\(\s*["'](\w+)["']\s*\)/g;
+  let lastMatch: string | undefined;
+  let m: RegExpExecArray | null;
+  while ((m = fromRegex.exec(searchText)) !== null) {
+    lastMatch = m[1];
+  }
+  return lastMatch;
 }
 
 /** Extract Supabase table, column, and function references from plan text. */
