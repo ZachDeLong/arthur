@@ -7,23 +7,7 @@ import { buildUserMessage, getSystemPrompt } from "../verifier/prompt.js";
 import { streamVerification } from "../verifier/client.js";
 import { createRenderer } from "../verifier/renderer.js";
 import { loadLastFeedback, saveSession } from "../session/store.js";
-import { analyzePaths } from "../analysis/path-checker.js";
-import { parseSchema, analyzeSchema } from "../analysis/schema-checker.js";
-import { analyzeImports } from "../analysis/import-checker.js";
-import { analyzeEnv } from "../analysis/env-checker.js";
-import { analyzeTypes } from "../analysis/type-checker.js";
-import { analyzeApiRoutes } from "../analysis/api-route-checker.js";
-import { analyzeSqlSchema } from "../analysis/sql-schema-checker.js";
-import {
-  printPathAnalysis,
-  printSchemaAnalysis,
-  printImportAnalysis,
-  printEnvAnalysis,
-  printTypeAnalysis,
-  printApiRouteAnalysis,
-  printSqlSchemaAnalysis,
-  formatStaticFindings,
-} from "../analysis/formatter.js";
+import { formatStaticFindings } from "../analysis/formatter.js";
 import { evaluateCoverageGate, runAllCheckers } from "../analysis/run-all.js";
 import { type CheckerResult } from "../analysis/registry.js";
 import "../analysis/checkers/index.js";
@@ -113,42 +97,7 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
       if (!result.applicable || result.hallucinated === 0) continue;
       hasAnyIssues = true;
 
-      if (checker.id === "paths") {
-        printPathAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-      if (checker.id === "schema") {
-        printSchemaAnalysis((result.rawAnalysis as any).analysis);
-        continue;
-      }
-      if (checker.id === "imports") {
-        printImportAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-      if (checker.id === "env") {
-        printEnvAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-      if (checker.id === "types") {
-        printTypeAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-      if (checker.id === "routes") {
-        printApiRouteAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-      if (checker.id === "sqlSchema") {
-        printSqlSchemaAnalysis(result.rawAnalysis as any);
-        continue;
-      }
-
-      // Fallback for checkers without dedicated terminal printer functions.
-      log.heading(`Static Analysis: ${checker.displayName}`);
-      log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
-      for (const finding of result.hallucinations) {
-        const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
-        log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
-      }
+      checker.formatForCli(result, projectDir);
     }
 
     staticFindings = hasAnyIssues

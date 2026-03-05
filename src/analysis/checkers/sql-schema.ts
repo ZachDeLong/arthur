@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeSqlSchema, buildSqlSchema, type SqlSchemaAnalysis } from "../sql-schema-checker.js";
+import { printSqlSchemaAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "sqlSchema",
@@ -60,6 +61,10 @@ registerChecker({
     lines.push(`**Tables:** ${[...sqlSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printSqlSchemaAnalysis(result.rawAnalysis as SqlSchemaAnalysis);
   },
 
   formatForFindings(result): string | undefined {

@@ -34,41 +34,10 @@ interface RunAllOptions {
 }
 
 function inferSkipReason(
-  checker: CheckerDefinition,
+  _checker: CheckerDefinition,
   result: CheckerResult,
 ): string {
-  if (result.notApplicableReason) return result.notApplicableReason;
-
-  const analysis = result.rawAnalysis as Record<string, unknown> | undefined;
-
-  switch (checker.id) {
-    case "schema":
-      return "No readable prisma/schema.prisma found";
-    case "sqlSchema":
-      return "No Drizzle or SQL schema files found";
-    case "supabaseSchema":
-      return "No Supabase generated types file found";
-    case "imports":
-      return "No package import refs found in plan";
-    case "env":
-      if (Array.isArray(analysis?.envFilesFound) && analysis.envFilesFound.length === 0) {
-        return "No .env* files found in project";
-      }
-      return "No env var refs found in plan";
-    case "types":
-      return "No TypeScript type/member refs found in plan";
-    case "routes":
-      return "No Next.js App Router route files found";
-    case "expressRoutes":
-      if (analysis?.framework === "none") {
-        return "Express/Fastify not detected in package.json";
-      }
-      return "No Express/Fastify routes indexed";
-    case "packageApi":
-      return "No package API refs could be validated";
-    default:
-      return "Not applicable";
-  }
+  return result.notApplicableReason ?? "Not applicable";
 }
 
 /** Run all selected checkers and return rollup totals + skipped checker details. */

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeSupabaseSchema, parseSupabaseSchema, type SupabaseSchemaAnalysis } from "../supabase-schema-checker.js";
+import * as log from "../../utils/logger.js";
 
 registerChecker({
   id: "supabaseSchema",
@@ -75,6 +76,15 @@ registerChecker({
     lines.push(`**Tables:** ${[...supabaseSchema.tables.keys()].map(t => `\`${t}\``).join(", ")}`);
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    log.heading(`Static Analysis: ${this.displayName}`);
+    log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
+    for (const finding of result.hallucinations) {
+      const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
+      log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+    }
   },
 
   formatForFindings(result): string | undefined {

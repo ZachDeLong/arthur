@@ -1,6 +1,7 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzePaths, findClosestPaths, getDirectoryContext } from "../path-checker.js";
 import { getAllFiles } from "../../context/tree.js";
+import { printPathAnalysis } from "../formatter.js";
 import type { PathAnalysis } from "../path-checker.js";
 
 registerChecker({
@@ -58,6 +59,10 @@ registerChecker({
     }
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printPathAnalysis(result.rawAnalysis as PathAnalysis);
   },
 
   formatForFindings(result): string | undefined {

@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeTypes, type TypeAnalysis } from "../type-checker.js";
+import { printTypeAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "types",
@@ -57,6 +58,10 @@ registerChecker({
     }
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printTypeAnalysis(result.rawAnalysis as TypeAnalysis);
   },
 
   formatForFindings(result): string | undefined {

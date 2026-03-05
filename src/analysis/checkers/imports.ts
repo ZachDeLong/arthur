@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeImports, type ImportAnalysis } from "../import-checker.js";
+import { printImportAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "imports",
@@ -48,6 +49,10 @@ registerChecker({
     }
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printImportAnalysis(result.rawAnalysis as ImportAnalysis);
   },
 
   formatForFindings(result): string | undefined {

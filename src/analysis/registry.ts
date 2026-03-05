@@ -50,6 +50,8 @@ export interface CheckerDefinition {
   formatForCheckAll(result: CheckerResult, projectDir: string): string[];
   /** Format result for the `verify_plan` static findings section (LLM context). */
   formatForFindings(result: CheckerResult): string | undefined;
+  /** Format result for CLI text output (colored, verbose). Called by verify.ts. */
+  formatForCli(result: CheckerResult, projectDir: string): void;
 }
 
 // --- Registry Runtime ---

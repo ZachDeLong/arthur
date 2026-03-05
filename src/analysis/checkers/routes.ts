@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeApiRoutes, buildRouteIndex, type ApiRouteAnalysis } from "../api-route-checker.js";
+import { printApiRouteAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "routes",
@@ -60,6 +61,10 @@ registerChecker({
     lines.push(`**Routes:** ${[...routeIndex.entries()].map(([url, r]) => `\`${url}\` [${[...r.methods].join(",")}]`).join(", ")}`);
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printApiRouteAnalysis(result.rawAnalysis as ApiRouteAnalysis);
   },
 
   formatForFindings(result): string | undefined {

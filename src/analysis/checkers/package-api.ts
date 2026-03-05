@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzePackageApi, type PackageApiAnalysis } from "../package-api-checker.js";
+import * as log from "../../utils/logger.js";
 
 registerChecker({
   id: "packageApi",
@@ -61,6 +62,15 @@ registerChecker({
     }
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    log.heading(`Static Analysis: ${this.displayName}`);
+    log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
+    for (const finding of result.hallucinations) {
+      const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
+      log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+    }
   },
 
   formatForFindings(result): string | undefined {

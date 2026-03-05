@@ -1,5 +1,6 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { analyzeEnv, parseEnvFiles, type EnvAnalysis } from "../env-checker.js";
+import { printEnvAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "env",
@@ -61,6 +62,10 @@ registerChecker({
     }
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    printEnvAnalysis(result.rawAnalysis as EnvAnalysis);
   },
 
   formatForFindings(result): string | undefined {

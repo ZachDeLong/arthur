@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
 import { parseSchema, analyzeSchema, type SchemaAnalysis } from "../schema-checker.js";
+import { printSchemaAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "schema",
@@ -108,6 +109,11 @@ registerChecker({
     lines.push(`**Schema:** ${[...schema.models.keys()].map(m => `\`${m}\``).join(", ")}${schema.enums.size > 0 ? ` | Enums: ${[...schema.enums].join(", ")}` : ""}`);
     lines.push(``);
     return lines;
+  },
+
+  formatForCli(result) {
+    const { analysis } = result.rawAnalysis as { analysis: SchemaAnalysis };
+    printSchemaAnalysis(analysis);
   },
 
   formatForFindings(result): string | undefined {
