@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -35,15 +35,13 @@ export function resolveDiffFiles(
 
   let stdout: string;
   try {
-    stdout = execSync(`git ${args.join(" ")}`, {
+    stdout = execFileSync("git", args, {
       cwd: projectDir,
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
     });
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : String(err);
-    throw new Error(`git diff failed: ${message}`);
+  } catch {
+    throw new Error(`git diff failed for ref "${diffRef}"`);
   }
 
   const filePaths = stdout

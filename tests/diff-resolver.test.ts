@@ -141,6 +141,15 @@ describe("resolveDiffFiles", () => {
     expect(paths).not.toContain("src/remove.ts");
   });
 
+  it("does not leak system paths in error messages", () => {
+    expect(() => resolveDiffFiles("/some/private/path", "nonexistent-ref")).toThrow();
+    try {
+      resolveDiffFiles("/some/private/path", "nonexistent-ref");
+    } catch (e: any) {
+      expect(e.message).not.toContain("/some/private/path");
+    }
+  });
+
   it("skips files that no longer exist on disk", () => {
     // File appears in git diff but was deleted after the diff ref
     writeFile("src/ghost.ts", "export const ghost = 1;\n");
