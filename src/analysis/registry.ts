@@ -14,6 +14,8 @@ export interface CheckerInput {
   mode: "plan" | "source";
   text: string;
   files?: DiffFile[];
+  /** Request-scoped cache. Created fresh per MCP invocation so entries are garbage-collected automatically. */
+  cache?: Map<string, unknown>;
 }
 
 /** Unified result returned by every checker's `run()` method. */

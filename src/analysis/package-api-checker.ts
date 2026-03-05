@@ -328,8 +328,13 @@ function substituteForDts(filePath: string): string | null {
 
 // --- .d.ts Export Parsing ---
 
-/** Module-level cache for parsed APIs. Keyed by resolved entrypoint path. */
+/** Module-level cache for parsed APIs. Keyed by resolved entrypoint path. Cleared per run via clearApiCaches(). */
 const apiCache = new Map<string, PackageApi>();
+
+/** Clear module-level caches. Call before each MCP tool invocation to avoid stale results. */
+export function clearApiCaches(): void {
+  apiCache.clear();
+}
 
 export function parseExportedApi(
   dtsContent: string,

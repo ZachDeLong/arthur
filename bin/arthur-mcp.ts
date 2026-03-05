@@ -40,8 +40,8 @@ import {
   analyzeSchema,
   type SchemaAnalysis,
 } from "../src/analysis/schema-checker.js";
-import { analyzeImports } from "../src/analysis/import-checker.js";
-import { analyzePackageApi } from "../src/analysis/package-api-checker.js";
+import { analyzeImports, clearImportCaches } from "../src/analysis/import-checker.js";
+import { analyzePackageApi, clearApiCaches } from "../src/analysis/package-api-checker.js";
 import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
 import { analyzeTypes, buildTypeIndex } from "../src/analysis/type-checker.js";
 import { analyzeApiRoutes, buildRouteIndex } from "../src/analysis/api-route-checker.js";
@@ -289,6 +289,9 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
+      // Clear stale module-level caches from previous requests in this long-running process.
+      clearImportCaches();
+
       const analysis = analyzeImports(planText, projectDir);
       const lines: string[] = [];
 
@@ -865,6 +868,9 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
+      // Clear stale module-level caches from previous requests in this long-running process.
+      clearApiCaches();
+
       const analysis = analyzePackageApi(planText, projectDir);
       const lines: string[] = [];
 

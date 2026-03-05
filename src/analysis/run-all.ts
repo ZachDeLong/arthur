@@ -1,5 +1,7 @@
 import type { CoverageMode } from "../config/arthur-check.js";
 import { getCheckers, type CheckerDefinition, type CheckerInput, type CheckerResult } from "./registry.js";
+import { clearImportCaches } from "./import-checker.js";
+import { clearApiCaches } from "./package-api-checker.js";
 
 export interface CheckerRun {
   checker: CheckerDefinition;
@@ -75,6 +77,14 @@ export function runAllCheckers(
   projectDir: string,
   options: RunAllOptions = {},
 ): CheckerRunSummary {
+  // Belt-and-suspenders: clear module-level caches so stale data from a
+  // previous request in this long-running MCP server process is discarded.
+  clearImportCaches();
+  clearApiCaches();
+
+  // Create a request-scoped cache for checkers that opt into it.
+  const scopedInput: CheckerInput = { ...input, cache: input.cache ?? new Map() };
+
   const checkerResults: CheckerRun[] = [];
   const skippedCheckers: SkippedChecker[] = [];
   let totalChecked = 0;
@@ -83,7 +93,7 @@ export function runAllCheckers(
   for (const checker of getCheckers({
     includeExperimental: options.includeExperimental,
   })) {
-    const result = checker.run(input, projectDir, options.checkerOptions);
+    const result = checker.run(scopedInput, projectDir, options.checkerOptions);
     checkerResults.push({ checker, result });
 
     if (result.applicable) {

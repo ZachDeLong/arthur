@@ -244,8 +244,13 @@ function suggestPackage(packageName: string, nodeModulesDir: string): string | u
 
 // --- Package.json Dependency Check ---
 
-/** Cache for parsed package.json deps (per projectDir). */
+/** Cache for parsed package.json deps (per projectDir). Cleared per run via clearImportCaches(). */
 const depsCache = new Map<string, Set<string>>();
+
+/** Clear module-level caches. Call before each MCP tool invocation to avoid stale results. */
+export function clearImportCaches(): void {
+  depsCache.clear();
+}
 
 /** Check if a package is listed in the project's package.json dependencies or devDependencies. */
 function isListedDependency(packageName: string, projectDir: string): boolean {
