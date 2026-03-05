@@ -60,6 +60,8 @@ export function parseSchema(schemaPath: string): PrismaSchema {
   }
 
   // Extract models with their fields
+  // Note: [\s\S]*? (lazy) anchored to ^} (line-start }) is safe from catastrophic
+  // backtracking — no nested quantifiers or overlapping alternatives.
   const modelRegex = /^model\s+(\w+)\s*\{([\s\S]*?)^}/gm;
   for (const match of content.matchAll(modelRegex)) {
     const modelName = match[1];
