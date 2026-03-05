@@ -189,6 +189,39 @@ const CONSTRAINT_KEYWORDS = new Set([
   "primary", "foreign", "unique", "check", "constraint", "index",
 ]);
 
+/** Split a SQL column body on top-level commas, respecting parentheses and quotes. */
+function splitColumnsAware(body: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+  let inString = false;
+  let stringChar = "";
+
+  for (const ch of body) {
+    if (inString) {
+      current += ch;
+      if (ch === stringChar) inString = false;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      inString = true;
+      stringChar = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === "(") { depth++; current += ch; continue; }
+    if (ch === ")") { depth--; current += ch; continue; }
+    if (ch === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
 /** Extract column definitions from a CREATE TABLE body. */
 function extractSqlColumns(content: string, startPos: number): Map<string, string> {
   const columns = new Map<string, string>();
@@ -203,7 +236,7 @@ function extractSqlColumns(content: string, startPos: number): Map<string, strin
   }
 
   const body = content.slice(startPos, i - 1);
-  const lines = body.split(",");
+  const lines = splitColumnsAware(body);
 
   for (const line of lines) {
     const trimmed = line.trim();
