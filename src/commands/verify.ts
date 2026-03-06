@@ -150,7 +150,7 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
     // 7. Save session
     const fullFeedback = renderer.getFullText();
     saveSession(projectDir, planText, fullFeedback);
-    log.success("Feedback saved to .codeverifier/sessions/");
+    log.success("Feedback saved to .arthur/sessions/");
 
     // 8. Verbose stats
     if (options.verbose) {

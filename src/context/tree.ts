@@ -9,6 +9,7 @@ const DEFAULT_IGNORES = [
   ".git",
   "dist",
   "build",
+  ".arthur",
   ".codeverifier",
   "__pycache__",
   ".next",

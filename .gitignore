@@ -2,6 +2,7 @@ node_modules/
 !bench/fixtures/fixture-f/node_modules/
 bench/fixtures/fixture-f/node_modules/.package-lock.json
 dist/
+.arthur/
 .codeverifier/
 .env
 *.tsbuildinfo

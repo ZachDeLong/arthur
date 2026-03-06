@@ -9,8 +9,11 @@ export const DEFAULT_CONFIG: CodeVerifierConfig = {
   tokenBudget: 80_000,
 };
 
-export const GLOBAL_CONFIG_DIR = ".codeverifier";
+export const GLOBAL_CONFIG_DIR = ".arthur";
 export const GLOBAL_CONFIG_FILE = "config.json";
-export const PROJECT_CONFIG_DIR = ".codeverifier";
+export const PROJECT_CONFIG_DIR = ".arthur";
 export const PROJECT_CONFIG_FILE = "config.json";
+
+/** @deprecated Old global config directory — used for migration only. */
+export const LEGACY_GLOBAL_CONFIG_DIR = ".codeverifier";
 export const SESSIONS_DIR = "sessions";

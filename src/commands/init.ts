@@ -17,7 +17,7 @@ function prompt(question: string): Promise<string> {
 }
 
 export async function runInit(): Promise<void> {
-  log.heading("CodeVerifier Setup");
+  log.heading("Arthur Setup");
 
   const apiKey = await prompt(
     "Anthropic API key (leave blank to use ANTHROPIC_API_KEY env var): ",
@@ -40,9 +40,9 @@ export async function runInit(): Promise<void> {
   }
 
   saveGlobalConfig(config);
-  log.success("Global config saved to ~/.codeverifier/config.json");
+  log.success("Global config saved to ~/.arthur/config.json");
 
   // Try to update .gitignore in cwd
   ensureGitignore(process.cwd());
-  log.info("Checked .gitignore for .codeverifier/ entry");
+  log.info("Checked .gitignore for .arthur/ entry");
 }

@@ -6,12 +6,21 @@ import {
   DEFAULT_CONFIG,
   GLOBAL_CONFIG_DIR,
   GLOBAL_CONFIG_FILE,
+  LEGACY_GLOBAL_CONFIG_DIR,
   PROJECT_CONFIG_DIR,
   PROJECT_CONFIG_FILE,
 } from "./schema.js";
 
 function getGlobalConfigPath(): string {
   return path.join(os.homedir(), GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILE);
+}
+
+function getLegacyGlobalConfigPath(): string {
+  return path.join(
+    os.homedir(),
+    LEGACY_GLOBAL_CONFIG_DIR,
+    GLOBAL_CONFIG_FILE,
+  );
 }
 
 function getProjectConfigPath(projectDir: string): string {
@@ -27,9 +36,32 @@ function readJsonSafe(filePath: string): Partial<CodeVerifierConfig> {
   }
 }
 
+/**
+ * If ~/.arthur/config.json doesn't exist but ~/.codeverifier/config.json does,
+ * read from the legacy location and print a deprecation warning to stderr.
+ * Returns the global config (from new location if it exists, legacy otherwise).
+ */
+function loadGlobalConfig(): Partial<CodeVerifierConfig> {
+  const newPath = getGlobalConfigPath();
+  if (fs.existsSync(newPath)) {
+    return readJsonSafe(newPath);
+  }
+
+  const legacyPath = getLegacyGlobalConfigPath();
+  if (fs.existsSync(legacyPath)) {
+    console.error(
+      `[arthur] Deprecation warning: ~/.codeverifier/config.json is deprecated. ` +
+        `Please move your config to ~/.arthur/config.json`,
+    );
+    return readJsonSafe(legacyPath);
+  }
+
+  return {};
+}
+
 /** Load merged config: defaults < global < project < env vars. */
 export function loadConfig(projectDir: string): CodeVerifierConfig {
-  const globalCfg = readJsonSafe(getGlobalConfigPath());
+  const globalCfg = loadGlobalConfig();
   const projectCfg = readJsonSafe(getProjectConfigPath(projectDir));
 
   const merged: CodeVerifierConfig = {
@@ -61,10 +93,10 @@ export function saveGlobalConfig(
   fs.writeFileSync(filePath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
 }
 
-/** Ensure .codeverifier/ is in the project's .gitignore. */
+/** Ensure .arthur/ is in the project's .gitignore. */
 export function ensureGitignore(projectDir: string): void {
   const gitignorePath = path.join(projectDir, ".gitignore");
-  const entry = ".codeverifier/";
+  const entry = ".arthur/";
 
   if (fs.existsSync(gitignorePath)) {
     const content = fs.readFileSync(gitignorePath, "utf-8");
@@ -75,7 +107,7 @@ export function ensureGitignore(projectDir: string): void {
   // If no .gitignore exists, don't create one — just skip
 }
 
-/** Get the project-level .codeverifier directory, creating it if needed. */
+/** Get the project-level .arthur directory, creating it if needed. */
 export function getProjectConfigDir(projectDir: string): string {
   const dir = path.join(projectDir, PROJECT_CONFIG_DIR);
   fs.mkdirSync(dir, { recursive: true });

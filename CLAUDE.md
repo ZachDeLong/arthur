@@ -101,9 +101,9 @@ arthur check --diff origin/main --project .       # CI: everything since branch 
 
 - **Naive prompt is frozen** — `bench/naive-prompt.ts` must never be modified. It's the reproducible baseline.
 - **Results dir is gitignored** — benchmark results in `bench/results/` are local only.
-- **Config locations** — global: `~/.codeverifier/config.json`, project: `.codeverifier/config.json`, env: `ANTHROPIC_API_KEY`
+- **Config locations** — global: `~/.arthur/config.json`, project: `.arthur/config.json`, env: `ANTHROPIC_API_KEY` (legacy: `~/.codeverifier/config.json` still read with deprecation warning)
 - **Token budget** — default 80k. Priority order: prompt > plan > README > CLAUDE.md > session feedback > referenced files > tree.
-- **Model default** — `claude-sonnet-4-5-20250929` (Sonnet 4.5). Override via project config `.codeverifier/config.json`.
+- **Model default** — `claude-sonnet-4-5-20250929` (Sonnet 4.5). Override via project config `.arthur/config.json`.
 - **Fixture src/ excluded from root tsconfig** — `bench/fixtures/*/src` is excluded because fixture source files have their own deps (Next.js, Prisma, etc.).
 
 ## Benchmark System
@@ -137,7 +137,7 @@ Tests Arthur against self-review on real LLM-generated plans with limited contex
 - **Prompts**: `bench/tier4/tier4-prompt.ts`
 - **Report**: `bench/tier4/tier4-report.ts`
 - **Cached plans**: `bench/tier4/plans/counselor-sophie/` (git-tracked, generated once)
-- **External project**: counselor-sophie at `C:\Users\zachd\counselor-sophie` (not copied into fixtures)
+- **External project**: counselor-sophie at `~/counselor-sophie` (not copied into fixtures)
 - **sql_schema excluded**: false positives on English phrases matching SQL patterns
 - **package_api included in strict/experimental modes**: validates named imports/member access against .d.ts files
 - Run with: `npm run bench:tier4` or individual modes (`generate`, `score`, `report`)
@@ -150,7 +150,7 @@ Hybrid benchmark — automated setup + manual Claude Code sessions.
 
 ## Roadmap
 
-Arthur's core pivot: from plan verifier to **automatic static analysis for AI-generated code**. Static checkers (100% detection, zero cost) are the product. LLM review is opt-in.
+Arthur's core pivot: from plan verifier to **automatic static analysis for AI-generated code**. Deterministic static checkers (zero cost, high recall on reference errors) are the product. LLM review is opt-in.
 
 ### Phase 1: `check --diff` (code input, not just plans)
 - [x] `CheckerInput` abstraction — checkers accept `{ mode: "plan" | "source", text, files? }` instead of raw planText
@@ -178,7 +178,7 @@ Arthur's core pivot: from plan verifier to **automatic static analysis for AI-ge
 - Arthur becomes useful beyond MCP/Claude Code — any AI coding tool, any CI pipeline
 
 ### Demoted (still available, not the focus)
-- `verify_plan` — LLM review is opt-in only. Static is default. Benchmarks showed static: 100% detection vs LLM: 60-83%
+- `verify_plan` — LLM review is opt-in only. Static is default. Benchmarks showed static checkers outperform self-review, though with methodological caveats (see bench/METHODOLOGY.md)
 - Session context tools — context compression is a Claude Code problem, not Arthur's
 - New language support (Python, etc.) — go deep on JS/TS before going wide
 
