@@ -20,70 +20,58 @@ Arthur is now available as an MCP server in Claude Code. All tools run locally. 
 
 ## Benchmark: Arthur vs Self-Review on a Real Production Project
 
-Arthur uses deterministic filesystem checks that catch reference errors self-review misses. Effectiveness varies by codebase and task type. See [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for known limitations.
-
 We tested Arthur against Opus 4.6 self-review on [counselor-sophie](https://github.com/ZachDeLong/counselor-sophie), a production Next.js app with 33 Supabase tables, 17 API routes, and 499 npm packages.
 
-**Setup:** 8 feature tasks (add email notifications, CSV import, counselor dashboard, etc.). For each task, Opus generates an implementation plan with only the project's CLAUDE.md as context (no file tree, no source code). Then Arthur's static checkers and self-review each try to find errors in the plan. Self-review gets the same limited context as plan generation, which is realistic: in Claude Code, the LLM that reviews its own plan doesn't suddenly get more files than when it wrote it.
+**Important context for interpreting these results:**
+- Arthur defines what counts as an "error" using its own checkers. These numbers measure whether self-review agrees with Arthur's classification, not whether the errors are independently verified as real problems.
+- In Tier 4, Arthur has full filesystem access while self-review only gets the project's CLAUDE.md. This tests the realistic scenario (self-review works with what it has), but the gap is partly explained by information availability. See the [Big Benchmark](#big-benchmark-static-analysis-vs-self-review-equal-context) for a fairer comparison where both get equal context.
+- Package API errors include a known 54% false positive rate on React re-exports (see below).
+- All results are from a single run of a non-deterministic process. One task's detection rate varied from 6% to 52% between runs.
+
+**Setup:** 8 feature tasks. Opus generates implementation plans with only the project's CLAUDE.md as context (no file tree, no source code). Then Arthur's checkers and self-review each try to find errors. Self-review gets the same limited context as plan generation.
 
 ### Results (single run, Tier 4)
 
-| Category | Errors | Arthur | Self-Review | Gap |
-|---|---|---|---|---|
-| File paths | 20 | 100% | 25% | 75pp |
-| Supabase schema | 44 | 100% | 32% | 68pp |
-| Package APIs | 48 | 100% | 6% | 94pp |
-| Env vars | 2 | 100% | 100% | 0pp |
-| **Overall** | **114** | **100%** | **21%** | **79pp** |
+| Category | Errors (Arthur-defined) | Self-Review Caught | Self-Review Missed |
+|---|---|---|---|
+| File paths | 20 | 5 (25%) | 15 |
+| Supabase schema | 44 | 14 (32%) | 30 |
+| Package APIs | 22 genuine + 26 React FPs | 3 (6%) | 45 |
+| Env vars | 2 | 2 (100%) | 0 |
+| **Overall** | **88 genuine + 26 FPs** | **24 (21%)** | **90** |
 
-Arthur caught 90 errors that self-review missed. These are single-run results from one project; see limitations below and [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for methodology details.
+26 of the 48 package API "errors" are React hooks and types (`useState`, `useEffect`, `React.memo`) that Arthur flags because they aren't direct exports of the `react` package's main entry point, but they work fine at runtime via re-exports. If you exclude these false positives: **88 errors, 64 missed by self-review, 73pp gap.** We report both numbers for transparency.
 
 ### What the errors look like
 
 **Supabase schema (44 errors, 32% self-review detection):** Opus knows table names from CLAUDE.md but guesses column names wrong. It writes `.select('early_decision_deadline')` when the actual column is something different. It invents tables like `email_log`, `deadline_reminders`, `essay_drafts` that don't exist. Self-review can't verify these without seeing the actual `database.types.ts` file.
 
-**Package APIs (48 errors, 6% self-review detection):** Opus writes `import { NextRequest } from 'next'` (should be `next/server`) in 5 of 8 tasks, and self-review never flags it. It imports from `@react-email/components` (not installed). It references `React.memo` and `React.ChangeEvent` as direct members.
+**Package APIs (22 genuine errors, 6% self-review detection):** Opus writes `import { NextRequest } from 'next'` (should be `next/server`) in 5 of 8 tasks, and self-review never flags it. It imports from `@react-email/components` (not installed).
 
 **File paths (20 errors, 25% self-review detection):** Opus invents `components/counselor/CounselorStats.tsx`, `hooks/useCounselorDashboard.ts`, and `supabase/migrations/` paths that don't exist in the project.
-
-### Limitations and confounding variables
-
-We want to be upfront about what these numbers do and don't prove.
-
-**Package API errors are inflated by React re-exports.** 26 of the 48 package_api errors are React hooks and types (`useState`, `useEffect`, `React.memo`, `React.Fragment`) that the checker flags because they aren't direct exports of the `react` package's main entry point, but they work fine at runtime via re-exports. The remaining 22 are genuine failures: 12 wrong Next.js subpath imports (`next` instead of `next/server`) and 10 imports from uninstalled packages (`@react-email/components`). If you exclude the React re-exports, the overall numbers drop to 88 total errors with a 73pp gap. We're reporting both for transparency.
-
-**Single project.** Tier 4 only runs against counselor-sophie. It's a real production codebase, but it's one project. We don't know how these numbers generalize to Python projects, Go backends, or smaller codebases. The [Big Benchmark](#big-benchmark-static-analysis-vs-self-review-full-context) tests across 4 different fixture projects but with a different methodology.
-
-**Self-review is non-deterministic.** LLM output varies between runs. In our first run, Task 04 self-review caught 6% of errors. In the second run with the same cached plan, it caught 52%. The overall gap (79pp) is from a single run. Running multiple trials and averaging would give more robust numbers, but costs money.
-
-**Detection parser has limits.** We determine whether self-review "caught" an error by parsing its output for mentions of the error term near negative sentiment phrases. If self-review flagged an issue using unusual phrasing the parser didn't recognize, we'd score it as a miss. This could undercount self-review's actual performance.
-
-**Arthur has its own false positive rate.** In the Big Benchmark (different methodology, full-context self-review), Arthur's checkers had a 2.2% false positive rate. The React re-exports described above are an example of technically-correct-but-not-useful findings.
-
-**Only tested on Opus 4.6.** We haven't run Tier 4 on Sonnet, Haiku, GPT-4, or other models. The gap could be larger or smaller depending on the model.
-
-**Limited context is a design choice, not a flaw.** We gave self-review the same context as plan generation (CLAUDE.md only) because that's realistic. You could argue self-review should get more context, and the [Big Benchmark](#big-benchmark-static-analysis-vs-self-review-full-context) tests exactly that. Even with the full project tree, self-review still missed 40% of errors.
 
 ### Full results
 
 Complete benchmark data including every individual error, detection method, and the generated plans: [`bench/results/`](bench/results/)
 
-## Big Benchmark: Static Analysis vs Self-Review (Full Context)
+## Big Benchmark: Static Analysis vs Self-Review (Equal Context)
 
-A separate benchmark where self-review gets the **full project tree, all schema files, and a maximally adversarial prompt**. This is the best-case scenario for self-review: unlimited context with explicit instructions to check every category.
+A separate benchmark where self-review gets the **full project tree, all schema files, and a maximally adversarial prompt**. This removes the information asymmetry from Tier 4 — both Arthur and self-review have equal access to ground truth files.
 
 11 prompts across 4 fixture projects (TypeScript, Go, Next.js+Prisma, Drizzle+SQL). Model: Opus 4.6.
 
-| Category | Errors Found | Self-Review Missed | Self-Review Detection Rate |
-|---|---|---|---|
-| Path | 30 | 11 | 63% |
-| Schema (Prisma) | 19 | 0 | 100% |
-| SQL Schema (Drizzle) | 15 | 15 | 0% |
-| Import | 22 | 5 | 77% |
-| Env | 7 | 0 | 100% |
-| **Total** | **93** | **37** | **60%** |
+| Category | Errors (Arthur-defined) | Self-Review Detection Rate |
+|---|---|---|
+| Path | 30 | 63% |
+| Schema (Prisma) | 19 | **100%** |
+| SQL Schema (Drizzle) | 15 | **0%** |
+| Import | 22 | 77% |
+| Env | 7 | **100%** |
+| **Total** | **93** | **60%** |
 
-Even with full context, self-review missed 37 errors (single run). SQL/Drizzle schema was a complete blind spot (0% detection). Arthur's deterministic checkers found all 93, though Arthur's own checkers define the ground truth here — see [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for what that means for precision claims.
+Key finding: **when self-review has full context, the gap narrows significantly.** Prisma schema and env vars reach 100% detection. SQL/Drizzle schema remains a complete blind spot (0%). The remaining 40% gap is concentrated in categories where the error patterns are less obvious to spot by reading (file paths, SQL column names).
+
+Arthur's checkers define the ground truth here — see [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for what that means for precision claims. These are single-run results.
 
 ## How It Works
 

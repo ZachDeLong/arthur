@@ -1,5 +1,15 @@
 # Benchmark Methodology
 
+## Key Methodological Limitation
+
+Arthur's benchmarks use Arthur's own checkers as ground truth. This means:
+- Arthur always scores 100% detection by definition — it found the errors because it defined them
+- Self-review is scored against Arthur's classification, not independent verification
+- Precision (are Arthur's "errors" actually real problems?) is not measured in any benchmark
+- The only way to verify precision is human review of individual findings
+
+The benchmarks measure: "given what Arthur classifies as errors, how many does self-review also find?" They do NOT measure: "how many real errors does Arthur find?" Those are different questions.
+
 ## Limitations
 
 These benchmarks have known methodological limitations that should be considered when interpreting results:
@@ -22,7 +32,6 @@ Tier 4 tasks were chosen by the benchmark author with knowledge of which schema 
 
 ### Known false positive rates
 - Package API checker: ~54% false positive rate for React re-exports
-- Type checker: ~98% false positive rate (disabled by default)
 - SQL schema checker: false positives on English phrases matching SQL patterns
 
 ## Reproducibility
