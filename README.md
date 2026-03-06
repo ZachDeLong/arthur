@@ -20,11 +20,13 @@ Arthur is now available as an MCP server in Claude Code. All tools run locally. 
 
 ## Benchmark: Arthur vs Self-Review on a Real Production Project
 
+Arthur uses deterministic filesystem checks that catch reference errors self-review misses. Effectiveness varies by codebase and task type. See [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for known limitations.
+
 We tested Arthur against Opus 4.6 self-review on [counselor-sophie](https://github.com/ZachDeLong/arthur), a production Next.js app with 33 Supabase tables, 17 API routes, and 499 npm packages.
 
 **Setup:** 8 feature tasks (add email notifications, CSV import, counselor dashboard, etc.). For each task, Opus generates an implementation plan with only the project's CLAUDE.md as context (no file tree, no source code). Then Arthur's static checkers and self-review each try to find errors in the plan. Self-review gets the same limited context as plan generation, which is realistic: in Claude Code, the LLM that reviews its own plan doesn't suddenly get more files than when it wrote it.
 
-### Results
+### Results (single run, Tier 4)
 
 | Category | Errors | Arthur | Self-Review | Gap |
 |---|---|---|---|---|
@@ -34,7 +36,7 @@ We tested Arthur against Opus 4.6 self-review on [counselor-sophie](https://gith
 | Env vars | 2 | 100% | 100% | 0pp |
 | **Overall** | **114** | **100%** | **21%** | **79pp** |
 
-Arthur caught 90 errors that self-review missed.
+Arthur caught 90 errors that self-review missed. These are single-run results from one project; see limitations below and [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for methodology details.
 
 ### What the errors look like
 
@@ -81,7 +83,7 @@ A separate benchmark where self-review gets the **full project tree, all schema 
 | Env | 7 | 0 | 100% |
 | **Total** | **93** | **37** | **60%** |
 
-Even with full context, self-review missed 37 errors. SQL/Drizzle schema was a complete blind spot (0% detection). Arthur caught all 93 deterministically.
+Even with full context, self-review missed 37 errors (single run). SQL/Drizzle schema was a complete blind spot (0% detection). Arthur's deterministic checkers found all 93, though Arthur's own checkers define the ground truth here — see [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for what that means for precision claims.
 
 ## How It Works
 
