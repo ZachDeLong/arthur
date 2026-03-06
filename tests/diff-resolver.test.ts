@@ -113,13 +113,15 @@ describe("resolveDiffFiles", () => {
   });
 
   it("supports diff against a branch ref", () => {
-    // Create a branch, add a file, diff against main
+    // Detect the default branch name (could be "main" or "master" depending on git config)
+    const defaultBranch = execSync("git branch --show-current", { cwd: tmpDir, encoding: "utf-8" }).trim();
+    // Create a branch, add a file, diff against the default branch
     git("checkout -b feature");
     writeFile("src/feature.ts", "export const feat = true;\n");
     git("add .");
     git('commit -m "feature commit"');
 
-    const files = resolveDiffFiles(tmpDir, "master");
+    const files = resolveDiffFiles(tmpDir, defaultBranch);
     expect(files).toHaveLength(1);
     expect(files[0].path).toBe("src/feature.ts");
   });
