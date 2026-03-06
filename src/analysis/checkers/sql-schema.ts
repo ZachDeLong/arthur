@@ -38,6 +38,78 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as SqlSchemaAnalysis;
+    const sqlSchema = buildSqlSchema(projectDir);
+    const lines: string[] = [];
+
+    const { checkedRefs, validRefs, hallucinations, tablesIndexed, byCategory } = analysis;
+
+    lines.push(`## SQL Schema Analysis`);
+    lines.push(``);
+
+    if (tablesIndexed === 0) {
+      lines.push(`No Drizzle or SQL CREATE TABLE schemas found in project.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**${tablesIndexed}** tables indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+    if (hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinations`);
+      for (const h of hallucinations) {
+        const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
+        const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+        lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+        // For hallucinated tables, list all available tables
+        if (h.hallucinationCategory === "hallucinated-table") {
+          const tableNames = [...sqlSchema.tables.keys()].join("`, `");
+          lines.push(`  - Available tables: \`${tableNames}\``);
+        }
+
+        // For hallucinated columns, list all columns on the target table
+        if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+          const table = sqlSchema.tables.get(h.tableName)
+            ?? sqlSchema.tables.get(sqlSchema.variableToTable.get(h.tableName) ?? "");
+          if (table) {
+            const cols = [...table.columns.entries()]
+              .map(([name, type]) => `\`${name}\` (${type})`)
+              .join(", ");
+            lines.push(`  - Columns on ${table.name}: ${cols}`);
+          }
+        }
+      }
+    }
+
+    // Category breakdown
+    const parts: string[] = [];
+    if (byCategory.tables.total > 0) {
+      parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
+    }
+    if (byCategory.columns.total > 0) {
+      parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
+    }
+    if (parts.length > 0) {
+      lines.push(``);
+      lines.push(`**Breakdown:** ${parts.join(", ")}`);
+    }
+
+    // Always include schema ground truth
+    lines.push(``);
+    lines.push(`### SQL Schema Ground Truth`);
+    for (const [tableName, table] of sqlSchema.tables) {
+      const varNote = table.variableName ? ` (var: \`${table.variableName}\`)` : "";
+      const cols = [...table.columns.entries()]
+        .map(([name, type]) => `${name} (${type})`)
+        .join(", ");
+      lines.push(`- **${tableName}**${varNote} [${table.source}]: ${cols}`);
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as SqlSchemaAnalysis;

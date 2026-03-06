@@ -48,6 +48,8 @@ export interface CheckerDefinition {
   run(input: CheckerInput, projectDir: string, options?: Record<string, string>): CheckerResult;
   /** Format result for the `check_all` combined report. */
   formatForCheckAll(result: CheckerResult, projectDir: string): string[];
+  /** Format result for an individual MCP tool response (verbose, with ground truth). */
+  formatForTool(result: CheckerResult, projectDir: string): string;
   /** Format result for the `verify_plan` static findings section (LLM context). */
   formatForFindings(result: CheckerResult): string | undefined;
   /** Format result for CLI text output (colored, verbose). Called by verify.ts. */

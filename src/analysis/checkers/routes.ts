@@ -38,6 +38,47 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as ApiRouteAnalysis;
+    const lines: string[] = [];
+
+    const { checkedRefs, validRefs, hallucinations, routesIndexed } = analysis;
+
+    lines.push(`## API Route Analysis`);
+    lines.push(``);
+
+    if (routesIndexed === 0) {
+      lines.push(`No Next.js App Router route files found in project.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**${routesIndexed}** routes indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+    if (hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinated Routes`);
+      for (const h of hallucinations) {
+        const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
+        const method = h.method ? `${h.method} ` : "";
+        const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+        lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
+      }
+    }
+
+    // Always include all available routes as ground truth
+    const routeIndex = buildRouteIndex(projectDir);
+    if (routeIndex.size > 0) {
+      lines.push(``);
+      lines.push(`### Available Routes`);
+      for (const [urlPath, route] of routeIndex) {
+        const methods = route.methods.size > 0 ? [...route.methods].join(", ") : "no exports";
+        lines.push(`- \`${urlPath}\` [${methods}] → \`${route.filePath}\``);
+      }
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as ApiRouteAnalysis;

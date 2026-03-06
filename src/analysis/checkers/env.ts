@@ -42,6 +42,43 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as EnvAnalysis;
+    const lines: string[] = [];
+
+    const { checkedRefs, validRefs, hallucinations, skippedRefs, envFilesFound } = analysis;
+
+    lines.push(`## Env Variable Analysis`);
+    lines.push(``);
+
+    if (envFilesFound.length === 0) {
+      lines.push(`No .env* files found in project — nothing to check against.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**${checkedRefs}** env vars checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated, **${skippedRefs}** skipped (runtime)`);
+    lines.push(`Sources: ${envFilesFound.join(", ")}`);
+
+    if (hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinated Env Variables`);
+      for (const h of hallucinations) {
+        const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
+        lines.push(`- \`${h.varName}\` — not in env files${suggestion}`);
+      }
+    }
+
+    // Always include all defined env vars as ground truth
+    const { vars } = parseEnvFiles(projectDir);
+    if (vars.size > 0) {
+      lines.push(``);
+      lines.push(`### Defined Env Variables`);
+      lines.push([...vars].map(v => `\`${v}\``).join(", "));
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as EnvAnalysis;

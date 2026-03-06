@@ -39,6 +39,101 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as SupabaseSchemaAnalysis;
+    const lines: string[] = [];
+
+    const { checkedRefs, validRefs, hallucinations, tablesIndexed, functionsIndexed, enumsIndexed, typesFilePath, byCategory } = analysis;
+
+    lines.push(`## Supabase Schema Analysis`);
+    lines.push(``);
+
+    if (tablesIndexed === 0 && !typesFilePath) {
+      lines.push(`No Supabase generated types file found in project.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**Source:** \`${typesFilePath}\``);
+    lines.push(`**${tablesIndexed}** tables, **${functionsIndexed}** functions, **${enumsIndexed}** enums indexed`);
+    lines.push(`**${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+    if (hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinations`);
+
+      const fullPath = path.join(projectDir, typesFilePath!);
+      const schema = parseSupabaseSchema(fullPath);
+
+      for (const h of hallucinations) {
+        const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
+          : h.hallucinationCategory === "hallucinated-column" ? "column not found"
+          : "function not found";
+        const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+        lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+
+        if (h.hallucinationCategory === "hallucinated-table") {
+          const tableNames = [...schema.tables.keys()].join("`, `");
+          lines.push(`  - Available tables: \`${tableNames}\``);
+        }
+
+        if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+          const table = schema.tables.get(h.tableName);
+          if (table) {
+            const cols = [...table.columns.entries()]
+              .map(([name, type]) => `\`${name}\` (${type})`)
+              .join(", ");
+            lines.push(`  - Columns on ${table.name}: ${cols}`);
+          }
+        }
+
+        if (h.hallucinationCategory === "hallucinated-function") {
+          const funcNames = [...schema.functions.keys()].join("`, `");
+          if (funcNames) lines.push(`  - Available functions: \`${funcNames}\``);
+        }
+      }
+    }
+
+    // Category breakdown
+    const parts: string[] = [];
+    if (byCategory.tables.total > 0) {
+      parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
+    }
+    if (byCategory.columns.total > 0) {
+      parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
+    }
+    if (byCategory.functions.total > 0) {
+      parts.push(`${byCategory.functions.total - byCategory.functions.hallucinated}/${byCategory.functions.total} functions`);
+    }
+    if (parts.length > 0) {
+      lines.push(``);
+      lines.push(`**Breakdown:** ${parts.join(", ")}`);
+    }
+
+    // Always include schema ground truth
+    if (typesFilePath) {
+      const fullPath = path.join(projectDir, typesFilePath);
+      const schema = parseSupabaseSchema(fullPath);
+
+      lines.push(``);
+      lines.push(`### Supabase Schema Ground Truth`);
+      for (const [tableName, table] of schema.tables) {
+        const cols = [...table.columns.entries()]
+          .map(([name, type]) => `${name} (${type})`)
+          .join(", ");
+        lines.push(`- **${tableName}**: ${cols}`);
+      }
+      if (schema.functions.size > 0) {
+        lines.push(``);
+        lines.push(`**Functions:** ${[...schema.functions.keys()].map(f => `\`${f}\``).join(", ")}`);
+      }
+      if (schema.enums.size > 0) {
+        lines.push(`**Enums:** ${[...schema.enums.entries()].map(([name, vals]) => `\`${name}\` (${vals.join(", ")})`).join(", ")}`);
+      }
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as SupabaseSchemaAnalysis;

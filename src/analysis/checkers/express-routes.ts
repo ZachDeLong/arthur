@@ -41,6 +41,57 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as ExpressRouteAnalysis;
+    const lines: string[] = [];
+
+    const { checkedRefs, validRefs, hallucinations, routesIndexed, framework } = analysis;
+
+    const frameworkLabel = framework === "both" ? "Express + Fastify"
+      : framework === "fastify" ? "Fastify"
+      : "Express";
+
+    lines.push(`## ${frameworkLabel} Route Analysis`);
+    lines.push(``);
+
+    if (framework === "none") {
+      lines.push(`No Express or Fastify dependency found in package.json.`);
+      return lines.join("\n");
+    }
+
+    if (routesIndexed === 0) {
+      lines.push(`${frameworkLabel} detected but no route definitions found in source files.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**${routesIndexed}** routes indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
+
+    if (hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinated Routes`);
+      for (const h of hallucinations) {
+        const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
+        const method = h.method ? `${h.method} ` : "";
+        const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
+        lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
+      }
+    }
+
+    // Always include full route table as ground truth
+    const index = buildExpressRouteIndex(projectDir);
+    if (index.size > 0) {
+      lines.push(``);
+      lines.push(`### Available Routes`);
+      for (const [urlPath, routes] of index) {
+        const methods = [...new Set(routes.map(r => r.method))].join(", ");
+        const file = routes[0].filePath;
+        lines.push(`- \`${urlPath}\` [${methods}] → \`${file}\``);
+      }
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as ExpressRouteAnalysis;

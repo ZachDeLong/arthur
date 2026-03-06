@@ -39,6 +39,36 @@ registerChecker({
     };
   },
 
+  formatForTool(result): string {
+    const analysis = result.rawAnalysis as PackageApiAnalysis;
+    const lines: string[] = [];
+
+    lines.push(`## Package API Analysis`);
+    lines.push(``);
+
+    if (!analysis.applicable) {
+      lines.push(`No packages with type definitions found to validate against.`);
+      return lines.join("\n");
+    }
+
+    lines.push(`**${analysis.checkedBindings}** named imports checked, **${analysis.checkedMembers}** member accesses checked — **${analysis.hallucinations.length}** hallucinated`);
+
+    if (analysis.hallucinations.length > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinated API Usage`);
+      for (const h of analysis.hallucinations) {
+        const category = h.category === "hallucinated-named-import" ? "not exported" : "member not found";
+        const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
+        lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
+        if (h.availableExports) {
+          lines.push(`  - Available exports: ${h.availableExports}`);
+        }
+      }
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as PackageApiAnalysis;

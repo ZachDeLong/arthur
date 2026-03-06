@@ -33,20 +33,8 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 
-import { analyzePaths, findClosestPaths, getDirectoryContext } from "../src/analysis/path-checker.js";
-import { getAllFiles } from "../src/context/tree.js";
-import {
-  parseSchema,
-  analyzeSchema,
-  type SchemaAnalysis,
-} from "../src/analysis/schema-checker.js";
-import { analyzeImports, clearImportCaches } from "../src/analysis/import-checker.js";
-import { analyzePackageApi, clearApiCaches } from "../src/analysis/package-api-checker.js";
-import { analyzeEnv, parseEnvFiles } from "../src/analysis/env-checker.js";
-import { analyzeTypes, buildTypeIndex } from "../src/analysis/type-checker.js";
-import { analyzeApiRoutes, buildRouteIndex } from "../src/analysis/api-route-checker.js";
-import { analyzeSqlSchema, buildSqlSchema } from "../src/analysis/sql-schema-checker.js";
-import { analyzeSupabaseSchema, parseSupabaseSchema, findSupabaseTypesFile } from "../src/analysis/supabase-schema-checker.js";
+import { clearImportCaches } from "../src/analysis/import-checker.js";
+import { clearApiCaches } from "../src/analysis/package-api-checker.js";
 import { formatStaticFindings } from "../src/analysis/formatter.js";
 import { buildContext } from "../src/context/builder.js";
 import { buildUserMessage, getSystemPrompt } from "../src/verifier/prompt.js";
@@ -61,7 +49,7 @@ import { buildJsonReport } from "../src/analysis/finding-schema.js";
 import "../src/analysis/checkers/index.js";
 
 import { resolveDiffFiles } from "../src/diff/resolver.js";
-import type { CheckerInput } from "../src/analysis/registry.js";
+import { getChecker, type CheckerInput } from "../src/analysis/registry.js";
 
 const server = new McpServer({
   name: "arthur",
@@ -79,73 +67,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzePaths(planText, projectDir);
-      const lines: string[] = [];
-
-      const checked = analysis.extractedPaths.length;
-      const hallucinated = analysis.hallucinatedPaths.length;
-      const intentionalNew = analysis.intentionalNewPaths.length;
-      const valid = checked - hallucinated - intentionalNew;
-
-      // Get actual files for ground truth context
-      const actualFiles = getAllFiles(projectDir);
-
-      lines.push(`## Path Analysis`);
-      lines.push(``);
-      lines.push(`**${checked}** paths checked — **${valid}** valid, **${hallucinated}** hallucinated, **${intentionalNew}** intentional new`);
-      lines.push(`**${actualFiles.size}** total files indexed in project`);
-
-      if (hallucinated > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Paths`);
-        for (const p of analysis.hallucinatedPaths) {
-          lines.push(`- \`${p}\` — **NOT FOUND**`);
-
-          // Closest matches
-          const closest = findClosestPaths(p, actualFiles);
-          if (closest.length > 0) {
-            lines.push(`  - Closest matches: ${closest.map(c => `\`${c}\``).join(", ")}`);
-          }
-
-          // Directory context — show what actually exists near the expected location
-          const dirFiles = getDirectoryContext(p, actualFiles);
-          if (dirFiles.length > 0) {
-            const parentDir = p.substring(0, p.lastIndexOf("/"));
-            lines.push(`  - Files in \`${parentDir}/\`: ${dirFiles.slice(0, 8).map(f => `\`${f}\``).join(", ")}${dirFiles.length > 8 ? ` (+${dirFiles.length - 8} more)` : ""}`);
-          }
-        }
-      }
-
-      if (intentionalNew > 0) {
-        lines.push(``);
-        lines.push(`### Intentional New Files`);
-        for (const p of analysis.intentionalNewPaths) {
-          lines.push(`- \`${p}\` — new file (CREATE signal found)`);
-        }
-      }
-
-      if (analysis.validPaths.length > 0) {
-        lines.push(``);
-        lines.push(`### Valid Paths`);
-        const show = analysis.validPaths.slice(0, 10);
-        for (const p of show) {
-          lines.push(`- \`${p}\` — exists`);
-        }
-        if (analysis.validPaths.length > 10) {
-          lines.push(`- ... and ${analysis.validPaths.length - 10} more`);
-        }
-      }
+      const checker = getChecker("paths")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_paths",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("paths", checked, hallucinated, analysis.hallucinatedPaths),
-        totalChecked: checked,
-        totalHallucinated: hallucinated,
+        findings: buildCatchFindings("paths", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -165,112 +99,29 @@ server.tool(
   },
   async ({ planText, projectDir, schemaPath }) => {
     try {
-      const resolvedPath = schemaPath
-        ?? (projectDir && fs.existsSync(path.join(projectDir, "prisma/schema.prisma"))
-          ? path.join(projectDir, "prisma/schema.prisma")
-          : undefined);
+      const checker = getChecker("schema")!;
+      const options: Record<string, string> = {};
+      if (schemaPath) options.schemaPath = schemaPath;
 
-      if (!resolvedPath) {
+      const result = checker.run({ mode: "plan", text: planText }, projectDir ?? "", options);
+
+      if (!result.applicable) {
         return {
           content: [{ type: "text", text: "No schema found. Provide schemaPath or projectDir with prisma/schema.prisma." }],
           isError: true,
         };
       }
 
-      const schema = parseSchema(resolvedPath);
-      const analysis = analyzeSchema(planText, schema);
-      const lines: string[] = [];
-
-      const { totalRefs, hallucinations, byCategory } = analysis;
-
-      lines.push(`## Schema Analysis`);
-      lines.push(``);
-      lines.push(`**${totalRefs}** schema refs — **${totalRefs - hallucinations.length}** valid, **${hallucinations.length}** hallucinated`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinations`);
-        for (const h of hallucinations) {
-          const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
-          lines.push(`- \`${h.raw}\` — ${h.hallucinationCategory}${suggestion}`);
-
-          // For hallucinated models, list all available models
-          if (h.hallucinationCategory === "hallucinated-model") {
-            const available = [...schema.accessorToModel.entries()]
-              .map(([accessor, model]) => `\`${accessor}\` (${model})`)
-              .join(", ");
-            lines.push(`  - Available models: ${available}`);
-          }
-
-          // For hallucinated fields, list all fields on the target model
-          if (h.hallucinationCategory === "hallucinated-field" && h.modelAccessor) {
-            const modelName = schema.accessorToModel.get(h.modelAccessor);
-            const model = modelName ? schema.models.get(modelName) : undefined;
-            if (model) {
-              const fields = [...model.fields.values()]
-                .map(f => `\`${f.name}\` (${f.type}${f.isRelation ? ", relation" : ""})`)
-                .join(", ");
-              lines.push(`  - Fields on ${modelName}: ${fields}`);
-            }
-          }
-
-          // For wrong relations, list available relation fields
-          if (h.hallucinationCategory === "wrong-relation" && h.modelAccessor) {
-            const modelName = schema.accessorToModel.get(h.modelAccessor);
-            const model = modelName ? schema.models.get(modelName) : undefined;
-            if (model) {
-              const relations = [...model.fields.values()]
-                .filter(f => f.isRelation)
-                .map(f => `\`${f.name}\` → ${f.relationModel}`)
-                .join(", ");
-              lines.push(`  - Available relations on ${modelName}: ${relations || "none"}`);
-            }
-          }
-        }
-      }
-
-      // Category breakdown
-      const parts: string[] = [];
-      if (byCategory.models.total > 0) {
-        parts.push(`${byCategory.models.total - byCategory.models.hallucinated}/${byCategory.models.total} models`);
-      }
-      if (byCategory.fields.total > 0) {
-        parts.push(`${byCategory.fields.total - byCategory.fields.hallucinated}/${byCategory.fields.total} fields`);
-      }
-      if (byCategory.methods.total > 0) {
-        parts.push(`${byCategory.methods.total - byCategory.methods.invalid}/${byCategory.methods.total} methods`);
-      }
-      if (byCategory.relations.total > 0) {
-        parts.push(`${byCategory.relations.total - byCategory.relations.wrong}/${byCategory.relations.total} relations`);
-      }
-      if (parts.length > 0) {
-        lines.push(``);
-        lines.push(`**Breakdown:** ${parts.join(", ")}`);
-      }
-
-      // Always include schema summary as ground truth
-      lines.push(``);
-      lines.push(`### Schema Ground Truth`);
-      for (const [modelName, model] of schema.models) {
-        const fieldNames = [...model.fields.values()]
-          .map(f => f.name + (f.isRelation ? ` → ${f.relationModel}` : ""))
-          .join(", ");
-        lines.push(`- **${modelName}** (accessor: \`${model.accessor}\`): ${fieldNames}`);
-      }
-      if (schema.enums.size > 0) {
-        lines.push(`- **Enums:** ${[...schema.enums].join(", ")}`);
-      }
-
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_schema",
-        projectDir: path.basename(projectDir ?? resolvedPath),
-        findings: buildCatchFindings("schema", totalRefs, hallucinations.length, hallucinations.map(h => h.raw)),
-        totalChecked: totalRefs,
-        totalHallucinated: hallucinations.length,
+        projectDir: path.basename(projectDir ?? ""),
+        findings: buildCatchFindings("schema", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir ?? "") }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -289,55 +140,20 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      // Clear stale module-level caches from previous requests in this long-running process.
       clearImportCaches();
-
-      const analysis = analyzeImports(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedImports, validImports, hallucinations, skippedImports } = analysis;
-
-      lines.push(`## Import Analysis`);
-      lines.push(``);
-      lines.push(`**${checkedImports}** imports checked — **${validImports}** valid, **${hallucinations.length}** hallucinated, **${skippedImports}** skipped (relative/builtin)`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Imports`);
-        for (const h of hallucinations) {
-          const reason = h.reason === "package-not-found" ? "package not found" : "subpath not exported";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${h.raw}\` — ${reason}${suggestion}`);
-        }
-
-        // List installed packages as ground truth for package-not-found errors
-        const hasPackageErrors = hallucinations.some(h => h.reason === "package-not-found");
-        if (hasPackageErrors) {
-          const pkgJsonPath = path.join(projectDir, "package.json");
-          if (fs.existsSync(pkgJsonPath)) {
-            try {
-              const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
-              const deps = Object.keys(pkg.dependencies ?? {});
-              const devDeps = Object.keys(pkg.devDependencies ?? {});
-              lines.push(``);
-              lines.push(`### Installed Packages`);
-              if (deps.length > 0) lines.push(`- **dependencies:** ${deps.map(d => `\`${d}\``).join(", ")}`);
-              if (devDeps.length > 0) lines.push(`- **devDependencies:** ${devDeps.map(d => `\`${d}\``).join(", ")}`);
-            } catch { /* ignore parse errors */ }
-          }
-        }
-      }
+      const checker = getChecker("imports")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_imports",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("imports", checkedImports, hallucinations.length, hallucinations.map(h => h.raw)),
-        totalChecked: checkedImports,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("imports", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -356,49 +172,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzeEnv(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, skippedRefs, envFilesFound } = analysis;
-
-      lines.push(`## Env Variable Analysis`);
-      lines.push(``);
-
-      if (envFilesFound.length === 0) {
-        lines.push(`No .env* files found in project — nothing to check against.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${checkedRefs}** env vars checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated, **${skippedRefs}** skipped (runtime)`);
-      lines.push(`Sources: ${envFilesFound.join(", ")}`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Env Variables`);
-        for (const h of hallucinations) {
-          const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
-          lines.push(`- \`${h.varName}\` — not in env files${suggestion}`);
-        }
-      }
-
-      // Always include all defined env vars as ground truth
-      const { vars } = parseEnvFiles(projectDir);
-      if (vars.size > 0) {
-        lines.push(``);
-        lines.push(`### Defined Env Variables`);
-        lines.push([...vars].map(v => `\`${v}\``).join(", "));
-      }
+      const checker = getChecker("env")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_env",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("env", checkedRefs, hallucinations.length, hallucinations.map(h => h.varName)),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("env", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -417,83 +203,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzeTypes(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, skippedRefs, byCategory } = analysis;
-
-      lines.push(`## TypeScript Type Analysis`);
-      lines.push(``);
-
-      if (checkedRefs === 0 && skippedRefs === 0) {
-        lines.push(`No type references found in plan text.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${checkedRefs}** types checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated, **${skippedRefs}** skipped (builtins)`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Types`);
-        const typeIndex = buildTypeIndex(projectDir);
-        for (const h of hallucinations) {
-          const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-
-          // For hallucinated members, show available members on the type
-          if (h.hallucinationCategory === "hallucinated-member" && h.typeName) {
-            const decl = typeIndex.get(h.typeName);
-            if (decl && decl.members.size > 0) {
-              const members = [...decl.members.keys()].join("`, `");
-              lines.push(`  - Members on ${h.typeName}: \`${members}\``);
-            }
-          }
-        }
-
-        // List project types as ground truth for type-not-found errors
-        const hasTypeErrors = hallucinations.some(h => h.hallucinationCategory === "hallucinated-type");
-        if (hasTypeErrors) {
-          const index = buildTypeIndex(projectDir);
-          if (index.size > 0) {
-            lines.push(``);
-            lines.push(`### Available Project Types`);
-            const typesByFile = new Map<string, string[]>();
-            for (const [name, decl] of index) {
-              const existing = typesByFile.get(decl.sourceFile) ?? [];
-              existing.push(`${name} (${decl.kind})`);
-              typesByFile.set(decl.sourceFile, existing);
-            }
-            for (const [file, types] of typesByFile) {
-              lines.push(`- \`${file}\`: ${types.join(", ")}`);
-            }
-          }
-        }
-      }
-
-      // Category breakdown
-      const parts: string[] = [];
-      if (byCategory.types.total > 0) {
-        parts.push(`${byCategory.types.total - byCategory.types.hallucinated}/${byCategory.types.total} types`);
-      }
-      if (byCategory.members.total > 0) {
-        parts.push(`${byCategory.members.total - byCategory.members.hallucinated}/${byCategory.members.total} members`);
-      }
-      if (parts.length > 0) {
-        lines.push(``);
-        lines.push(`**Breakdown:** ${parts.join(", ")}`);
-      }
+      const checker = getChecker("types")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_types",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("types", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("types", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -512,53 +234,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzeApiRoutes(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, routesIndexed } = analysis;
-
-      lines.push(`## API Route Analysis`);
-      lines.push(``);
-
-      if (routesIndexed === 0) {
-        lines.push(`No Next.js App Router route files found in project.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${routesIndexed}** routes indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Routes`);
-        for (const h of hallucinations) {
-          const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
-          const method = h.method ? `${h.method} ` : "";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
-        }
-      }
-
-      // Always include all available routes as ground truth
-      const routeIndex = buildRouteIndex(projectDir);
-      if (routeIndex.size > 0) {
-        lines.push(``);
-        lines.push(`### Available Routes`);
-        for (const [urlPath, route] of routeIndex) {
-          const methods = route.methods.size > 0 ? [...route.methods].join(", ") : "no exports";
-          lines.push(`- \`${urlPath}\` [${methods}] → \`${route.filePath}\``);
-        }
-      }
+      const checker = getChecker("routes")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_routes",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("routes", checkedRefs, hallucinations.length, hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim())),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("routes", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -577,84 +265,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzeSqlSchema(planText, projectDir);
-      const sqlSchema = buildSqlSchema(projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, tablesIndexed, byCategory } = analysis;
-
-      lines.push(`## SQL Schema Analysis`);
-      lines.push(``);
-
-      if (tablesIndexed === 0) {
-        lines.push(`No Drizzle or SQL CREATE TABLE schemas found in project.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${tablesIndexed}** tables indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinations`);
-        for (const h of hallucinations) {
-          const category = h.hallucinationCategory === "hallucinated-table" ? "table not found" : "column not found";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-
-          // For hallucinated tables, list all available tables
-          if (h.hallucinationCategory === "hallucinated-table") {
-            const tableNames = [...sqlSchema.tables.keys()].join("`, `");
-            lines.push(`  - Available tables: \`${tableNames}\``);
-          }
-
-          // For hallucinated columns, list all columns on the target table
-          if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
-            const table = sqlSchema.tables.get(h.tableName)
-              ?? sqlSchema.tables.get(sqlSchema.variableToTable.get(h.tableName) ?? "");
-            if (table) {
-              const cols = [...table.columns.entries()]
-                .map(([name, type]) => `\`${name}\` (${type})`)
-                .join(", ");
-              lines.push(`  - Columns on ${table.name}: ${cols}`);
-            }
-          }
-        }
-      }
-
-      // Category breakdown
-      const parts: string[] = [];
-      if (byCategory.tables.total > 0) {
-        parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
-      }
-      if (byCategory.columns.total > 0) {
-        parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
-      }
-      if (parts.length > 0) {
-        lines.push(``);
-        lines.push(`**Breakdown:** ${parts.join(", ")}`);
-      }
-
-      // Always include schema ground truth
-      lines.push(``);
-      lines.push(`### SQL Schema Ground Truth`);
-      for (const [tableName, table] of sqlSchema.tables) {
-        const varNote = table.variableName ? ` (var: \`${table.variableName}\`)` : "";
-        const cols = [...table.columns.entries()]
-          .map(([name, type]) => `${name} (${type})`)
-          .join(", ");
-        lines.push(`- **${tableName}**${varNote} [${table.source}]: ${cols}`);
-      }
+      const checker = getChecker("sqlSchema")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_sql_schema",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("sqlSchema", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("sqlSchema", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -673,107 +296,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const analysis = analyzeSupabaseSchema(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, tablesIndexed, functionsIndexed, enumsIndexed, typesFilePath, byCategory } = analysis;
-
-      lines.push(`## Supabase Schema Analysis`);
-      lines.push(``);
-
-      if (tablesIndexed === 0 && !typesFilePath) {
-        lines.push(`No Supabase generated types file found in project.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**Source:** \`${typesFilePath}\``);
-      lines.push(`**${tablesIndexed}** tables, **${functionsIndexed}** functions, **${enumsIndexed}** enums indexed`);
-      lines.push(`**${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinations`);
-
-        const fullPath = path.join(projectDir, typesFilePath!);
-        const schema = parseSupabaseSchema(fullPath);
-
-        for (const h of hallucinations) {
-          const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
-            : h.hallucinationCategory === "hallucinated-column" ? "column not found"
-            : "function not found";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-
-          if (h.hallucinationCategory === "hallucinated-table") {
-            const tableNames = [...schema.tables.keys()].join("`, `");
-            lines.push(`  - Available tables: \`${tableNames}\``);
-          }
-
-          if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
-            const table = schema.tables.get(h.tableName);
-            if (table) {
-              const cols = [...table.columns.entries()]
-                .map(([name, type]) => `\`${name}\` (${type})`)
-                .join(", ");
-              lines.push(`  - Columns on ${table.name}: ${cols}`);
-            }
-          }
-
-          if (h.hallucinationCategory === "hallucinated-function") {
-            const funcNames = [...schema.functions.keys()].join("`, `");
-            if (funcNames) lines.push(`  - Available functions: \`${funcNames}\``);
-          }
-        }
-      }
-
-      // Category breakdown
-      const parts: string[] = [];
-      if (byCategory.tables.total > 0) {
-        parts.push(`${byCategory.tables.total - byCategory.tables.hallucinated}/${byCategory.tables.total} tables`);
-      }
-      if (byCategory.columns.total > 0) {
-        parts.push(`${byCategory.columns.total - byCategory.columns.hallucinated}/${byCategory.columns.total} columns`);
-      }
-      if (byCategory.functions.total > 0) {
-        parts.push(`${byCategory.functions.total - byCategory.functions.hallucinated}/${byCategory.functions.total} functions`);
-      }
-      if (parts.length > 0) {
-        lines.push(``);
-        lines.push(`**Breakdown:** ${parts.join(", ")}`);
-      }
-
-      // Always include schema ground truth
-      if (typesFilePath) {
-        const fullPath = path.join(projectDir, typesFilePath);
-        const schema = parseSupabaseSchema(fullPath);
-
-        lines.push(``);
-        lines.push(`### Supabase Schema Ground Truth`);
-        for (const [tableName, table] of schema.tables) {
-          const cols = [...table.columns.entries()]
-            .map(([name, type]) => `${name} (${type})`)
-            .join(", ");
-          lines.push(`- **${tableName}**: ${cols}`);
-        }
-        if (schema.functions.size > 0) {
-          lines.push(``);
-          lines.push(`**Functions:** ${[...schema.functions.keys()].map(f => `\`${f}\``).join(", ")}`);
-        }
-        if (schema.enums.size > 0) {
-          lines.push(`**Enums:** ${[...schema.enums.entries()].map(([name, vals]) => `\`${name}\` (${vals.join(", ")})`).join(", ")}`);
-        }
-      }
+      const checker = getChecker("supabaseSchema")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_supabase_schema",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("supabaseSchema", checkedRefs, hallucinations.length, hallucinations.map(h => h.raw)),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("supabaseSchema", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -792,64 +327,19 @@ server.tool(
   },
   async ({ planText, projectDir }) => {
     try {
-      const { analyzeExpressRoutes, buildExpressRouteIndex } = await import("../src/analysis/express-route-checker.js");
-      const analysis = analyzeExpressRoutes(planText, projectDir);
-      const lines: string[] = [];
-
-      const { checkedRefs, validRefs, hallucinations, routesIndexed, framework } = analysis;
-
-      const frameworkLabel = framework === "both" ? "Express + Fastify"
-        : framework === "fastify" ? "Fastify"
-        : "Express";
-
-      lines.push(`## ${frameworkLabel} Route Analysis`);
-      lines.push(``);
-
-      if (framework === "none") {
-        lines.push(`No Express or Fastify dependency found in package.json.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      if (routesIndexed === 0) {
-        lines.push(`${frameworkLabel} detected but no route definitions found in source files.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${routesIndexed}** routes indexed, **${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
-
-      if (hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated Routes`);
-        for (const h of hallucinations) {
-          const category = h.hallucinationCategory === "hallucinated-route" ? "route not found" : "method not allowed";
-          const method = h.method ? `${h.method} ` : "";
-          const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
-          lines.push(`- \`${method}${h.urlPath}\` — ${category}${suggestion}`);
-        }
-      }
-
-      // Always include full route table as ground truth
-      const index = buildExpressRouteIndex(projectDir);
-      if (index.size > 0) {
-        lines.push(``);
-        lines.push(`### Available Routes`);
-        for (const [urlPath, routes] of index) {
-          const methods = [...new Set(routes.map(r => r.method))].join(", ");
-          const file = routes[0].filePath;
-          lines.push(`- \`${urlPath}\` [${methods}] → \`${file}\``);
-        }
-      }
+      const checker = getChecker("expressRoutes")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_express_routes",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("expressRoutes", checkedRefs, hallucinations.length, hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim())),
-        totalChecked: checkedRefs,
-        totalHallucinated: hallucinations.length,
+        findings: buildCatchFindings("expressRoutes", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
@@ -871,42 +361,19 @@ server.tool(
       // Clear stale module-level caches from previous requests in this long-running process.
       clearApiCaches();
 
-      const analysis = analyzePackageApi(planText, projectDir);
-      const lines: string[] = [];
-
-      lines.push(`## Package API Analysis`);
-      lines.push(``);
-
-      if (!analysis.applicable) {
-        lines.push(`No packages with type definitions found to validate against.`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      lines.push(`**${analysis.checkedBindings}** named imports checked, **${analysis.checkedMembers}** member accesses checked — **${analysis.hallucinations.length}** hallucinated`);
-
-      if (analysis.hallucinations.length > 0) {
-        lines.push(``);
-        lines.push(`### Hallucinated API Usage`);
-        for (const h of analysis.hallucinations) {
-          const category = h.category === "hallucinated-named-import" ? "not exported" : "member not found";
-          const suggestion = h.suggestion ? ` (did you mean \`${h.suggestion}\`?)` : "";
-          lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
-          if (h.availableExports) {
-            lines.push(`  - Available exports: ${h.availableExports}`);
-          }
-        }
-      }
+      const checker = getChecker("packageApi")!;
+      const result = checker.run({ mode: "plan", text: planText }, projectDir);
 
       logCatch({
         timestamp: new Date().toISOString(),
         tool: "check_package_api",
         projectDir: path.basename(projectDir),
-        findings: buildCatchFindings("packageApi", analysis.checkedBindings + analysis.checkedMembers, analysis.hallucinations.length, analysis.hallucinations.map(h => h.raw)),
-        totalChecked: analysis.checkedBindings + analysis.checkedMembers,
-        totalHallucinated: analysis.hallucinations.length,
+        findings: buildCatchFindings("packageApi", result.checked, result.hallucinated, result.catchItems),
+        totalChecked: result.checked,
+        totalHallucinated: result.hallucinated,
       });
 
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };

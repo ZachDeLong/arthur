@@ -38,6 +38,67 @@ registerChecker({
     };
   },
 
+  formatForTool(result, projectDir): string {
+    const analysis = result.rawAnalysis as PathAnalysis;
+    const lines: string[] = [];
+
+    const checked = analysis.extractedPaths.length;
+    const hallucinated = analysis.hallucinatedPaths.length;
+    const intentionalNew = analysis.intentionalNewPaths.length;
+    const valid = checked - hallucinated - intentionalNew;
+
+    // Get actual files for ground truth context
+    const actualFiles = getAllFiles(projectDir);
+
+    lines.push(`## Path Analysis`);
+    lines.push(``);
+    lines.push(`**${checked}** paths checked — **${valid}** valid, **${hallucinated}** hallucinated, **${intentionalNew}** intentional new`);
+    lines.push(`**${actualFiles.size}** total files indexed in project`);
+
+    if (hallucinated > 0) {
+      lines.push(``);
+      lines.push(`### Hallucinated Paths`);
+      for (const p of analysis.hallucinatedPaths) {
+        lines.push(`- \`${p}\` — **NOT FOUND**`);
+
+        // Closest matches
+        const closest = findClosestPaths(p, actualFiles);
+        if (closest.length > 0) {
+          lines.push(`  - Closest matches: ${closest.map(c => `\`${c}\``).join(", ")}`);
+        }
+
+        // Directory context — show what actually exists near the expected location
+        const dirFiles = getDirectoryContext(p, actualFiles);
+        if (dirFiles.length > 0) {
+          const parentDir = p.substring(0, p.lastIndexOf("/"));
+          lines.push(`  - Files in \`${parentDir}/\`: ${dirFiles.slice(0, 8).map(f => `\`${f}\``).join(", ")}${dirFiles.length > 8 ? ` (+${dirFiles.length - 8} more)` : ""}`);
+        }
+      }
+    }
+
+    if (intentionalNew > 0) {
+      lines.push(``);
+      lines.push(`### Intentional New Files`);
+      for (const p of analysis.intentionalNewPaths) {
+        lines.push(`- \`${p}\` — new file (CREATE signal found)`);
+      }
+    }
+
+    if (analysis.validPaths.length > 0) {
+      lines.push(``);
+      lines.push(`### Valid Paths`);
+      const show = analysis.validPaths.slice(0, 10);
+      for (const p of show) {
+        lines.push(`- \`${p}\` — exists`);
+      }
+      if (analysis.validPaths.length > 10) {
+        lines.push(`- ... and ${analysis.validPaths.length - 10} more`);
+      }
+    }
+
+    return lines.join("\n");
+  },
+
   formatForCheckAll(result, projectDir): string[] {
     const analysis = result.rawAnalysis as PathAnalysis;
     const actualFiles = getAllFiles(projectDir);
