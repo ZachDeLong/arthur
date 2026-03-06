@@ -1,0 +1,9 @@
+{
+  "name": "fixture-f",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Test fixture for package-api-checker tests (zod type resolution)",
+  "dependencies": {
+    "zod": "^4.0.0"
+  }
+}
