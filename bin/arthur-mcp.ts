@@ -11,7 +11,6 @@
  *   check_schema           — deterministic Prisma schema validation (no API key)
  *   check_imports          — deterministic package import validation (no API key)
  *   check_env              — deterministic env variable validation (no API key)
- *   check_types            — deterministic TypeScript type validation (no API key)
  *   check_routes           — deterministic Next.js API route validation (no API key)
  *   check_sql_schema       — deterministic Drizzle/SQL schema validation (no API key)
  *   check_supabase_schema  — deterministic Supabase schema validation (no API key)

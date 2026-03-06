@@ -23,7 +23,6 @@ import { parseSchema, analyzeSchema } from "./schema-checker.js";
 import { analyzeSqlSchema } from "../../src/analysis/sql-schema-checker.js";
 import { analyzeImports } from "../../src/analysis/import-checker.js";
 import { analyzeEnv } from "../../src/analysis/env-checker.js";
-// import { analyzeTypes } from "../../src/analysis/type-checker.js"; // disabled — 98% FP rate
 import { analyzeApiRoutes } from "../../src/analysis/api-route-checker.js";
 import { getAllFiles } from "../../src/context/tree.js";
 import { extractGroundTruth, type AllCheckerResults } from "./ground-truth.js";
@@ -121,9 +120,6 @@ function runStaticCheckers(
 
   // Env variables — requires .env* files
   results.env = analyzeEnv(planText, fixtureDir);
-
-  // TypeScript types — disabled in benchmark (98% FP rate, needs structural fix)
-  // results.types = analyzeTypes(planText, fixtureDir);
 
   // API routes — requires Next.js App Router structure
   results.routes = analyzeApiRoutes(planText, fixtureDir);

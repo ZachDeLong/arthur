@@ -145,7 +145,6 @@ check_all(planText, projectDir)
 | `check_supabase_schema` | Wrong Supabase tables, columns, functions | `database.types.ts` |
 | `check_imports` | Non-existent packages, invalid subpaths | `node_modules` + `package.json` |
 | `check_env` | Undefined environment variables | `.env*` files |
-| `check_types` *(experimental)* | Hallucinated TypeScript types/members | Project `.ts`/`.tsx` files |
 | `check_routes` | Non-existent API routes, wrong methods | Next.js App Router `route.ts` files |
 | `check_express_routes` | Wrong Express/Fastify routes | Express/Fastify route registrations |
 | `check_package_api` *(experimental)* | Hallucinated named imports/member access in package APIs | Package `.d.ts` exports in `node_modules` |

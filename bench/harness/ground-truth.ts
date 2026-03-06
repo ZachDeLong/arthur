@@ -11,7 +11,6 @@ import type { SchemaAnalysis } from "../../src/analysis/schema-checker.js";
 import type { SqlSchemaAnalysis } from "../../src/analysis/sql-schema-checker.js";
 import type { ImportAnalysis } from "../../src/analysis/import-checker.js";
 import type { EnvAnalysis } from "../../src/analysis/env-checker.js";
-import type { TypeAnalysis } from "../../src/analysis/type-checker.js";
 import type { ApiRouteAnalysis } from "../../src/analysis/api-route-checker.js";
 import type { ExpressRouteAnalysis } from "../../src/analysis/express-route-checker.js";
 import type { SupabaseSchemaAnalysis } from "../../src/analysis/supabase-schema-checker.js";
@@ -23,7 +22,6 @@ export interface AllCheckerResults {
   sqlSchema?: SqlSchemaAnalysis;
   imports?: ImportAnalysis;
   env?: EnvAnalysis;
-  types?: TypeAnalysis;
   routes?: ApiRouteAnalysis;
   expressRoutes?: ExpressRouteAnalysis;
   supabaseSchema?: SupabaseSchemaAnalysis;
@@ -88,18 +86,6 @@ export function extractGroundTruth(results: AllCheckerResults): GroundTruthError
         category: "env",
         raw: h.raw,
         description: `${h.reason}: ${h.varName}`,
-        suggestion: h.suggestion,
-      });
-    }
-  }
-
-  // Type hallucinations
-  if (results.types) {
-    for (const h of results.types.hallucinations) {
-      errors.push({
-        category: "type",
-        raw: h.raw,
-        description: `${h.hallucinationCategory}: ${h.raw}`,
         suggestion: h.suggestion,
       });
     }

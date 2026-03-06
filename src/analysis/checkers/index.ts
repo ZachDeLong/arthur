@@ -7,7 +7,6 @@ import "./schema.js";
 import "./sql-schema.js";
 import "./imports.js";
 import "./env.js";
-import "./types.js";
 import "./routes.js";
 import "./supabase-schema.js";
 import "./express-routes.js";

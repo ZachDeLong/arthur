@@ -3,7 +3,6 @@ import type { PathAnalysis } from "./path-checker.js";
 import type { SchemaAnalysis } from "./schema-checker.js";
 import type { ImportAnalysis } from "./import-checker.js";
 import type { EnvAnalysis } from "./env-checker.js";
-import type { TypeAnalysis } from "./type-checker.js";
 import type { ApiRouteAnalysis } from "./api-route-checker.js";
 import type { SqlSchemaAnalysis } from "./sql-schema-checker.js";
 import type { SupabaseSchemaAnalysis } from "./supabase-schema-checker.js";
@@ -137,43 +136,6 @@ export function printEnvAnalysis(analysis: EnvAnalysis): void {
   for (const h of hallucinations) {
     const suggestion = h.suggestion ? chalk.dim(` (did you mean ${h.suggestion}?)`) : "";
     console.log(chalk.red(`   ✗ ${h.varName}`) + chalk.dim(" — not in env files") + suggestion);
-  }
-
-  console.log();
-}
-
-/** Print static type analysis results to the console. */
-export function printTypeAnalysis(analysis: TypeAnalysis): void {
-  const { checkedRefs, hallucinations, skippedRefs, byCategory } = analysis;
-
-  console.log(
-    chalk.bold.cyan("── Static Analysis: TypeScript Types ") +
-    chalk.dim("─".repeat(23)),
-  );
-
-  console.log(
-    chalk.dim(`   ${checkedRefs} checked, ${skippedRefs} skipped (builtins), `) +
-    (hallucinations.length > 0
-      ? chalk.red(`${hallucinations.length} hallucinated`)
-      : chalk.green("0 hallucinated")),
-  );
-
-  for (const h of hallucinations) {
-    const category = h.hallucinationCategory === "hallucinated-type" ? "type not found" : "member not found";
-    const suggestion = h.suggestion ? chalk.dim(` (${h.suggestion})`) : "";
-    console.log(chalk.red(`   ✗ ${h.raw}`) + chalk.dim(` — ${category}`) + suggestion);
-  }
-
-  // Category breakdown
-  const parts: string[] = [];
-  if (byCategory.types.total > 0) {
-    parts.push(`${byCategory.types.total - byCategory.types.hallucinated}/${byCategory.types.total} types`);
-  }
-  if (byCategory.members.total > 0) {
-    parts.push(`${byCategory.members.total - byCategory.members.hallucinated}/${byCategory.members.total} members`);
-  }
-  if (parts.length > 0) {
-    console.log(chalk.dim(`   Valid: ${parts.join(", ")}`));
   }
 
   console.log();

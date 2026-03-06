@@ -16,15 +16,15 @@ describe("Checker Registry", () => {
     expect(ids).toContain("routes");
     expect(ids).toContain("supabaseSchema");
     expect(ids).toContain("expressRoutes");
-    // types is experimental — excluded by default
-    expect(ids).not.toContain("types");
+    // packageApi is experimental — excluded by default
+    expect(ids).not.toContain("packageApi");
   });
 
   it("includes experimental checkers when requested", () => {
     const checkers = getCheckers({ includeExperimental: true });
     const ids = checkers.map(c => c.id);
 
-    expect(ids).toContain("types");
+    expect(ids).toContain("packageApi");
     expect(ids).toContain("paths");
   });
 

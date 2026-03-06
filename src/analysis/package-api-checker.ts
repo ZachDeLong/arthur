@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parsePackageName } from "./import-checker.js";
-import { parseObjectMembers, parseClassMembers, type TypeMember } from "./type-checker.js";
+import { parseObjectMembers, parseClassMembers, type TypeMember } from "./member-parser.js";
 
 // --- Types ---
 

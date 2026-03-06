@@ -163,37 +163,6 @@ export function registerToolHandlers(server: McpServer): void {
     },
   );
 
-  // --- check_types ---
-
-  server.tool(
-    "check_types",
-    "Check TypeScript type references in a plan against the project's .ts/.tsx files. Catches hallucinated type names and member access. No API key required.",
-    {
-      planText: z.string().describe("The plan text to check for TypeScript type references"),
-      projectDir: z.string().describe("Absolute path to the project directory"),
-    },
-    async ({ planText, projectDir }) => {
-      try {
-        const checker = getChecker("types")!;
-        const result = checker.run({ mode: "plan", text: planText }, projectDir);
-
-        logCatch({
-          timestamp: new Date().toISOString(),
-          tool: "check_types",
-          projectDir: path.basename(projectDir),
-          findings: buildCatchFindings("types", result.checked, result.hallucinated, result.catchItems),
-          totalChecked: result.checked,
-          totalHallucinated: result.hallucinated,
-        });
-
-        return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
-      }
-    },
-  );
-
   // --- check_routes ---
 
   server.tool(

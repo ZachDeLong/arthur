@@ -246,7 +246,6 @@ describe("runCheck — experimental checker selection", () => {
       const report = JSON.parse(output);
       const ids = report.summary.checkerResults.map((c: { checker: string }) => c.checker);
 
-      expect(ids).toContain("types");
       expect(ids).toContain("packageApi");
     } finally {
       fs.unlinkSync(tmpFile);

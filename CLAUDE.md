@@ -34,7 +34,7 @@ bench/
 
 ## MCP Server
 
-Fourteen tools (registry-driven — adding a new checker is a 2-file operation):
+Thirteen tools (registry-driven — adding a new checker is a 2-file operation):
 - **`check_all`** — runs stable deterministic checkers against a plan in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool for plan verification.**
 - **`check_diff`** — validates actual code changes from a git diff against project ground truth (no API key). Runs source-mode checkers (currently: imports) on files added/modified since the given ref. **Use this after writing code.**
 - `check_paths` — path validation against project tree + closest matches (no API key)
@@ -43,7 +43,6 @@ Fourteen tools (registry-driven — adding a new checker is a 2-file operation):
 - `check_supabase_schema` — Supabase `database.types.ts` validation: tables, columns, functions, enums (no API key)
 - `check_imports` — package import validation + installed packages listing (no API key)
 - `check_env` — env variable validation + all defined vars (no API key)
-- `check_types` — TypeScript type validation + available types listing (no API key)
 - `check_routes` — Next.js App Router route validation + all routes listing (no API key)
 - `check_express_routes` — Express/Fastify route validation with mount prefix resolution (no API key)
 - `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY). Accepts `includeExperimental` / `strict` / `minCheckedRefs` / `coverageMode` like `check_all`.
@@ -204,4 +203,3 @@ Experimental checkers are included when `includeExperimental`/`strict` is enable
 - **No `console.log()` in MCP server** — stdout is JSON-RPC. Use `console.error()`.
 - **Fixtures don't have node_modules** — import checker must fall back to package.json deps. Already implemented.
 - **SQL FROM regex matches comments inside code blocks** — English stopword list handles known cases but isn't exhaustive.
-- **Type checker disabled in benchmark** — 98% FP rate from inline backticks. Needs structural fix: fenced code blocks only, syntactic positions. MCP tool `check_types` still works individually.
