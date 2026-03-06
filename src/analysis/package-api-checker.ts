@@ -423,25 +423,68 @@ export function parseExportedApi(
   }
 
   // 6. Extract class/interface members for member access validation
-  // Interfaces
-  const interfaceRegex = /^(?:export\s+(?:declare\s+)?)?interface\s+(\w+)(?:\s+extends\s+[\w\s,<>]+)?\s*\{([\s\S]*?)^\}/gm;
-  for (const match of dtsContent.matchAll(interfaceRegex)) {
-    const name = match[1];
+  for (const { name, body } of findDeclarationBodies(dtsContent, "interface")) {
     if (exports.has(name)) {
-      membersByExport.set(name, parseObjectMembers(match[2]));
+      membersByExport.set(name, parseObjectMembers(body));
     }
   }
 
-  // Classes
-  const classRegex = /^(?:export\s+(?:declare\s+)?)?(?:abstract\s+)?class\s+(\w+)(?:\s+(?:extends|implements)[\s\S]*?)?\s*\{([\s\S]*?)^\}/gm;
-  for (const match of dtsContent.matchAll(classRegex)) {
-    const name = match[1];
+  for (const { name, body } of findDeclarationBodies(dtsContent, "class")) {
     if (exports.has(name)) {
-      membersByExport.set(name, parseClassMembers(match[2]));
+      membersByExport.set(name, parseClassMembers(body));
     }
   }
 
   return { exports, membersByExport };
+}
+
+/**
+ * Find interface/class declarations and extract their bodies using manual
+ * brace-tracking. This correctly handles nested braces in generic constraints
+ * like `interface Foo<T extends { bar: number }> { ... }`.
+ */
+function findDeclarationBodies(
+  content: string,
+  kind: "interface" | "class",
+): { name: string; body: string }[] {
+  const results: { name: string; body: string }[] = [];
+
+  const pattern = kind === "interface"
+    ? /^(?:export\s+(?:declare\s+)?)?interface\s+(\w+)/gm
+    : /^(?:export\s+(?:declare\s+)?)?(?:abstract\s+)?class\s+(\w+)/gm;
+
+  for (const match of content.matchAll(pattern)) {
+    const name = match[1];
+    let pos = match.index! + match[0].length;
+    let braceDepth = 0;
+    let angleDepth = 0;
+    let bodyStart = -1;
+
+    while (pos < content.length) {
+      const ch = content[pos];
+      if (ch === "<") {
+        angleDepth++;
+      } else if (ch === ">" && angleDepth > 0) {
+        angleDepth--;
+      } else if (angleDepth === 0) {
+        if (ch === "{") {
+          if (braceDepth === 0) {
+            bodyStart = pos + 1;
+          }
+          braceDepth++;
+        } else if (ch === "}") {
+          braceDepth--;
+          if (braceDepth === 0 && bodyStart !== -1) {
+            results.push({ name, body: content.slice(bodyStart, pos) });
+            break;
+          }
+        }
+      }
+      pos++;
+    }
+  }
+
+  return results;
 }
 
 function resolveReExportPath(
