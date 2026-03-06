@@ -133,8 +133,11 @@ registerChecker({
     log.heading(`Static Analysis: ${this.displayName}`);
     log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
     for (const finding of result.hallucinations) {
+      const label = finding.category === "hallucinated-route" ? "route not found"
+        : finding.category === "wrong-method" ? "method not allowed"
+        : finding.category;
       const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
-      log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+      log.dim(`  - ${finding.raw} [${label}]${suggestion}`);
     }
   },
 

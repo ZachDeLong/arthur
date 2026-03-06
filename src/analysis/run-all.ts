@@ -33,13 +33,6 @@ interface RunAllOptions {
   checkerOptions?: Record<string, string>;
 }
 
-function inferSkipReason(
-  _checker: CheckerDefinition,
-  result: CheckerResult,
-): string {
-  return result.notApplicableReason ?? "Not applicable";
-}
-
 /** Run all selected checkers and return rollup totals + skipped checker details. */
 export function runAllCheckers(
   input: CheckerInput,
@@ -72,7 +65,7 @@ export function runAllCheckers(
       skippedCheckers.push({
         checker,
         result,
-        reason: inferSkipReason(checker, result),
+        reason: result.notApplicableReason ?? "Not applicable",
       });
     }
   }

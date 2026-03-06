@@ -98,8 +98,11 @@ registerChecker({
     log.heading(`Static Analysis: ${this.displayName}`);
     log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
     for (const finding of result.hallucinations) {
+      const label = finding.category === "hallucinated-named-import" ? "not exported"
+        : finding.category === "hallucinated-member" ? "member not found"
+        : finding.category;
       const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
-      log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+      log.dim(`  - ${finding.raw} [${label}]${suggestion}`);
     }
   },
 

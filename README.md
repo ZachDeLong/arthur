@@ -22,7 +22,7 @@ Arthur is now available as an MCP server in Claude Code. All tools run locally. 
 
 Arthur uses deterministic filesystem checks that catch reference errors self-review misses. Effectiveness varies by codebase and task type. See [bench/METHODOLOGY.md](bench/METHODOLOGY.md) for known limitations.
 
-We tested Arthur against Opus 4.6 self-review on [counselor-sophie](https://github.com/ZachDeLong/arthur), a production Next.js app with 33 Supabase tables, 17 API routes, and 499 npm packages.
+We tested Arthur against Opus 4.6 self-review on [counselor-sophie](https://github.com/ZachDeLong/counselor-sophie), a production Next.js app with 33 Supabase tables, 17 API routes, and 499 npm packages.
 
 **Setup:** 8 feature tasks (add email notifications, CSV import, counselor dashboard, etc.). For each task, Opus generates an implementation plan with only the project's CLAUDE.md as context (no file tree, no source code). Then Arthur's static checkers and self-review each try to find errors in the plan. Self-review gets the same limited context as plan generation, which is realistic: in Claude Code, the LLM that reviews its own plan doesn't suddenly get more files than when it wrote it.
 

@@ -17,7 +17,8 @@ Some fixtures (particularly fixture-c) use deliberately non-obvious naming to ma
 Tier 4 tasks were chosen by the benchmark author with knowledge of which schema areas would produce hallucinations. Tasks are not randomly sampled.
 
 ### Information asymmetry in comparisons
-Self-review comparisons give Arthur access to the full filesystem while self-review may receive limited context. This tests realistic conditions but is not a controlled comparison of methods.
+- **Tier 4:** Self-review gets only CLAUDE.md + task description (same as plan generation). Arthur gets the full filesystem. This is realistic but not a controlled comparison of methods.
+- **Big Benchmark:** Self-review gets the same full project context as Arthur plus an adversarial prompt. The comparison is fairer here, but the prompt instructs self-review what to look for.
 
 ### Known false positive rates
 - Package API checker: ~54% false positive rate for React re-exports

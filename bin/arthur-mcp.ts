@@ -15,6 +15,8 @@
  *   check_routes           — deterministic Next.js API route validation (no API key)
  *   check_sql_schema       — deterministic Drizzle/SQL schema validation (no API key)
  *   check_supabase_schema  — deterministic Supabase schema validation (no API key)
+ *   check_express_routes   — deterministic Express/Fastify route validation (no API key)
+ *   check_package_api      — deterministic package API validation (no API key)
  *   check_all              — runs all deterministic checkers in one call (no API key)
  *   check_diff             — validates actual code changes from a git diff (no API key)
  *   verify_plan            — full pipeline: static analysis + LLM review (requires ANTHROPIC_API_KEY)

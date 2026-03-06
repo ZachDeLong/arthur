@@ -34,7 +34,7 @@ bench/
 
 ## MCP Server
 
-Thirteen tools (registry-driven — adding a new checker is a 2-file operation):
+Fourteen tools (registry-driven — adding a new checker is a 2-file operation):
 - **`check_all`** — runs stable deterministic checkers against a plan in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool for plan verification.**
 - **`check_diff`** — validates actual code changes from a git diff against project ground truth (no API key). Runs source-mode checkers (currently: imports) on files added/modified since the given ref. **Use this after writing code.**
 - `check_paths` — path validation against project tree + closest matches (no API key)

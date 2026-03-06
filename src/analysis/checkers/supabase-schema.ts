@@ -57,12 +57,12 @@ registerChecker({
     lines.push(`**${tablesIndexed}** tables, **${functionsIndexed}** functions, **${enumsIndexed}** enums indexed`);
     lines.push(`**${checkedRefs}** refs checked — **${validRefs}** valid, **${hallucinations.length}** hallucinated`);
 
+    // Parse schema once for both hallucination context and ground truth
+    const schema = typesFilePath ? parseSupabaseSchema(path.join(projectDir, typesFilePath)) : undefined;
+
     if (hallucinations.length > 0) {
       lines.push(``);
       lines.push(`### Hallucinations`);
-
-      const fullPath = path.join(projectDir, typesFilePath!);
-      const schema = parseSupabaseSchema(fullPath);
 
       for (const h of hallucinations) {
         const category = h.hallucinationCategory === "hallucinated-table" ? "table not found"
@@ -71,24 +71,26 @@ registerChecker({
         const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
         lines.push(`- \`${h.raw}\` — ${category}${suggestion}`);
 
-        if (h.hallucinationCategory === "hallucinated-table") {
-          const tableNames = [...schema.tables.keys()].join("`, `");
-          lines.push(`  - Available tables: \`${tableNames}\``);
-        }
-
-        if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
-          const table = schema.tables.get(h.tableName);
-          if (table) {
-            const cols = [...table.columns.entries()]
-              .map(([name, type]) => `\`${name}\` (${type})`)
-              .join(", ");
-            lines.push(`  - Columns on ${table.name}: ${cols}`);
+        if (schema) {
+          if (h.hallucinationCategory === "hallucinated-table") {
+            const tableNames = [...schema.tables.keys()].join("`, `");
+            lines.push(`  - Available tables: \`${tableNames}\``);
           }
-        }
 
-        if (h.hallucinationCategory === "hallucinated-function") {
-          const funcNames = [...schema.functions.keys()].join("`, `");
-          if (funcNames) lines.push(`  - Available functions: \`${funcNames}\``);
+          if (h.hallucinationCategory === "hallucinated-column" && h.tableName) {
+            const table = schema.tables.get(h.tableName);
+            if (table) {
+              const cols = [...table.columns.entries()]
+                .map(([name, type]) => `\`${name}\` (${type})`)
+                .join(", ");
+              lines.push(`  - Columns on ${table.name}: ${cols}`);
+            }
+          }
+
+          if (h.hallucinationCategory === "hallucinated-function") {
+            const funcNames = [...schema.functions.keys()].join("`, `");
+            if (funcNames) lines.push(`  - Available functions: \`${funcNames}\``);
+          }
         }
       }
     }
@@ -110,9 +112,7 @@ registerChecker({
     }
 
     // Always include schema ground truth
-    if (typesFilePath) {
-      const fullPath = path.join(projectDir, typesFilePath);
-      const schema = parseSupabaseSchema(fullPath);
+    if (schema) {
 
       lines.push(``);
       lines.push(`### Supabase Schema Ground Truth`);
@@ -137,9 +137,10 @@ registerChecker({
   formatForCheckAll(result, projectDir): string[] {
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as SupabaseSchemaAnalysis;
+    if (!analysis.typesFilePath) return [];
     const lines: string[] = [];
 
-    const supabaseFullPath = path.join(projectDir, analysis.typesFilePath!);
+    const supabaseFullPath = path.join(projectDir, analysis.typesFilePath);
     const supabaseSchema = parseSupabaseSchema(supabaseFullPath);
     const supabaseIssues = analysis.hallucinations.length;
 
@@ -177,8 +178,12 @@ registerChecker({
     log.heading(`Static Analysis: ${this.displayName}`);
     log.dim(`  ${result.checked} checked, ${result.hallucinated} hallucinated`);
     for (const finding of result.hallucinations) {
+      const label = finding.category === "hallucinated-table" ? "table not found"
+        : finding.category === "hallucinated-column" ? "column not found"
+        : finding.category === "hallucinated-function" ? "function not found"
+        : finding.category;
       const suggestion = finding.suggestion ? ` (${finding.suggestion})` : "";
-      log.dim(`  - ${finding.raw} [${finding.category}]${suggestion}`);
+      log.dim(`  - ${finding.raw} [${label}]${suggestion}`);
     }
   },
 
