@@ -25,6 +25,11 @@ export function resolveDiffFiles(
   diffRef: string,
   options?: ResolveDiffOptions,
 ): DiffFile[] {
+  // Reject flag injection (starts with -) and shell metacharacters
+  if (/^-/.test(diffRef) || /[;&|`$(){}\[\]!<>\\]/.test(diffRef) || diffRef.length > 256) {
+    throw new Error(`Invalid git ref: "${diffRef}"`);
+  }
+
   const args = ["diff", "--name-only", "--diff-filter=ACMR"];
 
   if (options?.staged) {

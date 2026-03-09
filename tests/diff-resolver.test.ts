@@ -167,4 +167,18 @@ describe("resolveDiffFiles", () => {
     expect(paths).not.toContain("src/ghost.ts");
     expect(paths).toContain("src/real.ts");
   });
+
+  it("rejects refs that look like flags", () => {
+    expect(() => resolveDiffFiles(tmpDir, "--output=/tmp/evil")).toThrow(/invalid git ref/i);
+  });
+
+  it("rejects refs with shell metacharacters", () => {
+    expect(() => resolveDiffFiles(tmpDir, "HEAD; rm -rf /")).toThrow(/invalid git ref/i);
+  });
+
+  it("accepts normal refs without validation error", () => {
+    // These may fail at git level but should not throw validation errors
+    expect(() => resolveDiffFiles(tmpDir, "HEAD")).not.toThrow(/invalid git ref/i);
+    expect(() => resolveDiffFiles(tmpDir, "abc1234")).not.toThrow(/invalid git ref/i);
+  });
 });
