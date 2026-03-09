@@ -53,6 +53,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_paths: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -95,6 +96,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir ?? "") }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_schema: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -127,6 +129,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_imports: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -158,6 +161,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_env: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -189,6 +193,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_routes: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -220,6 +225,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_sql_schema: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -251,6 +257,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_supabase_schema: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -282,6 +289,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_express_routes: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -316,6 +324,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: checker.formatForTool(result, projectDir) }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_package_api: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -457,6 +466,7 @@ export function registerToolHandlers(server: McpServer): void {
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_all: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -594,6 +604,7 @@ export function registerToolHandlers(server: McpServer): void {
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in check_diff: ${msg}`);
         return { content: [{ type: "text" as const, text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -721,6 +732,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: outputParts.join("\n\n") }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in verify_plan: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -769,6 +781,7 @@ export function registerToolHandlers(server: McpServer): void {
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in update_session_context: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
@@ -801,6 +814,7 @@ export function registerToolHandlers(server: McpServer): void {
         return { content: [{ type: "text", text: content }] };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[arthur-mcp] Error in get_session_context: ${msg}`);
         return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
       }
     },
