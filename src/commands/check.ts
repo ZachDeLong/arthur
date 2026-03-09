@@ -45,10 +45,21 @@ async function loadPlanText(opts: CheckOptions): Promise<string | null> {
 
   // Explicit --stdin or piped stdin
   if (opts.stdin || !process.stdin.isTTY) {
+    const MAX_STDIN_BYTES = 10 * 1024 * 1024; // 10MB
     return new Promise((resolve) => {
       let data = "";
+      let bytes = 0;
       process.stdin.setEncoding("utf-8");
-      process.stdin.on("data", (chunk) => { data += chunk; });
+      process.stdin.on("data", (chunk: string) => {
+        bytes += Buffer.byteLength(chunk, "utf-8");
+        if (bytes > MAX_STDIN_BYTES) {
+          process.stdin.destroy();
+          console.error(chalk.red(`Error: stdin input exceeds ${MAX_STDIN_BYTES / 1024 / 1024}MB limit`));
+          resolve(null);
+          return;
+        }
+        data += chunk;
+      });
       process.stdin.on("end", () => resolve(data));
     });
   }
