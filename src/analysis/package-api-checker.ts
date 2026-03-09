@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parsePackageName } from "./import-checker.js";
 import { parseObjectMembers, parseClassMembers, type TypeMember } from "./member-parser.js";
+import { parseDtsExports } from "./dts-parser.js";
 
 // --- Types ---
 
@@ -343,6 +344,47 @@ export function parseExportedApi(
   depth: number = 0,
 ): PackageApi {
   const MAX_DEPTH = 3;
+
+  // --- TS Compiler API path (preferred) ---
+  const tsResult = parseDtsExports(dtsContent);
+  if (tsResult) {
+    const { exports, membersByExport } = tsResult;
+
+    // The TS parser skips `export * from` and `export * as ns from` re-exports
+    // since they need file I/O. Handle them with regex + file resolution.
+    if (depth < MAX_DEPTH) {
+      const starReExportRegex = /^export\s+\*\s+from\s+['"]([^'"]+)['"]/gm;
+      for (const match of dtsContent.matchAll(starReExportRegex)) {
+        const specifier = match[1];
+        const resolvedPath = resolveReExportPath(specifier, dtsFilePath, packageDir);
+        if (resolvedPath && fs.existsSync(resolvedPath)) {
+          try {
+            const subContent = fs.readFileSync(resolvedPath, "utf-8");
+            const subApi = parseExportedApi(subContent, resolvedPath, packageDir, depth + 1);
+            for (const name of subApi.exports) {
+              exports.add(name);
+            }
+            for (const [name, members] of subApi.membersByExport) {
+              membersByExport.set(name, members);
+            }
+          } catch {
+            // Can't read sub-module — skip silently
+          }
+        }
+      }
+
+      // export * as ns from './submodule' — add the namespace name
+      const starAsRegex = /^export\s+\*\s+as\s+(\w+)\s+from\s+['"]([^'"]+)['"]/gm;
+      for (const match of dtsContent.matchAll(starAsRegex)) {
+        exports.add(match[1]);
+      }
+    }
+
+    return { exports, membersByExport };
+  }
+
+  // --- Regex fallback path (TS unavailable) ---
+
   const exports = new Set<string>();
   const membersByExport = new Map<string, Map<string, TypeMember>>();
 

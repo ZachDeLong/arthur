@@ -32,6 +32,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { registerToolHandlers } from "../src/mcp/tool-handlers.js";
+import { initTsParser } from "../src/analysis/dts-parser.js";
 
 const server = new McpServer({
   name: "arthur",
@@ -43,6 +44,9 @@ registerToolHandlers(server);
 // --- Start server ---
 
 async function main() {
+  const tsAvailable = await initTsParser();
+  console.error(`[arthur-mcp] TypeScript parser: ${tsAvailable ? "available" : "unavailable (regex fallback)"}`);
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[arthur-mcp] Server started on stdio");
