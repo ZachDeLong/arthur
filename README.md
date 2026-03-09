@@ -1,6 +1,6 @@
 # Arthur
 
-Ground truth verification for AI-generated code. Catches hallucinated file paths, schema references, imports, env vars, routes, and package API usage before code gets written. Deterministic, zero cost, no API key.
+Inspired by Quantum Merlin-Arthur (QMA) verification, Arthur is a deterministic ground truth verification method for AI-generated code. It catches hallucinated file paths, schema references, imports, env vars, routes, and package API usage before code gets written.
 
 ## The Problem
 
