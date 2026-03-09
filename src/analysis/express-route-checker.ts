@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { getAllFiles } from "../context/tree.js";
 
+/** Escape special regex characters in a string for use in RegExp constructor. */
+export function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // --- Types ---
 
 export interface ExpressRoute {
@@ -113,14 +118,14 @@ function extractRouteDecls(content: string, filePath: string): { routes: RawRout
 /** Resolve which file a router variable was imported from. */
 function resolveRouterImport(content: string, routerVar: string, filePath: string, projectDir: string): string | undefined {
   // Match: import routerVar from './routes/users'
-  const importRegex = new RegExp(`import\\s+(?:\\{[^}]*\\}|${routerVar})\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
+  const importRegex = new RegExp(`import\\s+(?:\\{[^}]*\\}|${escapeRegExp(routerVar)})\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
   const match = content.match(importRegex);
   if (match) {
     return resolveRelativePath(match[1], filePath, projectDir);
   }
 
   // Match: const routerVar = require('./routes/users')
-  const requireRegex = new RegExp(`(?:const|let|var)\\s+${routerVar}\\s*=\\s*require\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`);
+  const requireRegex = new RegExp(`(?:const|let|var)\\s+${escapeRegExp(routerVar)}\\s*=\\s*require\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`);
   const reqMatch = content.match(requireRegex);
   if (reqMatch) {
     return resolveRelativePath(reqMatch[1], filePath, projectDir);
