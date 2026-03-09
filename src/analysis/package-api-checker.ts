@@ -481,9 +481,14 @@ export function parseExportedApi(
 }
 
 /**
- * Find interface/class declarations and extract their bodies using manual
- * brace-tracking. This correctly handles nested braces in generic constraints
- * like `interface Foo<T extends { bar: number }> { ... }`.
+ * REGEX FALLBACK ONLY — used when TypeScript isn't available at runtime.
+ * When TS Compiler API is available, parseDtsExports() in dts-parser.ts
+ * handles this with full AST accuracy.
+ *
+ * Finds interface/class declarations and extracts their bodies using manual
+ * brace-tracking. Handles nested braces in generic constraints but can break
+ * on string literals containing braces, comments with braces, and complex
+ * generic union types.
  */
 function findDeclarationBodies(
   content: string,
