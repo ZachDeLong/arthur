@@ -22,7 +22,7 @@ registerChecker({
       };
     }
 
-    const analysis = analyzePackageApi(input.text, projectDir);
+    const analysis = analyzePackageApi(input.text, projectDir, input.cache);
     return {
       checkerId: "packageApi",
       checked: analysis.checkedBindings + analysis.checkedMembers,

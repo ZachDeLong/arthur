@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { clearImportCaches } from "../src/analysis/import-checker.js";
+import path from "node:path";
+import { analyzeImports, clearImportCaches } from "../src/analysis/import-checker.js";
 import { clearApiCaches } from "../src/analysis/package-api-checker.js";
 import { runAllCheckers } from "../src/analysis/run-all.js";
 import type { CheckerInput } from "../src/analysis/registry.js";
@@ -74,5 +75,16 @@ describe("Cache invalidation", () => {
 
     // Should not throw — existing cache is passed through
     expect(() => runAllCheckers(input, "/nonexistent/path")).not.toThrow();
+  });
+
+  it("request-scoped cache is populated by analyzeImports", () => {
+    const cache = new Map<string, unknown>();
+    analyzeImports(
+      "```ts\nimport express from 'express';\n```",
+      path.resolve(import.meta.dirname, "../bench/fixtures/fixture-e"),
+      { cache },
+    );
+    const hasEntry = [...cache.keys()].some(k => k.startsWith("deps:"));
+    expect(hasEntry).toBe(true);
   });
 });

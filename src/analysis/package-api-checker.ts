@@ -581,7 +581,7 @@ function suggestExportName(hallucinated: string, available: Set<string>): string
 
 // --- Main Analysis ---
 
-export function analyzePackageApi(planText: string, projectDir: string): PackageApiAnalysis {
+export function analyzePackageApi(planText: string, projectDir: string, cache?: Map<string, unknown>): PackageApiAnalysis {
   const nodeModulesDir = path.join(projectDir, "node_modules");
   if (!fs.existsSync(nodeModulesDir)) {
     return {
@@ -626,12 +626,14 @@ export function analyzePackageApi(planText: string, projectDir: string): Package
     if (!entrypoint) continue;
 
     // Check cache
-    let api = apiCache.get(entrypoint);
+    const cacheKey = `api:${entrypoint}`;
+    let api = (cache?.get(cacheKey) as PackageApi | undefined) ?? apiCache.get(entrypoint);
     if (!api) {
       try {
         const content = fs.readFileSync(entrypoint, "utf-8");
         api = parseExportedApi(content, entrypoint, pkgDir);
         apiCache.set(entrypoint, api);
+        if (cache) cache.set(cacheKey, api);
       } catch {
         continue;
       }

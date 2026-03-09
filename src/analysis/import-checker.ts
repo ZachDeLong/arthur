@@ -253,8 +253,9 @@ export function clearImportCaches(): void {
 }
 
 /** Check if a package is listed in the project's package.json dependencies or devDependencies. */
-function isListedDependency(packageName: string, projectDir: string): boolean {
-  let allDeps = depsCache.get(projectDir);
+function isListedDependency(packageName: string, projectDir: string, cache?: Map<string, unknown>): boolean {
+  const cacheKey = `deps:${projectDir}`;
+  let allDeps = (cache?.get(cacheKey) as Set<string> | undefined) ?? depsCache.get(projectDir);
   if (!allDeps) {
     allDeps = new Set<string>();
     const pkgPath = path.join(projectDir, "package.json");
@@ -272,6 +273,7 @@ function isListedDependency(packageName: string, projectDir: string): boolean {
       // No package.json or parse error — can't validate
     }
     depsCache.set(projectDir, allDeps);
+    if (cache) cache.set(cacheKey, allDeps);
   }
   return allDeps.has(packageName);
 }
@@ -287,6 +289,7 @@ function validateImportSource(
   projectDir: string,
   nodeModulesDir: string,
   filePath?: string,
+  cache?: Map<string, unknown>,
 ): { ref: ImportRef | null; skipped: boolean } {
   if (shouldSkip(source)) {
     return { ref: null, skipped: true };
@@ -298,7 +301,7 @@ function validateImportSource(
   const pkgJsonPath = path.join(nodeModulesDir, packageName, "package.json");
   if (!fs.existsSync(pkgJsonPath)) {
     // Fallback: check if it's listed in the project's package.json deps
-    if (isListedDependency(packageName, projectDir)) {
+    if (isListedDependency(packageName, projectDir, cache)) {
       return { ref: null, skipped: false };
     }
     const suggestion = suggestPackage(packageName, nodeModulesDir);
@@ -357,7 +360,7 @@ function validateImportSource(
 }
 
 /** Analyze imports from DiffFile[] (source mode) — per-file attribution. */
-function analyzeImportsFromFiles(files: DiffFile[], projectDir: string): ImportAnalysis {
+function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: Map<string, unknown>): ImportAnalysis {
   const nodeModulesDir = path.join(projectDir, "node_modules");
   const hallucinations: ImportRef[] = [];
   let totalImports = 0;
@@ -376,7 +379,7 @@ function analyzeImportsFromFiles(files: DiffFile[], projectDir: string): ImportA
       // Check cache first
       let result = validatedPackages.get(source);
       if (!result) {
-        result = validateImportSource(source, projectDir, nodeModulesDir);
+        result = validateImportSource(source, projectDir, nodeModulesDir, undefined, cache);
         validatedPackages.set(source, result);
       }
 
@@ -416,11 +419,11 @@ function analyzeImportsFromFiles(files: DiffFile[], projectDir: string): ImportA
 export function analyzeImports(
   input: string | DiffFile[],
   projectDir: string,
-  options?: { mode?: "plan" | "source" },
+  options?: { mode?: "plan" | "source"; cache?: Map<string, unknown> },
 ): ImportAnalysis {
   // Source mode: iterate DiffFile[] with per-file attribution
   if (options?.mode === "source" && Array.isArray(input)) {
-    return analyzeImportsFromFiles(input as DiffFile[], projectDir);
+    return analyzeImportsFromFiles(input as DiffFile[], projectDir, options?.cache);
   }
 
   // Plan mode (default): extract from plan text string
@@ -434,7 +437,7 @@ export function analyzeImports(
   let validImports = 0;
 
   for (const source of allSources) {
-    const result = validateImportSource(source, projectDir, nodeModulesDir);
+    const result = validateImportSource(source, projectDir, nodeModulesDir, undefined, options?.cache);
 
     if (result.skipped) {
       skippedImports++;

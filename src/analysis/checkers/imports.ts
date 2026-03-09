@@ -12,8 +12,8 @@ registerChecker({
 
   run(input: CheckerInput, projectDir): CheckerResult {
     const analysis = input.mode === "source" && input.files
-      ? analyzeImports(input.files, projectDir, { mode: "source" })
-      : analyzeImports(input.text, projectDir);
+      ? analyzeImports(input.files, projectDir, { mode: "source", cache: input.cache })
+      : analyzeImports(input.text, projectDir, { cache: input.cache });
 
     return {
       checkerId: "imports",
