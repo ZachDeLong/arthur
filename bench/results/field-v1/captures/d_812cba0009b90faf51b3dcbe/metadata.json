@@ -1,0 +1,28 @@
+{
+  "agentEvidence": "Current Codex task transcript; Codex implemented and verified commit 52d5bad6d11b372d49e5c77d101e4b8baf59e3d5",
+  "agentTool": "Codex",
+  "baseCommit": "16574fbb29644ce1d5e7ff2ddcf3f7269e27bf0c",
+  "capturedAt": "2026-09-07T08:55:23.022Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "scripts/wikipedia-match.mjs",
+    "tests/wikipedia-match.test.mjs"
+  ],
+  "changeId": "d_812cba0009b90faf51b3dcbe",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/Counselor-Sophie/usa-college-map/tree/codex/reject-unrelated-wikipedia-matches",
+  "rawDiffSha256": "f3836a4e7aa04cc9907ed3f487f66308c007053bb90adfdbdf8d8ef2ac78c0eb",
+  "relevantSourcePaths": [
+    "scripts/wikipedia-match.mjs",
+    "tests/wikipedia-match.test.mjs"
+  ],
+  "repositoryId": "usa-college-map",
+  "resultCommit": "52d5bad6d11b372d49e5c77d101e4b8baf59e3d5",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "f3836a4e7aa04cc9907ed3f487f66308c007053bb90adfdbdf8d8ef2ac78c0eb",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

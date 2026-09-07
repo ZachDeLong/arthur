@@ -1,0 +1,34 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 431f054e15cb87192436696999871c4c2e0ec074",
+  "agentTool": "Codex",
+  "baseCommit": "f35223c9482586e7c5787884311e93550f2c910f",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_ed0d9ab9408c8e3a0cdc3191",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/Counselor-Sophie/usa-college-map/tree/codex/reject-unrelated-wikipedia-matches",
+  "rawDiffSha256": "655efec567dea00ebc083a3d10ad1fe51feb3522ed19fbfd0bf3a8f4198ad38c",
+  "relevantSourcePaths": [
+    "scripts/fetch-all-campuses.mjs",
+    "scripts/fetch-options.mjs",
+    "tests/fetch-options.test.mjs"
+  ],
+  "repositoryId": "usa-college-map",
+  "resultCommit": "431f054e15cb87192436696999871c4c2e0ec074",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T08:59:09.470Z",
+  "standardTools": [
+    {
+      "command": "npm test",
+      "kind": "test",
+      "name": "node"
+    },
+    {
+      "command": "npm run check",
+      "kind": "compiler",
+      "name": "syntax"
+    }
+  ],
+  "studyId": "field-v1"
+}

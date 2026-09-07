@@ -1,0 +1,139 @@
+diff --git a/mod/agent-bridge.js b/mod/agent-bridge.js
+index a3edd4a1e1ca1d702217dd26f5c44ebc8b9e16a0..9e32391752343f133c380e3b52e8bf159fbe2f07 100644
+--- a/mod/agent-bridge.js
++++ b/mod/agent-bridge.js
+@@ -18,6 +18,7 @@ const METADATA = {
+ 
+ const BRIDGE_URL = "ws://127.0.0.1:8765";
+ const RECONNECT_MS = 2000;
++const MAX_RUN_SECONDS = 300;
+ 
+ // The A* belt router is injected here by serve-mod.mjs from
+ // router/belt-router.mjs. The mod loader evaluates this file with
+@@ -523,6 +524,11 @@ class Mod extends shapez.Mod {
+      * result does not depend on wall-clock or framerate.
+      */
+     run({ seconds = 10 }) {
++        if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_RUN_SECONDS) {
++            throw new Error(
++                `seconds must be a finite number greater than 0 and no more than ${MAX_RUN_SECONDS}`
++            );
++        }
+         const core = this.root.gameState.core;
+         const deltaSeconds = this.root.dynamicTickrate.deltaSeconds;
+         const ticks = Math.max(1, Math.round(seconds / deltaSeconds));
+diff --git a/scripts/test-connect.mjs b/scripts/test-connect.mjs
+index 86730462a64988304f86d926d307f31aff7e891c..5c01463b4933fcc413faf69b1947ce22a9b1c104 100644
+--- a/scripts/test-connect.mjs
++++ b/scripts/test-connect.mjs
+@@ -263,6 +263,20 @@ console.log("=== mod lifecycle ===");
+         missing.length ? `missing: ${missing.join(", ")}` : `${TOOL_NAMES.length} tools`);
+ }
+ 
++console.log("\n=== run duration validation ===");
++{
++    const mod = newMod({});
++    for (const seconds of [0, -1, NaN, Infinity, 301]) {
++        let rejected = false;
++        try {
++            mod.run({ seconds });
++        } catch (ex) {
++            rejected = ex.message.includes("finite number");
++        }
++        check(`game-side run rejects ${String(seconds)}`, rejected);
++    }
++}
++
+ // patch.pos is the centroid of a patch's tiles, so it is fractional and can sit
+ // on a tile with no resource on it. Miners must go on an actual resource tile.
+ console.log("\n=== resource patch anchoring ===");
+diff --git a/scripts/test-protocol.mjs b/scripts/test-protocol.mjs
+index 553de9ea4d75bd593b55586572b64ac26dffcbb2..fbb4c415a379a99594b1348404bde972298b0b20 100644
+--- a/scripts/test-protocol.mjs
++++ b/scripts/test-protocol.mjs
+@@ -57,6 +57,18 @@ const [a, b, c] = await Promise.all([bridge.buildings(), bridge.ping(), bridge.r
+ check("concurrent calls resolve independently",
+     Array.isArray(a) && b.pong === true && c.ticks === 900);
+ 
++// Invalid durations must fail before an RPC can lock the game into an
++// effectively unbounded synchronous update loop.
++for (const seconds of [0, -1, NaN, Infinity, 301]) {
++    let invalidRunRejected = false;
++    try {
++        await bridge.run(seconds);
++    } catch (ex) {
++        invalidRunRejected = ex.message.includes("finite number");
++    }
++    check(`run rejects unsafe duration ${String(seconds)}`, invalidRunRejected);
++}
++
+ // --- game-side errors surface as rejections ---
+ let rejected = false;
+ try { await bridge.call("boom"); } catch (ex) { rejected = ex.message.includes("simulated"); }
+@@ -75,6 +87,9 @@ check("every tool has name/description/input_schema",
+ check("every dispatcher key has a schema and vice versa",
+     TOOLS.every(t => typeof dispatch === "function") && TOOLS.length === 7,
+     `${TOOLS.length} tools`);
++const runSecondsSchema = TOOLS.find(t => t.name === "run")?.input_schema?.properties?.seconds;
++check("run schema excludes non-positive durations", runSecondsSchema?.exclusiveMinimum === 0);
++check("run schema caps synchronous simulation work", runSecondsSchema?.maximum === 300);
+ for (const t of TOOLS) {
+     const r = await dispatch(t.name, {});
+     check(`  dispatch(${t.name}) reaches the game`, !r?.error || !r.error.startsWith("Unknown tool"));
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index a0fbbae6788b164bcae122201024b85d919e5333..c69ad4a9b4ab9626747e01cef76df80eca0768c5 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -8,6 +8,14 @@ import { WebSocketServer } from "ws";
+ 
+ const PORT = Number(process.env.BRIDGE_PORT || 8765);
+ const DEFAULT_TIMEOUT_MS = 30_000;
++export const MAX_RUN_SECONDS = 300;
++
++export function validateRunSeconds(seconds) {
++    if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_RUN_SECONDS) {
++        throw new Error(`seconds must be a finite number greater than 0 and no more than ${MAX_RUN_SECONDS}`);
++    }
++    return seconds;
++}
+ 
+ export class GameBridge {
+     constructor({ port = PORT, log = console.log } = {}) {
+@@ -221,7 +229,12 @@ export class GameBridge {
+     }
+     /** Stepping is synchronous game-side, so allow generous headroom. */
+     run(seconds = 10) {
+-        return this.call("run", { seconds }, Math.max(60_000, seconds * 2000));
++        const validatedSeconds = validateRunSeconds(seconds);
++        return this.call(
++            "run",
++            { seconds: validatedSeconds },
++            Math.max(60_000, validatedSeconds * 2000)
++        );
+     }
+ }
+ 
+diff --git a/server/tools.mjs b/server/tools.mjs
+index ca6982193896f3390cad021bcd87470d6505dceb..5460979d6fda983b6248cc699e1313c73fba2823 100644
+--- a/server/tools.mjs
++++ b/server/tools.mjs
+@@ -4,6 +4,8 @@
+ // Schemas are in Anthropic tool format ({name, description, input_schema}) and
+ // are plain JSON — usable from any harness.
+ 
++import { MAX_RUN_SECONDS } from "./bridge-server.mjs";
++
+ export const TOOLS = [
+     {
+         name: "observe",
+@@ -158,7 +160,9 @@ export const TOOLS = [
+             properties: {
+                 seconds: {
+                     type: "number",
+-                    description: "In-game seconds to advance. Default 10.",
++                    exclusiveMinimum: 0,
++                    maximum: MAX_RUN_SECONDS,
++                    description: `In-game seconds to advance, up to ${MAX_RUN_SECONDS}. Default 10.`,
+                 },
+             },
+         },

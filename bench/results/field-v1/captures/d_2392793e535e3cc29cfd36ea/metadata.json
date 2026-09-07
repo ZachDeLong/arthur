@@ -1,0 +1,30 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 8ef23276e88929dacb28ac579b80ed663677e6bf",
+  "agentTool": "Codex",
+  "baseCommit": "8a5adbda921a3bca5047f371844da395b2df1e24",
+  "capturedAt": "2026-09-07T09:10:25.234Z",
+  "caseCount": 1,
+  "changedPaths": [
+    "frontend/src/App.tsx",
+    "frontend/src/utils/queryUtils.test.ts",
+    "frontend/src/utils/queryUtils.ts"
+  ],
+  "changeId": "d_2392793e535e3cc29cfd36ea",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/ai-reasoning-hub/tree/codex/export-all-filtered-papers",
+  "rawDiffSha256": "7280e2108059f446a2258011093adedc63bda31967457107ac5b107b8f783f63",
+  "relevantSourcePaths": [
+    "frontend/src/App.tsx",
+    "frontend/src/utils/queryUtils.test.ts",
+    "frontend/src/utils/queryUtils.ts"
+  ],
+  "repositoryId": "ai-reasoning-hub",
+  "resultCommit": "8ef23276e88929dacb28ac579b80ed663677e6bf",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "7280e2108059f446a2258011093adedc63bda31967457107ac5b107b8f783f63",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

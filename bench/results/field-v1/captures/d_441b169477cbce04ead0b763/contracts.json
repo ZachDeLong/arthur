@@ -1,0 +1,103 @@
+{
+  "env": {
+    "definedNames": [],
+    "filesFound": []
+  },
+  "packages": [
+    {
+      "declaredVersion": "^4.0.18",
+      "installed": true,
+      "installedManifest": {
+        "exports": {
+          ".": {
+            "import": {
+              "default": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            },
+            "require": {
+              "default": "./index.cjs",
+              "types": "./index.d.cts"
+            }
+          },
+          "./browser": {
+            "default": "./browser/context.js",
+            "types": "./browser/context.d.ts"
+          },
+          "./config": {
+            "default": "./dist/config.js",
+            "require": "./dist/config.cjs",
+            "types": "./config.d.ts"
+          },
+          "./coverage": {
+            "default": "./dist/coverage.js",
+            "types": "./coverage.d.ts"
+          },
+          "./environments": {
+            "default": "./dist/environments.js",
+            "types": "./dist/environments.d.ts"
+          },
+          "./globals": {
+            "types": "./globals.d.ts"
+          },
+          "./import-meta": {
+            "types": "./import-meta.d.ts"
+          },
+          "./importMeta": {
+            "types": "./importMeta.d.ts"
+          },
+          "./internal/browser": {
+            "default": "./dist/browser.js",
+            "types": "./dist/browser.d.ts"
+          },
+          "./internal/module-runner": {
+            "default": "./dist/module-runner.js",
+            "types": "./dist/module-runner.d.ts"
+          },
+          "./jsdom": {
+            "types": "./jsdom.d.ts"
+          },
+          "./mocker": {
+            "default": "./dist/mocker.js",
+            "types": "./dist/mocker.d.ts"
+          },
+          "./node": {
+            "default": "./dist/node.js",
+            "types": "./dist/node.d.ts"
+          },
+          "./optional-types.js": {
+            "types": "./optional-types.d.ts"
+          },
+          "./package.json": "./package.json",
+          "./reporters": {
+            "default": "./dist/reporters.js",
+            "types": "./dist/reporters.d.ts"
+          },
+          "./runners": {
+            "default": "./dist/runners.js",
+            "types": "./dist/runners.d.ts"
+          },
+          "./snapshot": {
+            "default": "./dist/snapshot.js",
+            "types": "./dist/snapshot.d.ts"
+          },
+          "./src/*": "./src/*",
+          "./suite": {
+            "default": "./dist/suite.js",
+            "types": "./dist/suite.d.ts"
+          },
+          "./worker": {
+            "default": "./dist/worker.js",
+            "types": "./worker.d.ts"
+          }
+        },
+        "main": "./dist/index.js",
+        "module": "./dist/index.js",
+        "name": "vitest",
+        "types": "./dist/index.d.ts",
+        "version": "4.0.18"
+      },
+      "packageName": "vitest"
+    }
+  ],
+  "routes": []
+}

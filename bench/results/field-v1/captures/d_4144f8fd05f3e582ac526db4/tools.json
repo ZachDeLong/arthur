@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm --prefix frontend run build",
+    "durationMs": 2870.7652,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "frontend-build",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:51:36.384Z",
+    "stderr": "Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme\n",
+    "stdout": "\n> benchbro-frontend@0.1.0 build\n> tsc && vite build\n\nvite v6.4.1 building for production...\ntransforming...\n✓ 46 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../src/benchbro/static/index.html                   0.44 kB │ gzip:  0.30 kB\n../src/benchbro/static/assets/index-BMcIdeJV.css   14.25 kB │ gzip:  3.31 kB\n../src/benchbro/static/assets/index-BNoLZR4Z.js   250.31 kB │ gzip: 78.22 kB\n✓ built in 1.29s\n",
+    "timedOut": false
+  },
+  {
+    "command": "python -m pytest",
+    "durationMs": 7264.636,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "pytest",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:51:39.255Z",
+    "stderr": "",
+    "stdout": "============================= test session starts =============================\r\nplatform win32 -- Python 3.14.3, pytest-9.0.2, pluggy-1.6.0\r\nrootdir: C:\\Users\\zachd\\benchbro\r\nconfigfile: pyproject.toml\r\ntestpaths: tests\r\nplugins: anyio-4.13.0, asyncio-1.3.0, httpx-0.36.0\r\nasyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\r\ncollected 24 items\r\n\r\ntests\\test_adapters.py ......                                            [ 25%]\r\ntests\\test_api.py ....                                                   [ 41%]\r\ntests\\test_benchmarks.py .......                                         [ 70%]\r\ntests\\test_db.py .....                                                   [ 91%]\r\ntests\\test_runner.py ..                                                  [100%]\r\n\r\n============================= 24 passed in 6.08s ==============================\r\n",
+    "timedOut": false
+  }
+]

@@ -1,0 +1,212 @@
+diff --git a/canvas-proxy.ts b/canvas-proxy.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a92a6eaecff763c86e99c4121002deaa616dbda
+--- /dev/null
++++ b/canvas-proxy.ts
+@@ -0,0 +1,73 @@
++import type { IncomingMessage, ServerResponse } from 'node:http'
++import { normalizeCanvasHost } from './api/canvas.js'
++
++async function readRequestBody(req: IncomingMessage): Promise<Uint8Array> {
++  const chunks: Uint8Array[] = []
++  for await (const chunk of req) {
++    chunks.push(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : new Uint8Array(chunk))
++  }
++
++  const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0)
++  const body = new Uint8Array(size)
++  let offset = 0
++  for (const chunk of chunks) {
++    body.set(chunk, offset)
++    offset += chunk.byteLength
++  }
++  return body
++}
++
++export async function canvasProxyMiddleware(
++  req: IncomingMessage,
++  res: ServerResponse,
++  next: () => void,
++) {
++  if (!req.url?.startsWith('/api/canvas/')) {
++    next()
++    return
++  }
++
++  const rawCanvasHost = req.headers['x-canvas-host']
++  const canvasHost = typeof rawCanvasHost === 'string' ? normalizeCanvasHost(rawCanvasHost) : null
++  if (!rawCanvasHost) {
++    res.statusCode = 400
++    res.end(JSON.stringify({ error: 'Missing X-Canvas-Host header' }))
++    return
++  }
++  if (!canvasHost) {
++    res.statusCode = 400
++    res.end(JSON.stringify({ error: 'Invalid Canvas host' }))
++    return
++  }
++
++  const canvasPath = req.url.replace('/api/canvas/', '')
++  const canvasUrl = `https://${canvasHost}/api/v1/${canvasPath}`
++
++  try {
++    const headers: Record<string, string> = { Accept: 'application/json' }
++    if (req.headers.authorization) {
++      headers.Authorization = req.headers.authorization
++    }
++    if (req.headers['content-type']) {
++      headers['Content-Type'] = req.headers['content-type']
++    }
++
++    const method = req.method ?? 'GET'
++    const fetchOptions: RequestInit = { method, headers }
++    if (method !== 'GET' && method !== 'HEAD') {
++      fetchOptions.body = await readRequestBody(req)
++    }
++
++    const canvasRes = await fetch(canvasUrl, fetchOptions)
++    const data = await canvasRes.text()
++
++    res.statusCode = canvasRes.status
++    res.setHeader('Content-Type', canvasRes.headers.get('content-type') || 'application/json')
++    const linkHeader = canvasRes.headers.get('link')
++    if (linkHeader) res.setHeader('Link', linkHeader)
++    res.end(data)
++  } catch {
++    res.statusCode = 500
++    res.end(JSON.stringify({ error: 'Failed to reach Canvas API' }))
++  }
++}
+diff --git a/vite.config.test.ts b/vite.config.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b3e9382d9f3ecc6f72e980c446e51a539bbb029
+--- /dev/null
++++ b/vite.config.test.ts
+@@ -0,0 +1,77 @@
++import { PassThrough } from 'node:stream'
++import type { IncomingMessage, ServerResponse } from 'node:http'
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { canvasProxyMiddleware } from './canvas-proxy'
++
++function requestFor(options: { host: string; method?: string; body?: string }) {
++  const request = new PassThrough() as PassThrough & IncomingMessage
++  request.url = '/api/canvas/courses/7/assignments?per_page=100'
++  request.method = options.method ?? 'GET'
++  request.headers = {
++    authorization: 'Bearer test-token',
++    'content-type': 'application/json',
++    'x-canvas-host': options.host,
++  }
++  return request
++}
++
++function responseRecorder() {
++  const headers = new Map<string, string | number | readonly string[]>()
++  const end = vi.fn()
++  const response = {
++    statusCode: 0,
++    setHeader: (name: string, value: string | number | readonly string[]) => headers.set(name, value),
++    end,
++  } as unknown as ServerResponse
++  return { response, headers, end }
++}
++
++afterEach(() => {
++  vi.unstubAllGlobals()
++})
++
++describe('Vite Canvas proxy', () => {
++  it('forwards mutation methods, bodies, content type, and pagination headers', async () => {
++    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', {
++      status: 201,
++      headers: {
++        'Content-Type': 'application/json; charset=utf-8',
++        Link: '<https://school.instructure.com/api/v1/next>; rel="next"',
++      },
++    }))
++    vi.stubGlobal('fetch', fetchMock)
++    const request = requestFor({ host: 'School.Instructure.com', method: 'POST' })
++    const { response, headers } = responseRecorder()
++
++    const handled = canvasProxyMiddleware(request, response, vi.fn())
++    request.end('{"comment":"done"}')
++    await handled
++
++    const [url, options] = fetchMock.mock.calls[0]
++    expect(url).toBe('https://school.instructure.com/api/v1/courses/7/assignments?per_page=100')
++    expect(options).toMatchObject({
++      method: 'POST',
++      headers: expect.objectContaining({
++        Authorization: 'Bearer test-token',
++        'Content-Type': 'application/json',
++      }),
++    })
++    expect(new TextDecoder().decode(options.body)).toBe('{"comment":"done"}')
++    expect(response.statusCode).toBe(201)
++    expect(headers.get('Content-Type')).toBe('application/json; charset=utf-8')
++    expect(headers.get('Link')).toContain('rel="next"')
++  })
++
++  it('rejects an unsafe outbound host before fetch', async () => {
++    const fetchMock = vi.fn()
++    vi.stubGlobal('fetch', fetchMock)
++    const request = requestFor({ host: 'instructure.com.attacker.test' })
++    const { response, end } = responseRecorder()
++
++    await canvasProxyMiddleware(request, response, vi.fn())
++
++    expect(response.statusCode).toBe(400)
++    expect(end).toHaveBeenCalledWith(JSON.stringify({ error: 'Invalid Canvas host' }))
++    expect(fetchMock).not.toHaveBeenCalled()
++  })
++})
+diff --git a/vite.config.ts b/vite.config.ts
+index 526e44251836021777d0c7f32638269d01bfe45f..77873eecb8eaec3ec31bcac403e80d97ca5f5ad2 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -1,43 +1,13 @@
+ import { defineConfig, type Plugin } from 'vite'
+ import tailwindcss from '@tailwindcss/vite'
+ import react from '@vitejs/plugin-react'
++import { canvasProxyMiddleware } from './canvas-proxy'
+ 
+ function canvasProxyPlugin(): Plugin {
+   return {
+     name: 'canvas-proxy',
+     configureServer(server) {
+-      server.middlewares.use(async (req, res, next) => {
+-        if (!req.url?.startsWith('/api/canvas/')) {
+-          return next()
+-        }
+-
+-        const canvasHost = req.headers['x-canvas-host'] as string
+-        if (!canvasHost) {
+-          res.statusCode = 400
+-          res.end(JSON.stringify({ error: 'Missing X-Canvas-Host header' }))
+-          return
+-        }
+-
+-        const canvasPath = req.url.replace('/api/canvas/', '')
+-        const canvasUrl = `https://${canvasHost}/api/v1/${canvasPath}`
+-
+-        try {
+-          const headers: Record<string, string> = {}
+-          if (req.headers.authorization) {
+-            headers['Authorization'] = req.headers.authorization as string
+-          }
+-
+-          const canvasRes = await fetch(canvasUrl, { headers })
+-          const data = await canvasRes.text()
+-
+-          res.statusCode = canvasRes.status
+-          res.setHeader('Content-Type', 'application/json')
+-          res.end(data)
+-        } catch {
+-          res.statusCode = 500
+-          res.end(JSON.stringify({ error: 'Failed to reach Canvas API' }))
+-        }
+-      })
++      server.middlewares.use(canvasProxyMiddleware)
+     }
+   }
+ }

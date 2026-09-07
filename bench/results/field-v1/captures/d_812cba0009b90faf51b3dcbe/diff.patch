@@ -1,0 +1,44 @@
+diff --git a/scripts/wikipedia-match.mjs b/scripts/wikipedia-match.mjs
+index 34e6a293d16e25a1e89b5ec1b13a8245ac28b6e6..5235b3a0af94e70c7f6bcc6189dd9c702bc960e0 100644
+--- a/scripts/wikipedia-match.mjs
++++ b/scripts/wikipedia-match.mjs
+@@ -61,7 +61,7 @@ export function isRelevantMatch(summary, buildingName, collegeName) {
+     .join('');
+   const collegeMentioned =
+     includesPhrase(articleText, normalizedCollege) ||
+-    (collegeTokens.length > 0 && collegeTokens.every((word) => articleWords.has(word))) ||
++    (collegeTokens.length >= 2 && collegeTokens.every((word) => articleWords.has(word))) ||
+     (collegeInitials.length >= 3 && articleWords.has(collegeInitials));
+   if (!collegeMentioned) return false;
+ 
+diff --git a/tests/wikipedia-match.test.mjs b/tests/wikipedia-match.test.mjs
+index 1ff0e911ce63ad170fff5b6fae819757d46958e6..81a79847d795b5f804d1ae7c1a9802e59f25954e 100644
+--- a/tests/wikipedia-match.test.mjs
++++ b/tests/wikipedia-match.test.mjs
+@@ -65,3 +65,26 @@ test('accepts a college acronym derived from its full name', () => {
+     true
+   );
+ });
++
++test('does not infer the college from a shared word in the building name', () => {
++  const summary = {
++    title: 'Washington Hall',
++    description: 'Academic building at the University of Notre Dame',
++    extract: 'Washington Hall is a historic campus building at the University of Notre Dame.',
++  };
++
++  assert.equal(
++    isRelevantMatch(summary, 'Washington Hall', 'University of Washington'),
++    false
++  );
++});
++
++test('still accepts an explicit single-token college phrase', () => {
++  const summary = {
++    title: 'Washington Hall',
++    description: 'Academic building at Stanford',
++    extract: 'Washington Hall is located on the Stanford campus.',
++  };
++
++  assert.equal(isRelevantMatch(summary, 'Washington Hall', 'Stanford'), true);
++});

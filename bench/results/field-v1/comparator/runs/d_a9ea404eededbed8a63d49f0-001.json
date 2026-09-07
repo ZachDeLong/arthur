@@ -1,0 +1,25 @@
+{
+  "batchInputSha256": "0b64c6b3b407edf92052eb44ff5e9551d41ef730e743581502c842de457d4e8b",
+  "durationMs": 2271.510900000001,
+  "inputTokens": 1551,
+  "model": "claude-sonnet-5",
+  "outputTokens": 153,
+  "predictions": [
+    {
+      "caseId": "c_00375cc3678c0f23e67154bd",
+      "predictedInvalid": false,
+      "reason": "Importing named exports from root 'vitest' entry, which resolves via package.json exports; valid and installed."
+    },
+    {
+      "caseId": "c_ee5133685fce407dc00233a5",
+      "predictedInvalid": false,
+      "reason": "Root 'vitest' import matches installed package's exports map; not an invalid reference."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_00375cc3678c0f23e67154bd\",\"predictedInvalid\":false,\"reason\":\"Importing named exports from root 'vitest' entry, which resolves via package.json exports; valid and installed.\"},{\"caseId\":\"c_ee5133685fce407dc00233a5\",\"predictedInvalid\":false,\"reason\":\"Root 'vitest' import matches installed package's exports map; not an invalid reference.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnCqA4sCzE8N6wFJvbf",
+  "system": "anthropic/claude-sonnet-5"
+}

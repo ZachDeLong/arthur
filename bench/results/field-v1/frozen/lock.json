@@ -1,0 +1,17 @@
+{
+  "activationCommit": "2d914e5e41637726dbb440dda4aed47ea148febb",
+  "arthurPredictionsSha256": "752d2e075477c0a4657f334c8ef1f988d257887082e4f0779548f52c4fb5d5d1",
+  "captureIndexSha256": "f39d20f3ee412e0f319a1cd3102c7e7bd2df441b53e4cd37fe7278ce4e1a22c0",
+  "caseInventorySha256": "8652e62aa3fc996ba58116fe8ae08771995276b2f67b87319bf9d3db0879dcaf",
+  "checkerBuildSha256": "ebd920ecee65504abe59a4c188e1820dba128f23a58100b64c24a48b8f76ecd1",
+  "collectionLockSha256": "4cc6ba8ee2e20374241904ed463936a0c8bc982a8bb27c76233c0202a6f21b5b",
+  "comparatorPredictionsSha256": "403b41b642c6a3aa03ac7781c50cb8844ec21c92a1691c39e8ce65005e8a174a",
+  "comparatorRunSha256": "ebdfa4eb0d0698ef7016d72557b2a66c85225e4b4ead0a9e4c840f06424ac9dc",
+  "frozenAt": "2026-09-07T21:21:51.924Z",
+  "protocolSha256": "59908655a1a74d27bcf499ebfc204c8f6de87e55932ca49c31549098f1d3da95",
+  "reviewPacketsSha256": "0a0d5b25f7713d0d322c52bce3a44a02f1ae95c244a7554ab3253fec82402cda",
+  "schemaVersion": 1,
+  "standardToolEvidenceSha256": "9487e08f9611b31506cb1bf3025143c0c722004577b8262365f2714a90da5362",
+  "studyId": "field-v1",
+  "studyPlanSha256": "34ebb8c706f61cb1f72201610858658c038e7d746b9477f6ed85885c99d5c7a8"
+}

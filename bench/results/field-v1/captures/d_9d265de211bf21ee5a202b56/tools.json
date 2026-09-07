@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 446.682,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:39:09.163Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ parses force and explicit campus targets (0.8381ms)\n✔ uses every available campus when no slug is specified (0.1137ms)\n✔ rejects unknown options before enrichment starts (0.2404ms)\n✔ rejects missing campus files instead of reporting success (45.0842ms)\n✔ uses all campuses by default (0.9236ms)\n✔ parses the supported options in either order (0.1515ms)\n✔ rejects missing, non-numeric, zero, and negative limits (0.2721ms)\n✔ rejects unsafe, repeated, and unknown options (0.0855ms)\n✔ closes a valid open polygon ring (1.0476ms)\n✔ does not close an already closed ring twice (0.1261ms)\n✔ rejects missing and non-finite coordinates (0.1098ms)\n✔ rejects rings without three distinct positions (0.0547ms)\n✔ accepts a normal Overpass payload, including an empty result (0.6143ms)\n✔ rejects HTTP-200 error remarks so the caller retries (0.3962ms)\n✔ rejects malformed payloads instead of treating them as empty data (0.1643ms)\n✔ returns parsed JSON and sends the project user agent (0.8463ms)\n✔ treats a 404 as a definitive missing resource (0.0987ms)\n✔ throws on transient HTTP failures so callers can retry (0.2602ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.539ms)\n✔ accepts a specific campus building with college evidence (1.1626ms)\n✔ rejects an unrelated building with the same name (0.2466ms)\n✔ rejects a person whose name contains the building name (0.5282ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1088ms)\n✔ matches short college names as words instead of substrings (0.0716ms)\n✔ accepts a college acronym derived from its full name (0.1552ms)\n✔ does not infer the college from a shared word in the building name (0.0844ms)\n✔ still accepts an explicit single-token college phrase (0.0664ms)\nℹ tests 27\nℹ suites 0\nℹ pass 27\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 113.4997\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 558.5375999999999,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:39:09.610Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

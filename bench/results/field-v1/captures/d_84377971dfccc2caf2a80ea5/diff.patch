@@ -1,0 +1,153 @@
+diff --git a/package.json b/package.json
+index 1209e5ae038c01f09a6e95b024c082a8ce77f802..dd769ab951c0a010ecb60fd54dd4da4672fbd09f 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/fetch-all-campuses.mjs b/scripts/fetch-all-campuses.mjs
+index c460183b168d5d2637a28076bc75f8f8384a19ec..4c75e1feb373ec1177adf2108bdb329816eb43b8 100644
+--- a/scripts/fetch-all-campuses.mjs
++++ b/scripts/fetch-all-campuses.mjs
+@@ -9,6 +9,7 @@
+ 
+ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+ import { parseFetchOptions } from './fetch-options.mjs';
++import { geometryToLinearRing } from './geojson-ring.mjs';
+ import { validateOverpassResponse } from './overpass-response.mjs';
+ 
+ const OVERPASS_ENDPOINTS = [
+@@ -105,13 +106,6 @@ async function queryOverpass(body) {
+   throw lastErr || new Error('All Overpass endpoints failed');
+ }
+ 
+-function wayToRing(el) {
+-  const coords = el.geometry.map((p) => [p.lon, p.lat]);
+-  const first = coords[0], last = coords[coords.length - 1];
+-  if (first[0] !== last[0] || first[1] !== last[1]) coords.push(first);
+-  return coords;
+-}
+-
+ async function fetchCollege(college) {
+   const { lat, lng, slug, name } = college;
+   const out = `data/buildings/${slug}.geojson`;
+@@ -132,10 +126,15 @@ out geom tags;`;
+   // Partition into buildings + context zones
+   const buildings = [];
+   const zones = [];
++  let invalidGeometry = 0;
+   for (const el of data.elements || []) {
+-    if (el.type !== 'way' || !el.geometry || el.geometry.length < 3) continue;
++    if (el.type !== 'way') continue;
++    const ring = geometryToLinearRing(el.geometry);
++    if (!ring) {
++      invalidGeometry++;
++      continue;
++    }
+     const tags = el.tags || {};
+-    const ring = wayToRing(el);
+     if (tags.building) {
+       buildings.push({ el, tags, ring });
+     } else if (tags.landuse || tags.amenity === 'university') {
+@@ -182,6 +181,9 @@ out geom tags;`;
+ 
+   const named = features.filter((f) => f.properties.name).length;
+   console.log(`  ✓ ${name}: ${features.length} buildings (${named} named) in ${dt}ms`);
++  if (invalidGeometry) {
++    console.warn(`  ! ${name}: skipped ${invalidGeometry} way(s) with invalid polygon geometry`);
++  }
+ }
+ 
+ // ─────────────────────────────────────────────────────────────
+diff --git a/scripts/geojson-ring.mjs b/scripts/geojson-ring.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..7eb34c16a7bd8361bcdf01b6a951f203a1509315
+--- /dev/null
++++ b/scripts/geojson-ring.mjs
+@@ -0,0 +1,28 @@
++export function geometryToLinearRing(geometry) {
++  if (!Array.isArray(geometry) || geometry.length < 3) return null;
++
++  const coordinates = [];
++  const distinct = new Set();
++  for (const point of geometry) {
++    if (
++      typeof point !== 'object' ||
++      point === null ||
++      !Number.isFinite(point.lon) ||
++      !Number.isFinite(point.lat)
++    ) {
++      return null;
++    }
++
++    coordinates.push([point.lon, point.lat]);
++    distinct.add(`${point.lon},${point.lat}`);
++  }
++
++  if (distinct.size < 3) return null;
++
++  const first = coordinates[0];
++  const last = coordinates[coordinates.length - 1];
++  if (first[0] !== last[0] || first[1] !== last[1]) {
++    coordinates.push([...first]);
++  }
++  return coordinates;
++}
+diff --git a/tests/geojson-ring.test.mjs b/tests/geojson-ring.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..894cfa97edfeede0a0d51f4494705be5b6177aa1
+--- /dev/null
++++ b/tests/geojson-ring.test.mjs
+@@ -0,0 +1,46 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { geometryToLinearRing } from '../scripts/geojson-ring.mjs';
++
++test('closes a valid open polygon ring', () => {
++  assert.deepEqual(geometryToLinearRing([
++    { lon: -71, lat: 42 },
++    { lon: -70, lat: 42 },
++    { lon: -70, lat: 43 },
++  ]), [
++    [-71, 42],
++    [-70, 42],
++    [-70, 43],
++    [-71, 42],
++  ]);
++});
++
++test('does not close an already closed ring twice', () => {
++  const ring = geometryToLinearRing([
++    { lon: 0, lat: 0 },
++    { lon: 1, lat: 0 },
++    { lon: 0, lat: 1 },
++    { lon: 0, lat: 0 },
++  ]);
++
++  assert.equal(ring?.length, 4);
++});
++
++test('rejects missing and non-finite coordinates', () => {
++  for (const geometry of [
++    [{ lon: 0, lat: 0 }, { lon: 1, lat: 0 }, { lon: 0 }],
++    [{ lon: 0, lat: 0 }, { lon: 1, lat: 0 }, { lon: Infinity, lat: 1 }],
++    [{ lon: 0, lat: 0 }, { lon: 1, lat: 0 }, null],
++  ]) {
++    assert.equal(geometryToLinearRing(geometry), null);
++  }
++});
++
++test('rejects rings without three distinct positions', () => {
++  assert.equal(geometryToLinearRing([
++    { lon: 0, lat: 0 },
++    { lon: 1, lat: 0 },
++    { lon: 0, lat: 0 },
++  ]), null);
++});

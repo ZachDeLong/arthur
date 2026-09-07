@@ -1,0 +1,193 @@
+diff --git a/scripts/atomic-write.mjs b/scripts/atomic-write.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..52a80d22a26ff0f188cfaed9b6d9afc2294b8dfc
+--- /dev/null
++++ b/scripts/atomic-write.mjs
+@@ -0,0 +1,34 @@
++import { randomUUID } from "node:crypto";
++import { rename, rm, writeFile } from "node:fs/promises";
++import { basename, dirname, join } from "node:path";
++
++const DEFAULT_FILE_OPERATIONS = { rename, rm, writeFile };
++
++/**
++ * Replace a file only after its complete contents have been written beside it.
++ * Keeping the temporary file in the destination directory makes the final
++ * rename atomic on the supported filesystems.
++ */
++export async function writeFileAtomic(
++    target,
++    contents,
++    encoding = "utf8",
++    fileOperations = DEFAULT_FILE_OPERATIONS
++) {
++    const temporary = join(
++        dirname(target),
++        `.${basename(target)}.${process.pid}.${randomUUID()}.tmp`
++    );
++
++    try {
++        await fileOperations.writeFile(temporary, contents, encoding);
++        await fileOperations.rename(temporary, target);
++    } catch (error) {
++        try {
++            await fileOperations.rm(temporary, { force: true });
++        } catch {
++            // Preserve the write/rename error that made the operation fail.
++        }
++        throw error;
++    }
++}
+diff --git a/scripts/build.mjs b/scripts/build.mjs
+index 4186d8a6be9c822dd2b49c9aa20051a212330912..0356e8ab666bdc15bb49d1cf035fd9ac740d0927 100644
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -4,10 +4,11 @@
+ // standalone reads plain .js files off disk, so the router has to be inlined
+ // ahead of time rather than at serve time.
+ 
+-import { readFile, writeFile, mkdir } from "node:fs/promises";
++import { readFile, mkdir } from "node:fs/promises";
+ import { fileURLToPath } from "node:url";
+ import { dirname, join } from "node:path";
+ import { buildMod } from "../server/serve-mod.mjs";
++import { writeFileAtomic } from "./atomic-write.mjs";
+ 
+ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+ const OUT_DIR = process.argv[2] ? process.argv[2] : join(ROOT, "dist");
+@@ -24,5 +25,5 @@ if (!built.includes("const METADATA")) throw new Error("no METADATA in the outpu
+ new Function(built); // parse check — catches syntax errors before the game does
+ 
+ await mkdir(OUT_DIR, { recursive: true });
+-await writeFile(OUT, built, "utf8");
++await writeFileAtomic(OUT, built);
+ console.log(`Wrote ${OUT} (${built.length} bytes)`);
+diff --git a/scripts/install-mod.mjs b/scripts/install-mod.mjs
+index c2daef6cb180411295a67632ec6d5706c40854f0..d4c58594a2f80da963de24543e90a36ef764cabc 100644
+--- a/scripts/install-mod.mjs
++++ b/scripts/install-mod.mjs
+@@ -3,10 +3,11 @@
+ // The standalone reads every .js in %APPDATA%/shapez.io/mods at startup
+ // (electron/index.js:27), so installing is just dropping the built file there.
+ 
+-import { readFile, writeFile, mkdir, access } from "node:fs/promises";
++import { readFile, mkdir, access } from "node:fs/promises";
+ import { fileURLToPath } from "node:url";
+ import { dirname, join } from "node:path";
+ import { buildMod } from "../server/serve-mod.mjs";
++import { writeFileAtomic } from "./atomic-write.mjs";
+ 
+ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+ 
+@@ -34,6 +35,6 @@ try {
+     await mkdir(dir, { recursive: true });
+ }
+ 
+-await writeFile(target, built, "utf8");
++await writeFileAtomic(target, built);
+ console.log(`Installed ${target} (${built.length} bytes)`);
+ console.log("\nRestart shapez to load it. Delete that file to uninstall.");
+diff --git a/scripts/test-all.mjs b/scripts/test-all.mjs
+index 3be78dbbfb431c409b90afc9b02d72b930ad747f..aa00a42d0e6487d28d0b064714820367b7d387ed 100644
+--- a/scripts/test-all.mjs
++++ b/scripts/test-all.mjs
+@@ -10,6 +10,7 @@ const SUITES = [
+     ["bridge protocol", "test-protocol.mjs"],
+     ["connect / port resolution", "test-connect.mjs"],
+     ["agent loop", "test-agent-loop.mjs"],
++    ["atomic file writes", "test-atomic-write.mjs"],
+ ];
+ 
+ let failed = 0;
+diff --git a/scripts/test-atomic-write.mjs b/scripts/test-atomic-write.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e2be9a357694710a5865a8be014602c97fab3c6a
+--- /dev/null
++++ b/scripts/test-atomic-write.mjs
+@@ -0,0 +1,86 @@
++import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { writeFileAtomic } from "./atomic-write.mjs";
++
++let failures = 0;
++let checks = 0;
++function check(name, condition, extra = "") {
++    checks++;
++    if (!condition) failures++;
++    console.log(`${condition ? "PASS" : "FAIL"}  ${name}${extra ? " — " + extra : ""}`);
++}
++
++const directory = await mkdtemp(join(tmpdir(), "shapez-agent-atomic-write-"));
++const target = join(directory, "agent-bridge.js");
++
++try {
++    await writeFile(target, "known-good", "utf8");
++    await writeFileAtomic(target, "complete-update");
++
++    check("complete writes replace the target", (await readFile(target, "utf8")) === "complete-update");
++    check(
++        "successful writes leave no temporary file",
++        (await readdir(directory)).every(name => !name.endsWith(".tmp"))
++    );
++
++    await writeFile(target, "known-good", "utf8");
++    const expected = new Error("simulated interrupted write");
++    const calls = [];
++    const interruptedOperations = {
++        async writeFile(path) {
++            calls.push(["write", path]);
++            throw expected;
++        },
++        async rename(from, to) {
++            calls.push(["rename", from, to]);
++        },
++        async rm(path, options) {
++            calls.push(["cleanup", path, options]);
++        },
++    };
++
++    let thrown;
++    try {
++        await writeFileAtomic(target, "partial-update", "utf8", interruptedOperations);
++    } catch (error) {
++        thrown = error;
++    }
++
++    check("interrupted writes report their original error", thrown === expected);
++    check("interrupted writes do not rename partial contents", !calls.some(([operation]) => operation === "rename"));
++    check("interrupted writes clean up their temporary file", calls.some(([operation]) => operation === "cleanup"));
++    check("interrupted writes preserve the installed mod", (await readFile(target, "utf8")) === "known-good");
++
++    const renameError = new Error("simulated failed replacement");
++    const renameOperations = {
++        async writeFile(path, contents, encoding) {
++            await writeFile(path, contents, encoding);
++        },
++        async rename() {
++            throw renameError;
++        },
++        async rm(path, options) {
++            await rm(path, options);
++        },
++    };
++
++    thrown = undefined;
++    try {
++        await writeFileAtomic(target, "complete-but-not-installed", "utf8", renameOperations);
++    } catch (error) {
++        thrown = error;
++    }
++
++    check("failed replacements report the rename error", thrown === renameError);
++    check("failed replacements preserve the installed mod", (await readFile(target, "utf8")) === "known-good");
++    check(
++        "failed replacements remove the completed temporary file",
++        (await readdir(directory)).every(name => !name.endsWith(".tmp"))
++    );
++} finally {
++    await rm(directory, { recursive: true, force: true });
++}
++
++console.log(`\n${checks} checks, ${failures} failures`);
++process.exit(failures ? 1 : 0);

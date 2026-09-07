@@ -1,0 +1,178 @@
+{
+  "env": {
+    "definedNames": [],
+    "filesFound": []
+  },
+  "packages": [
+    {
+      "declaredVersion": "^4.0.18",
+      "installed": true,
+      "installedManifest": {
+        "exports": {
+          ".": {
+            "import": {
+              "default": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            },
+            "require": {
+              "default": "./index.cjs",
+              "types": "./index.d.cts"
+            }
+          },
+          "./browser": {
+            "default": "./browser/context.js",
+            "types": "./browser/context.d.ts"
+          },
+          "./config": {
+            "default": "./dist/config.js",
+            "require": "./dist/config.cjs",
+            "types": "./config.d.ts"
+          },
+          "./coverage": {
+            "default": "./dist/coverage.js",
+            "types": "./coverage.d.ts"
+          },
+          "./environments": {
+            "default": "./dist/environments.js",
+            "types": "./dist/environments.d.ts"
+          },
+          "./globals": {
+            "types": "./globals.d.ts"
+          },
+          "./import-meta": {
+            "types": "./import-meta.d.ts"
+          },
+          "./importMeta": {
+            "types": "./importMeta.d.ts"
+          },
+          "./internal/browser": {
+            "default": "./dist/browser.js",
+            "types": "./dist/browser.d.ts"
+          },
+          "./internal/module-runner": {
+            "default": "./dist/module-runner.js",
+            "types": "./dist/module-runner.d.ts"
+          },
+          "./jsdom": {
+            "types": "./jsdom.d.ts"
+          },
+          "./mocker": {
+            "default": "./dist/mocker.js",
+            "types": "./dist/mocker.d.ts"
+          },
+          "./node": {
+            "default": "./dist/node.js",
+            "types": "./dist/node.d.ts"
+          },
+          "./optional-types.js": {
+            "types": "./optional-types.d.ts"
+          },
+          "./package.json": "./package.json",
+          "./reporters": {
+            "default": "./dist/reporters.js",
+            "types": "./dist/reporters.d.ts"
+          },
+          "./runners": {
+            "default": "./dist/runners.js",
+            "types": "./dist/runners.d.ts"
+          },
+          "./snapshot": {
+            "default": "./dist/snapshot.js",
+            "types": "./dist/snapshot.d.ts"
+          },
+          "./src/*": "./src/*",
+          "./suite": {
+            "default": "./dist/suite.js",
+            "types": "./dist/suite.d.ts"
+          },
+          "./worker": {
+            "default": "./dist/worker.js",
+            "types": "./worker.d.ts"
+          }
+        },
+        "main": "./dist/index.js",
+        "module": "./dist/index.js",
+        "name": "vitest",
+        "types": "./dist/index.d.ts",
+        "version": "4.0.18"
+      },
+      "packageName": "vitest"
+    },
+    {
+      "declaredVersion": "^4.3.6",
+      "installed": true,
+      "installedManifest": {
+        "exports": {
+          ".": {
+            "@zod/source": "./src/index.ts",
+            "import": "./index.js",
+            "require": "./index.cjs",
+            "types": "./index.d.cts"
+          },
+          "./locales": {
+            "@zod/source": "./src/locales/index.ts",
+            "import": "./locales/index.js",
+            "require": "./locales/index.cjs",
+            "types": "./locales/index.d.cts"
+          },
+          "./mini": {
+            "@zod/source": "./src/mini/index.ts",
+            "import": "./mini/index.js",
+            "require": "./mini/index.cjs",
+            "types": "./mini/index.d.cts"
+          },
+          "./package.json": "./package.json",
+          "./v3": {
+            "@zod/source": "./src/v3/index.ts",
+            "import": "./v3/index.js",
+            "require": "./v3/index.cjs",
+            "types": "./v3/index.d.cts"
+          },
+          "./v4": {
+            "@zod/source": "./src/v4/index.ts",
+            "import": "./v4/index.js",
+            "require": "./v4/index.cjs",
+            "types": "./v4/index.d.cts"
+          },
+          "./v4-mini": {
+            "@zod/source": "./src/v4-mini/index.ts",
+            "import": "./v4-mini/index.js",
+            "require": "./v4-mini/index.cjs",
+            "types": "./v4-mini/index.d.cts"
+          },
+          "./v4/core": {
+            "@zod/source": "./src/v4/core/index.ts",
+            "import": "./v4/core/index.js",
+            "require": "./v4/core/index.cjs",
+            "types": "./v4/core/index.d.cts"
+          },
+          "./v4/locales": {
+            "@zod/source": "./src/v4/locales/index.ts",
+            "import": "./v4/locales/index.js",
+            "require": "./v4/locales/index.cjs",
+            "types": "./v4/locales/index.d.cts"
+          },
+          "./v4/locales/*": {
+            "@zod/source": "./src/v4/locales/*",
+            "import": "./v4/locales/*",
+            "require": "./v4/locales/*",
+            "types": "./v4/locales/*"
+          },
+          "./v4/mini": {
+            "@zod/source": "./src/v4/mini/index.ts",
+            "import": "./v4/mini/index.js",
+            "require": "./v4/mini/index.cjs",
+            "types": "./v4/mini/index.d.cts"
+          }
+        },
+        "main": "./index.cjs",
+        "module": "./index.js",
+        "name": "zod",
+        "types": "./index.d.cts",
+        "version": "4.3.6"
+      },
+      "packageName": "zod"
+    }
+  ],
+  "routes": []
+}

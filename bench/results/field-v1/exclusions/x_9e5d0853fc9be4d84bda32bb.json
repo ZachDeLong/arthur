@@ -1,0 +1,9 @@
+{
+  "baseCommit": "9196ad0fda14695dc82813578d0ef0ea18fb4c72",
+  "candidateId": "x_9e5d0853fc9be4d84bda32bb",
+  "note": "Agent-authored CSV export fix changed only Python source and tests; collector rejected it before prediction.",
+  "reason": "no_javascript_or_typescript_change",
+  "recordedAt": "2026-09-07T09:06:54.796Z",
+  "repositoryId": "ai-reasoning-hub",
+  "resultCommit": "8a5adbda921a3bca5047f371844da395b2df1e24"
+}

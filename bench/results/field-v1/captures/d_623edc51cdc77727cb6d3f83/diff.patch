@@ -1,0 +1,45 @@
+diff --git a/src/store/taskStore.test.ts b/src/store/taskStore.test.ts
+index 23ff143692a4f616122935678cc9031bb36e37bb..6ed7da15af9d668d70615b6217e6e16880abf2d9 100644
+--- a/src/store/taskStore.test.ts
++++ b/src/store/taskStore.test.ts
+@@ -36,7 +36,7 @@ describe('taskStore', () => {
+         source: 'manual',
+         completed: false,
+       })
+-      expect(tasks[0].id).toMatch(/^manual-\d+$/)
++      expect(tasks[0].id).toMatch(/^manual-[0-9a-f-]{36}$/)
+     })
+ 
+     it('adds a task with due date and custom course', () => {
+@@ -51,6 +51,18 @@ describe('taskStore', () => {
+         courseName: 'Math',
+       })
+     })
++
++    it('keeps IDs unique when tasks are created in the same millisecond', () => {
++      const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
++      const { addManualTask } = useTaskStore.getState()
++
++      addManualTask('First task', null)
++      addManualTask('Second task', null)
++
++      const ids = useTaskStore.getState().tasks.map(task => task.id)
++      expect(new Set(ids).size).toBe(2)
++      now.mockRestore()
++    })
+   })
+ 
+   describe('toggleComplete', () => {
+diff --git a/src/store/taskStore.ts b/src/store/taskStore.ts
+index b08c274ba672bd333c941161bc5e82cb1620bf7c..48d5f1800a8d963af8eb052ed1861eed9f64207f 100644
+--- a/src/store/taskStore.ts
++++ b/src/store/taskStore.ts
+@@ -103,7 +103,7 @@ export const useTaskStore = create<TaskStore>()(
+ 
+       addManualTask: (title, dueDate, courseName = 'Personal') => set((state) => ({
+         tasks: [...state.tasks, {
+-          id: `manual-${Date.now()}`,
++          id: `manual-${crypto.randomUUID()}`,
+           title,
+           dueDate,
+           courseName,

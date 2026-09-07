@@ -1,0 +1,38 @@
+{
+  "agentEvidence": "Current Codex task transcript; Codex implemented and verified commit 9196ad0fda14695dc82813578d0ef0ea18fb4c72",
+  "agentTool": "Codex",
+  "baseCommit": "b7b2a36a29918eec98e6fe01e81cab5cc0bca3fe",
+  "capturedAt": "2026-09-07T08:32:39.774Z",
+  "caseCount": 1,
+  "changedPaths": [
+    "frontend/package-lock.json",
+    "frontend/package.json",
+    "frontend/src/App.tsx",
+    "frontend/src/hooks/useBookmarks.ts",
+    "frontend/src/hooks/useReadingLists.ts",
+    "frontend/src/utils/index.ts",
+    "frontend/src/utils/storage.test.ts",
+    "frontend/src/utils/storage.ts"
+  ],
+  "changeId": "d_dbd35e6465da6e1c71c3aa33",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/ai-reasoning-hub/tree/codex/recover-corrupt-local-storage",
+  "rawDiffSha256": "980448b12bced8017b05dbe05532e66c238e444dad1ed6bebbcabf458c14099b",
+  "relevantSourcePaths": [
+    "frontend/src/App.tsx",
+    "frontend/src/hooks/useBookmarks.ts",
+    "frontend/src/hooks/useReadingLists.ts",
+    "frontend/src/utils/index.ts",
+    "frontend/src/utils/storage.test.ts",
+    "frontend/src/utils/storage.ts"
+  ],
+  "repositoryId": "ai-reasoning-hub",
+  "resultCommit": "9196ad0fda14695dc82813578d0ef0ea18fb4c72",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "980448b12bced8017b05dbe05532e66c238e444dad1ed6bebbcabf458c14099b",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

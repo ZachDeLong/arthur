@@ -1,0 +1,18 @@
+{
+  "captureIndexSha256": "f39d20f3ee412e0f319a1cd3102c7e7bd2df441b53e4cd37fe7278ce4e1a22c0",
+  "caseIdsSha256": "4b458a70b1730f1fc5a106059477a0a4b30e78dff564029061415e9c3f8f419e",
+  "closedAt": "2026-09-07T21:21:17.797Z",
+  "comparatorRequest": {
+    "model": "claude-sonnet-5",
+    "pricing": {
+      "inputUsdPerMillion": 2,
+      "outputUsdPerMillion": 10,
+      "source": "Anthropic Claude API pricing and model versioning docs, accessed 2026-09-07: https://platform.claude.com/docs/en/about-claude/pricing ; https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions"
+    },
+    "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+    "provider": "anthropic"
+  },
+  "exclusionsSha256": "a8ebfe42294b1c5e0569c559cc6d4d10be35c9fff1161e924d6262ca95e5ba9d",
+  "schemaVersion": 1,
+  "studyId": "field-v1"
+}

@@ -1,0 +1,34 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 76c19834ce752b840a1bc4bbf6cc19f05b5e1f71",
+  "agentTool": "Codex",
+  "baseCommit": "961489f979acf8b89c309cbd776dc56fdac46edc",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_21e761a58a2c53e5047b0f0a",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/benchbro/tree/codex/fix-run-detail-contract",
+  "rawDiffSha256": "79e9deb6131ed7ce6a68bf8e26b4c53fa14a088b167a06b65f4f94d22c5a4f9a",
+  "relevantSourcePaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/Results.tsx",
+    "src/benchbro/static/assets/index-BAbJmBiX.js"
+  ],
+  "repositoryId": "benchbro",
+  "resultCommit": "76c19834ce752b840a1bc4bbf6cc19f05b5e1f71",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T20:42:40.148Z",
+  "standardTools": [
+    {
+      "command": "py -m pytest -q",
+      "kind": "test",
+      "name": "pytest"
+    },
+    {
+      "command": "npm run build --prefix frontend",
+      "kind": "compiler",
+      "name": "frontend"
+    }
+  ],
+  "studyId": "field-v1"
+}

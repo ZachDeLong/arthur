@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 539.2588999999998,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:53:17.480Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ replaces an existing JSON file only after the new contents are complete (10.7838ms)\n✔ preserves the cached file and removes the temporary file when replacement fails (6.9986ms)\n✔ loads and validates a campus FeatureCollection (24.8717ms)\n✔ times out a campus request so a later load can retry (15.2022ms)\n✔ treats only a 404 as definitively missing campus data (0.3858ms)\n✔ throws on transient HTTP failures so the caller can retry (0.3302ms)\n✔ throws on malformed successful responses instead of caching a false miss (0.5772ms)\n✔ parses force and explicit campus targets (1.3348ms)\n✔ uses every available campus when no slug is specified (0.1597ms)\n✔ rejects unknown options before enrichment starts (0.5894ms)\n✔ rejects missing campus files instead of reporting success (62.28ms)\n✔ uses all campuses by default (1.2107ms)\n✔ parses the supported options in either order (0.192ms)\n✔ rejects missing, non-numeric, zero, and negative limits (0.3017ms)\n✔ rejects unsafe, repeated, and unknown options (0.0889ms)\n✔ passes request options and an abort signal to fetch (0.8302ms)\n✔ aborts a request that exceeds its deadline (11.3866ms)\n✔ rejects invalid deadlines before starting a request (0.2139ms)\n✔ closes a valid open polygon ring (1.1986ms)\n✔ does not close an already closed ring twice (0.1606ms)\n✔ rejects missing and non-finite coordinates (0.1567ms)\n✔ rejects rings without three distinct positions (0.0774ms)\n✔ accepts a normal Overpass payload, including an empty result (0.6236ms)\n✔ rejects HTTP-200 error remarks so the caller retries (0.4246ms)\n✔ rejects malformed payloads instead of treating them as empty data (0.2139ms)\n✔ returns parsed JSON and sends the project user agent (1.0567ms)\n✔ times out a Wikipedia request instead of stalling the enrichment run (26.0382ms)\n✔ treats a 404 as a definitive missing resource (0.2115ms)\n✔ throws on transient HTTP failures so callers can retry (0.1577ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.1275ms)\n✔ accepts a specific campus building with college evidence (1.1354ms)\n✔ rejects an unrelated building with the same name (0.2573ms)\n✔ rejects a person whose name contains the building name (0.6882ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1087ms)\n✔ matches short college names as words instead of substrings (0.0679ms)\n✔ accepts a college acronym derived from its full name (0.0701ms)\n✔ does not infer the college from a shared word in the building name (0.0712ms)\n✔ still accepts an explicit single-token college phrase (0.0539ms)\nℹ tests 38\nℹ suites 0\nℹ pass 38\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 173.4421\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 790.6559000000002,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:53:18.020Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/atomic-json-write.mjs && node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/fetch-timeout.js && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

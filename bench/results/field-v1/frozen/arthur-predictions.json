@@ -1,0 +1,89 @@
+[
+  {
+    "caseId": "c_00375cc3678c0f23e67154bd",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_2072a3929f4c718d83b473de",
+    "findingId": "92f9fe38",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_2130f4d93b33ed99218161c1",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_2947d44da97f1de10c7f8352",
+    "findingId": "03eb0e3f",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_323d1cd1dc3cd16ae53403ac",
+    "findingId": "97cc8044",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_4b93bf33685a2f6020e0bf67",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_5c274160247f2bb6a2735a22",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_66368da4645ca52d8436d47b",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+    "findingId": "0c9a042a",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_76f8dbc5196839bf7c4e6745",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_84404ca18f825a00998f3753",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_9766ef6250c4d053eeab5fbe",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_9807a485e8aed74c2529df2a",
+    "findingId": "efcecb3a",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_a78efe3a9f582c27a63ef203",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_adf02e5337e84e4d12ae28a9",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+    "findingId": "c56204cb",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_ca844fa0c54fa565ea518ea0",
+    "outcome": "clean"
+  },
+  {
+    "caseId": "c_e93ebe77d3edecffbb4cb4b3",
+    "findingId": "6f480b34",
+    "outcome": "error"
+  },
+  {
+    "caseId": "c_ee5133685fce407dc00233a5",
+    "outcome": "clean"
+  }
+]

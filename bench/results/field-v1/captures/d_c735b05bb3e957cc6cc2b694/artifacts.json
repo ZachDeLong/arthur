@@ -1,0 +1,46 @@
+{
+  "aggregateSha256": "63da6d96ec2f11cd668853978011815e4e06205c2d238c1d175632a146f9fea4",
+  "files": [
+    {
+      "bytes": 2212,
+      "path": "arthur.json",
+      "sha256": "6eaf4a94bd1afa619dfaf9fa361e1c67fbca1598b8f80b2709a8362f876ddd5b"
+    },
+    {
+      "bytes": 98,
+      "path": "contracts.json",
+      "sha256": "4df92ccb7f2753a82d4b15330f371e2d2f5bce5924aa23fcdb3a11f560f5c4c1"
+    },
+    {
+      "bytes": 14101,
+      "path": "diff.patch",
+      "sha256": "8a323d4ea171727b8bdfc1604be81968ba3eba3902c658324bb45f3a7e63279b"
+    },
+    {
+      "bytes": 3,
+      "path": "inventory.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "bytes": 1239,
+      "path": "metadata.json",
+      "sha256": "6bca1f8ca1078eb2195958fc82ca9a8ab451242118c05f7dd7e82e37154ca246"
+    },
+    {
+      "bytes": 215570,
+      "path": "project-artifacts.json",
+      "sha256": "276af1c3ca22619eb4426706e85f353a270506d5a09db590c3666ad42e30ee2d"
+    },
+    {
+      "bytes": 33681,
+      "path": "sources.json",
+      "sha256": "2a9d9386b04712cd64327066aaae5e50b292958b5d75dd7b58c598132b67c6be"
+    },
+    {
+      "bytes": 2369,
+      "path": "tools.json",
+      "sha256": "cac761e0bb43046ac68040ae38eb365e77c8c5879e8280dc8a57c19e41ded165"
+    }
+  ],
+  "schemaVersion": 1
+}

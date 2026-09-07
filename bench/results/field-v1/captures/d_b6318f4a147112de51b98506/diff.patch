@@ -1,0 +1,136 @@
+diff --git a/index.html b/index.html
+index 780aaa7521121704e584b1ee444bf648f6d73214..1120076cc877bd643a2855af4ef1fcb4fdd78433 100644
+--- a/index.html
++++ b/index.html
+@@ -360,7 +360,9 @@
+     </div>
+   </div>
+ 
+-  <script>
++  <script type="module">
++    import { fetchCampusFeatureCollection } from './scripts/campus-fetch.js';
++
+     // ────────────────────────────────────────────────────────────────
+     // College data — same structure as before
+     // ────────────────────────────────────────────────────────────────
+@@ -520,19 +522,12 @@
+ 
+       const p = (async () => {
+         try {
+-          const res = await fetch(`./data/buildings/${slug}.geojson`, { cache: 'no-cache' });
+-          if (!res.ok) {
+-            console.warn(`No campus data for ${slug} (${res.status})`);
+-            campusCache.set(slug, null);
+-            return null;
+-          }
+-          const fc = await res.json();
++          const fc = await fetchCampusFeatureCollection(`./data/buildings/${slug}.geojson`);
+           campusCache.set(slug, fc);
+           return fc;
+         } catch (err) {
+           console.warn(`Failed to load campus ${slug}:`, err);
+-          campusCache.set(slug, null);
+-          return null;
++          return undefined;
+         } finally {
+           campusInflight.delete(slug);
+         }
+@@ -583,7 +578,14 @@
+       const fc = await loadCampusData(nearest);
+       if (myToken !== updateToken) return; // stale
+ 
+-      if (!fc) {
++      if (fc === undefined) {
++        source.setData({ type: 'FeatureCollection', features: [] });
++        showStatus(`Couldn't load ${nearest.name}; move away and back to retry`);
++        activeCampusSlug = null;
++        return;
++      }
++
++      if (fc === null) {
+         source.setData({ type: 'FeatureCollection', features: [] });
+         showStatus(`No campus data yet for ${nearest.name}`);
+         activeCampusSlug = null;
+diff --git a/package.json b/package.json
+index bfb4cc2e5d6dfc549dacc8ffbe553b1fe9d93236..0fb039f5f83a36e48655bf1ca0a906d427702d88 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/campus-fetch.js b/scripts/campus-fetch.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c0498300446dbfcb542aa09d8550750437437d4
+--- /dev/null
++++ b/scripts/campus-fetch.js
+@@ -0,0 +1,17 @@
++export async function fetchCampusFeatureCollection(url, fetchImpl = fetch) {
++  const response = await fetchImpl(url, { cache: 'no-cache' });
++  if (response.status === 404) return null;
++  if (!response.ok) {
++    throw new Error(`HTTP ${response.status} fetching ${url}`);
++  }
++
++  const featureCollection = await response.json();
++  if (
++    !featureCollection ||
++    featureCollection.type !== 'FeatureCollection' ||
++    !Array.isArray(featureCollection.features)
++  ) {
++    throw new Error(`Invalid campus GeoJSON from ${url}`);
++  }
++  return featureCollection;
++}
+diff --git a/tests/campus-fetch.test.mjs b/tests/campus-fetch.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3c953bb78a48e80cd01a36694d277a00365881c
+--- /dev/null
++++ b/tests/campus-fetch.test.mjs
+@@ -0,0 +1,41 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { fetchCampusFeatureCollection } from '../scripts/campus-fetch.js';
++
++test('loads and validates a campus FeatureCollection', async () => {
++  const expected = { type: 'FeatureCollection', features: [] };
++  const fetchMock = async (_url, options) => {
++    assert.deepEqual(options, { cache: 'no-cache' });
++    return new Response(JSON.stringify(expected), {
++      status: 200,
++      headers: { 'Content-Type': 'application/json' },
++    });
++  };
++
++  assert.deepEqual(await fetchCampusFeatureCollection('/campus.geojson', fetchMock), expected);
++});
++
++test('treats only a 404 as definitively missing campus data', async () => {
++  const fetchMock = async () => new Response('missing', { status: 404 });
++  assert.equal(await fetchCampusFeatureCollection('/missing.geojson', fetchMock), null);
++});
++
++test('throws on transient HTTP failures so the caller can retry', async () => {
++  const fetchMock = async () => new Response('unavailable', { status: 503 });
++  await assert.rejects(
++    fetchCampusFeatureCollection('/campus.geojson', fetchMock),
++    /HTTP 503/,
++  );
++});
++
++test('throws on malformed successful responses instead of caching a false miss', async () => {
++  const fetchMock = async () => new Response('{"features":{}}', {
++    status: 200,
++    headers: { 'Content-Type': 'application/json' },
++  });
++  await assert.rejects(
++    fetchCampusFeatureCollection('/campus.geojson', fetchMock),
++    /Invalid campus GeoJSON/,
++  );
++});

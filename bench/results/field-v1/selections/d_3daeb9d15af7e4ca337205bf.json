@@ -1,0 +1,33 @@
+{
+  "agentEvidence": "Current Codex task transcript; Codex implemented and verified commit a2063fba3aeefd3d071ada2ad43810efba28a263",
+  "agentTool": "Codex",
+  "baseCommit": "26125e9d19942ae82b380fae977dc826b57470e6",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_3daeb9d15af7e4ca337205bf",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/shapez-agent/tree/codex/fix-bridge-reconnect-race",
+  "rawDiffSha256": "0b74a30094af5c16ae2c05a05c04a22dc6488dd512263c9c58b2f083574ade34",
+  "relevantSourcePaths": [
+    "scripts/test-protocol.mjs",
+    "server/bridge-server.mjs"
+  ],
+  "repositoryId": "shapez-agent",
+  "resultCommit": "a2063fba3aeefd3d071ada2ad43810efba28a263",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T08:38:38.719Z",
+  "standardTools": [
+    {
+      "command": "npm test",
+      "kind": "test",
+      "name": "all"
+    },
+    {
+      "command": "npm run build",
+      "kind": "compiler",
+      "name": "build"
+    }
+  ],
+  "studyId": "field-v1"
+}

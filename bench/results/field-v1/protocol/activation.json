@@ -1,0 +1,17 @@
+{
+  "protocolVersion": 1,
+  "activationCommit": "2d914e5e41637726dbb440dda4aed47ea148febb",
+  "activatedAt": "2026-09-06T22:34:56-07:00",
+  "branch": "codex/arthur-validation-reset",
+  "protocolSha256": "59908655a1a74d27bcf499ebfc204c8f6de87e55932ca49c31549098f1d3da95",
+  "studyPlanSha256": "34ebb8c706f61cb1f72201610858658c038e7d746b9477f6ed85885c99d5c7a8",
+  "checkerBuildSha256": "ebd920ecee65504abe59a4c188e1820dba128f23a58100b64c24a48b8f76ecd1",
+  "checkerBuildInputs": [
+    "src/analysis",
+    "src/diff",
+    "src/config/arthur-check.ts",
+    "src/config/manager.ts",
+    "src/config/schema.ts",
+    "package-lock.json"
+  ]
+}

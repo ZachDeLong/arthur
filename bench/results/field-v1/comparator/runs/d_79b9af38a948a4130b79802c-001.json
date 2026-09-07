@@ -1,0 +1,25 @@
+{
+  "batchInputSha256": "c621c923b22f198445f2fa0ca14289812c6fa96dc824fbcd167448a9ab2f8c0d",
+  "durationMs": 1904.9328000000023,
+  "inputTokens": 893,
+  "model": "claude-sonnet-5",
+  "outputTokens": 137,
+  "predictions": [
+    {
+      "caseId": "c_84404ca18f825a00998f3753",
+      "predictedInvalid": false,
+      "reason": "No route contract violations listed; empty contract provides no basis for invalidity."
+    },
+    {
+      "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+      "predictedInvalid": true,
+      "reason": "Contract states react package is not installed, so import is invalid."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_c1c8eaf8d2c7b56cce115b31\",\"predictedInvalid\":true,\"reason\":\"Contract states react package is not installed, so import is invalid.\"},{\"caseId\":\"c_84404ca18f825a00998f3753\",\"predictedInvalid\":false,\"reason\":\"No route contract violations listed; empty contract provides no basis for invalidity.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnCgwxA4D1Ub5aQj4VN",
+  "system": "anthropic/claude-sonnet-5"
+}

@@ -1,0 +1,76 @@
+[
+  {
+    "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+    "changeId": "d_5566a5369c5039114000271a",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import { sanitizePersistedSettings } from './settingsValidation'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 39,
+      "endColumn": 45,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/settingsValidation.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "c67975dee8fc4c93f9b492b79f98ac92d3e705f91d92701c2be4428e178298d0",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_66368da4645ca52d8436d47b",
+    "changeId": "d_5566a5369c5039114000271a",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { z } from 'zod'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "export interface CanvasInstance {"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 20,
+      "endColumn": 23,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/settingsValidation.ts"
+    },
+    "raw": "zod",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "2bf0fa6f41c5f80162dcef39c25abd91d2307d6a920c55e689354ba7103f8992",
+    "target": "zod"
+  }
+]

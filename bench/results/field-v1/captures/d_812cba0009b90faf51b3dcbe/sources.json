@@ -1,0 +1,42 @@
+[
+  {
+    "changedLines": [
+      64
+    ],
+    "content": "// Conservative matching for Wikipedia search results. Explicit OSM wikipedia and\n// wikidata tags bypass this heuristic because those references are authoritative.\n\nconst PLACE_WORDS = /\\b(building|tower|hall|library|centre|center|stadium|union|church|cathedral|chapel|museum|garden|pavilion|wing|annex|dormitory|residence|hospital|arena|auditorium|theatre|theater|campus|quadrangle|quad|laboratory|observatory|gymnasium|complex|institute|gallery|lab|mall|structure|facility|bridge|statue|memorial|monument|park|plaza|school|academy)\\b/i;\n\nconst NON_PLACE_DESCRIPTORS = /\\b(politician|businessman|businesswoman|entrepreneur|philanthropist|artist|painter|sculptor|author|writer|novelist|journalist|director|architect|professor|scientist|physicist|mathematician|chemist|biologist|economist|musician|singer|actor|actress|judge|lawyer|philosopher|theologian|athlete|football|basketball|baseball|tennis|boxer|olympian|coach|cardinal|horse|farm|ranch|film|movie|novel|song|album|character|species|ship|aircraft|vehicle|company|corporation|organization|foundation|fraternity|sorority|band|team|faction)\\b/i;\n\nconst GENERIC_COLLEGE_WORDS = new Set([\n  'university', 'college', 'institute', 'school', 'the', 'of', 'at',\n]);\nconst ACRONYM_STOP_WORDS = new Set(['the', 'of', 'at']);\n\nconst GENERIC_BUILDING_WORDS = new Set([\n  'academy', 'annex', 'arena', 'auditorium', 'building', 'campus',\n  'cathedral', 'center', 'centre', 'chapel', 'church', 'complex',\n  'dormitory', 'facility', 'gallery', 'garden', 'gymnasium', 'hall',\n  'hospital', 'house', 'institute', 'laboratory', 'library', 'mall',\n  'memorial', 'museum', 'observatory', 'park', 'pavilion', 'plaza',\n  'quadrangle', 'residence', 'school', 'stadium', 'structure', 'theater',\n  'theatre', 'tower', 'union', 'wing',\n]);\n\nfunction normalize(value) {\n  return String(value || '')\n    .toLocaleLowerCase('en-US')\n    .replace(/[_\\p{P}\\p{S}]+/gu, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction includesPhrase(text, phrase) {\n  return phrase.length > 0 && ` ${text} `.includes(` ${phrase} `);\n}\n\n// Is this search result about a specific building on this college's campus?\nexport function isRelevantMatch(summary, buildingName, collegeName) {\n  const title = normalize(summary.title);\n  const extract = normalize(summary.extract);\n  const description = normalize(summary.description);\n  const normalizedBuilding = normalize(buildingName);\n  const normalizedCollege = normalize(collegeName);\n\n  if (NON_PLACE_DESCRIPTORS.test(description)) return false;\n  if (title === normalizedCollege) return false;\n\n  const looksLikePlace =\n    PLACE_WORDS.test(title) ||\n    PLACE_WORDS.test(description) ||\n    /\\b(is a building|is an academic|was built|was completed|was constructed|was designed|is located on|is housed in|is the main|opened in)\\b/i.test(extract.slice(0, 400));\n  if (!looksLikePlace) return false;\n\n  const articleText = `${title} ${description} ${extract}`;\n  const articleWords = new Set(articleText.split(' ').filter(Boolean));\n  const collegeTokens = normalizedCollege\n    .split(' ')\n    .filter((word) => word.length > 2 && !GENERIC_COLLEGE_WORDS.has(word));\n  const collegeInitials = normalizedCollege\n    .split(' ')\n    .filter((word) => word.length > 0 && !ACRONYM_STOP_WORDS.has(word))\n    .map((word) => word[0])\n    .join('');\n  const collegeMentioned =\n    includesPhrase(articleText, normalizedCollege) ||\n    (collegeTokens.length >= 2 && collegeTokens.every((word) => articleWords.has(word))) ||\n    (collegeInitials.length >= 3 && articleWords.has(collegeInitials));\n  if (!collegeMentioned) return false;\n\n  const titleWords = new Set(title.split(' ').filter(Boolean));\n  const distinctiveBuildingTokens = normalizedBuilding\n    .split(' ')\n    .filter((word) => word.length > 3 && !GENERIC_BUILDING_WORDS.has(word));\n  const exactBuildingMention =\n    includesPhrase(title, normalizedBuilding) ||\n    includesPhrase(extract, normalizedBuilding);\n  const titleHasDistinctiveToken = distinctiveBuildingTokens.some((word) =>\n    titleWords.has(word)\n  );\n\n  return exactBuildingMention || titleHasDistinctiveToken;\n}\n",
+    "path": "scripts/wikipedia-match.mjs",
+    "redactionCount": 0,
+    "status": "modified"
+  },
+  {
+    "changedLines": [
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90
+    ],
+    "content": "import assert from 'node:assert/strict';\nimport test from 'node:test';\n\nimport { isRelevantMatch } from '../scripts/wikipedia-match.mjs';\n\ntest('accepts a specific campus building with college evidence', () => {\n  const summary = {\n    title: 'Hoover Tower',\n    description: '285-foot structure on the campus of Stanford University',\n    extract: 'Hoover Tower is a structure on the campus of Stanford University.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Hoover Tower', 'Stanford University'), true);\n});\n\ntest('rejects an unrelated building with the same name', () => {\n  const summary = {\n    title: 'Murray House',\n    description: 'Building in Stanley, Hong Kong',\n    extract: 'Murray House is a Victorian-era building in Stanley, Hong Kong.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Murray House', 'Stanford University'), false);\n});\n\ntest('rejects a person whose name contains the building name', () => {\n  const summary = {\n    title: 'Jesús Huerta de Soto',\n    description: 'Spanish economist of the Austrian School',\n    extract: 'Jesús Huerta de Soto is a professor in Madrid, Spain.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Soto', 'Stanford University'), false);\n});\n\ntest('rejects a generic building name matched to a different campus landmark', () => {\n  const summary = {\n    title: 'Hoover Tower',\n    description: 'Tower on the campus of Stanford University',\n    extract: 'Hoover Tower is located at Stanford University.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Tower Building', 'Stanford University'), false);\n});\n\ntest('matches short college names as words instead of substrings', () => {\n  const summary = {\n    title: 'Committee Hall',\n    description: 'Academic building',\n    extract: 'Committee Hall is the main building for a regional committee.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Committee Hall', 'MIT'), false);\n});\n\ntest('accepts a college acronym derived from its full name', () => {\n  const summary = {\n    title: 'Great Dome',\n    description: 'Academic building at MIT',\n    extract: 'The Great Dome is a landmark on the MIT campus.',\n  };\n\n  assert.equal(\n    isRelevantMatch(summary, 'Great Dome', 'Massachusetts Institute of Technology'),\n    true\n  );\n});\n\ntest('does not infer the college from a shared word in the building name', () => {\n  const summary = {\n    title: 'Washington Hall',\n    description: 'Academic building at the University of Notre Dame',\n    extract: 'Washington Hall is a historic campus building at the University of Notre Dame.',\n  };\n\n  assert.equal(\n    isRelevantMatch(summary, 'Washington Hall', 'University of Washington'),\n    false\n  );\n});\n\ntest('still accepts an explicit single-token college phrase', () => {\n  const summary = {\n    title: 'Washington Hall',\n    description: 'Academic building at Stanford',\n    extract: 'Washington Hall is located on the Stanford campus.',\n  };\n\n  assert.equal(isRelevantMatch(summary, 'Washington Hall', 'Stanford'), true);\n});\n",
+    "path": "tests/wikipedia-match.test.mjs",
+    "redactionCount": 0,
+    "status": "modified"
+  }
+]

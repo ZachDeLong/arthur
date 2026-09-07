@@ -1,0 +1,162 @@
+diff --git a/package.json b/package.json
+index c2d2e4ccc68df4c6c056e1569f0ff1b6765e0ced..c4af1dce0ae0172d00ef2ab4ca173fa9c25c3047 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs",
++    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/enrich-campuses.mjs b/scripts/enrich-campuses.mjs
+index f92afbdd9b8493d6272b3fa82674e01adb6d5354..585b3d9c95ad583d8c693e1199104847f819b4d9 100644
+--- a/scripts/enrich-campuses.mjs
++++ b/scripts/enrich-campuses.mjs
+@@ -10,6 +10,7 @@
+ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+ import path from 'node:path';
+ import { isRelevantMatch } from './wikipedia-match.mjs';
++import { fetchJSON } from './wiki-fetch.mjs';
+ 
+ const CONCURRENCY = 4;
+ const BATCH_DIR = 'data/buildings';
+@@ -76,14 +77,6 @@ const COLLEGE_NAME = {
+   'university-of-alaska-fairbanks': 'University of Alaska Fairbanks',
+ };
+ 
+-const UA = 'usa-college-map/1.0 (https://github.com/Counselor-Sophie/usa-college-map)';
+-
+-async function fetchJSON(url) {
+-  const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'application/json' } });
+-  if (!res.ok) return null;
+-  return await res.json();
+-}
+-
+ function extractWikipediaTitle(tags) {
+   if (typeof tags.wikipedia !== 'string') return null;
+   const parts = tags.wikipedia.split(':');
+@@ -198,20 +191,26 @@ async function enrichCampus(slug, force) {
+ 
+   const WIKI_FIELDS = ['wikiTitle','wikiDescription','wikiExtract','wikiUrl','wikiPhoto','wikiBuilt','wikiHeight'];
+   let succeeded = 0;
++  let retryableFailures = 0;
+   let idx = 0;
+   const workers = Array.from({ length: CONCURRENCY }, () => (async () => {
+     while (idx < toEnrich.length) {
+       const feature = toEnrich[idx++];
+-      // Strip any stale wiki fields first so a now-rejected match gets cleared.
+-      for (const k of WIKI_FIELDS) delete feature.properties[k];
+       try {
+         const enrichment = await enrichBuilding(feature, collegeName);
+         if (enrichment) {
++          // Only replace cached data after a definitive response. A transient
++          // failure should not destroy the last known-good enrichment.
++          for (const k of WIKI_FIELDS) delete feature.properties[k];
++          delete feature.properties._wikiTried;
+           Object.assign(feature.properties, enrichment);
+           if (enrichment.wikiTitle) succeeded++;
+         }
+-      } catch (err) {
+-        feature.properties._wikiTried = true;
++      } catch {
++        // Network/API failures are not evidence that no article exists. Keep
++        // cached data, but remove the marker so a normal future run retries.
++        delete feature.properties._wikiTried;
++        retryableFailures++;
+       }
+     }
+   })());
+@@ -219,6 +218,9 @@ async function enrichCampus(slug, force) {
+ 
+   writeFileSync(file, JSON.stringify(data));
+   console.log(`  ✓ ${slug}: ${succeeded}/${toEnrich.length} buildings matched a Wikipedia article`);
++  if (retryableFailures) {
++    console.warn(`  ! ${slug}: ${retryableFailures} transient failure(s) left unmarked for retry`);
++  }
+ }
+ 
+ async function main() {
+diff --git a/scripts/wiki-fetch.mjs b/scripts/wiki-fetch.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e356d26966324458fea8fc0b4a55a419dfbf3f5
+--- /dev/null
++++ b/scripts/wiki-fetch.mjs
+@@ -0,0 +1,18 @@
++const USER_AGENT = 'usa-college-map/1.0 (https://github.com/Counselor-Sophie/usa-college-map)';
++
++export async function fetchJSON(url, fetchImpl = fetch) {
++  const response = await fetchImpl(url, {
++    headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' },
++  });
++
++  if (response.status === 404) return null;
++  if (!response.ok) {
++    throw new Error(`HTTP ${response.status} fetching ${url}`);
++  }
++
++  try {
++    return await response.json();
++  } catch (cause) {
++    throw new Error(`Invalid JSON fetching ${url}`, { cause });
++  }
++}
+diff --git a/tests/wiki-fetch.test.mjs b/tests/wiki-fetch.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..fae525b82be950f8ba6b3321e69a2015ec6fb1b6
+--- /dev/null
++++ b/tests/wiki-fetch.test.mjs
+@@ -0,0 +1,51 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { fetchJSON } from '../scripts/wiki-fetch.mjs';
++
++test('returns parsed JSON and sends the project user agent', async () => {
++  let requestOptions;
++  const result = await fetchJSON('https://example.test/data', async (_url, options) => {
++    requestOptions = options;
++    return {
++      ok: true,
++      status: 200,
++      json: async () => ({ found: true }),
++    };
++  });
++
++  assert.deepEqual(result, { found: true });
++  assert.match(requestOptions.headers['User-Agent'], /usa-college-map/);
++  assert.equal(requestOptions.headers.Accept, 'application/json');
++});
++
++test('treats a 404 as a definitive missing resource', async () => {
++  const result = await fetchJSON('https://example.test/missing', async () => ({
++    ok: false,
++    status: 404,
++  }));
++
++  assert.equal(result, null);
++});
++
++test('throws on transient HTTP failures so callers can retry', async () => {
++  await assert.rejects(
++    fetchJSON('https://example.test/limited', async () => ({ ok: false, status: 429 })),
++    /HTTP 429/
++  );
++  await assert.rejects(
++    fetchJSON('https://example.test/unavailable', async () => ({ ok: false, status: 503 })),
++    /HTTP 503/
++  );
++});
++
++test('throws on malformed JSON so callers do not cache a false miss', async () => {
++  await assert.rejects(
++    fetchJSON('https://example.test/broken', async () => ({
++      ok: true,
++      status: 200,
++      json: async () => { throw new SyntaxError('Unexpected token'); },
++    })),
++    /Invalid JSON/
++  );
++});

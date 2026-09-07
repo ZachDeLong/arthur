@@ -1,0 +1,94 @@
+diff --git a/api/canvas.js b/api/canvas.js
+index 9f7760fe1ef9ad4b5fcf2774ffa411e47495d327..bfea71078533816f13fb74c48f03a91f5b35c347 100644
+--- a/api/canvas.js
++++ b/api/canvas.js
+@@ -72,10 +72,20 @@ export default async function handler(req) {
+       headers['Authorization'] = authHeader
+     }
+ 
+-    const canvasRes = await fetch(canvasUrl, {
++    const contentType = req.headers.get('content-type')
++    if (contentType) {
++      headers['Content-Type'] = contentType
++    }
++
++    const fetchOptions = {
+       method: req.method,
+       headers,
+-    })
++    }
++    if (req.method !== 'GET' && req.method !== 'HEAD') {
++      fetchOptions.body = await req.arrayBuffer()
++    }
++
++    const canvasRes = await fetch(canvasUrl, fetchOptions)
+ 
+     const data = await canvasRes.text()
+ 
+diff --git a/api/canvas.test.js b/api/canvas.test.js
+index 5a57d1c0989778b65df4e9323460c301d3a59cb4..182dd3acac8de6a52ec2b9c0051ad16d40dd309c 100644
+--- a/api/canvas.test.js
++++ b/api/canvas.test.js
+@@ -1,15 +1,20 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import handler, { normalizeCanvasHost } from './canvas.js'
+ 
+-function requestFor(host) {
+-  return {
+-    method: 'GET',
+-    url: 'https://checklist.example/api/canvas/courses?enrollment_state=active',
+-    headers: new Headers({
+-      'Authorization': 'Bearer test-token',
+-      'X-Canvas-Host': host,
+-    }),
+-  }
++function requestFor(host, options = {}) {
++  const method = options.method ?? 'GET'
++  return new Request(
++    'https://checklist.example/api/canvas/courses?enrollment_state=active',
++    {
++      method,
++      body: options.body,
++      headers: {
++        'Authorization': 'Bearer test-token',
++        'X-Canvas-Host': host,
++        ...(options.contentType ? { 'Content-Type': options.contentType } : {}),
++      },
++    },
++  )
+ }
+ 
+ afterEach(() => {
+@@ -65,5 +70,32 @@ describe('Canvas proxy', () => {
+       'https://ivc-new.instructure.com/api/v1/courses?enrollment_state=active',
+       expect.objectContaining({ method: 'GET' }),
+     )
++    expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('body')
++  })
++
++  it('forwards mutation bodies and their content type', async () => {
++    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', {
++      status: 200,
++      headers: { 'Content-Type': 'application/json' },
++    }))
++    vi.stubGlobal('fetch', fetchMock)
++
++    const payload = JSON.stringify({ comment: { text_comment: 'Done' } })
++    const response = await handler(requestFor('school.instructure.com', {
++      method: 'POST',
++      body: payload,
++      contentType: 'application/json',
++    }))
++
++    expect(response.status).toBe(200)
++    const [, options] = fetchMock.mock.calls[0]
++    expect(options).toMatchObject({
++      method: 'POST',
++      headers: expect.objectContaining({
++        'Authorization': 'Bearer test-token',
++        'Content-Type': 'application/json',
++      }),
++    })
++    expect(new TextDecoder().decode(options.body)).toBe(payload)
+   })
+ })

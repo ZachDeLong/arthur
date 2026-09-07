@@ -1,0 +1,184 @@
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 644b0d0a8d7c08b0db42afea73222ca768ca4dc1..a78af3f1c9b4ef9d7826eed40e93a91a90ccb902 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -7,6 +7,8 @@ import {
+   buildQueryString,
+   getScoreColor,
+   fetchBibtex,
++  fetchCategories,
++  fetchPapers,
+   parseMinScoreParam,
+   parsePageParam,
+   parseSortParam,
+@@ -274,21 +276,29 @@ function App() {
+   const [totalPages, setTotalPages] = useState(1);
+   const [resultsCount, setResultsCount] = useState(0);
+   const [isLoading, setIsLoading] = useState(true);
++  const [papersError, setPapersError] = useState<string | null>(null);
++  const [reloadAttempt, setReloadAttempt] = useState(0);
+ 
+   useEffect(() => {
+-    fetch('/api/categories')
+-      .then(res => res.json())
++    const controller = new AbortController();
++    fetchCategories(controller.signal)
+       .then(data => setAllCategories(data))
+-      .catch(err => console.error("Failed to fetch categories:", err));
++      .catch(err => {
++        if (!(err instanceof Error && err.name === 'AbortError')) {
++          console.error("Failed to fetch categories:", err);
++        }
++      });
++    return () => controller.abort();
+   }, []);
+ 
+   useEffect(() => {
++    const controller = new AbortController();
+     setIsLoading(true);
++    setPapersError(null);
+     const queryString = buildQueryString(filters, currentPage);
+ 
+     const timer = setTimeout(() => {
+-      fetch(`/api/papers?${queryString}`)
+-        .then(res => res.json())
++      fetchPapers(queryString, controller.signal)
+         .then(data => {
+           const lastPage = Math.max(0, data.total_pages - 1);
+           if (currentPage > lastPage) {
+@@ -301,13 +311,17 @@ function App() {
+           setIsLoading(false);
+         })
+         .catch(err => {
+-          console.error("Failed to fetch papers:", err);
++          if (err instanceof Error && err.name === 'AbortError') return;
++          setPapersError(err instanceof Error ? err.message : 'Failed to fetch papers');
+           setIsLoading(false);
+         });
+     }, 10);
+ 
+-    return () => clearTimeout(timer);
+-  }, [filters, currentPage]);
++    return () => {
++      clearTimeout(timer);
++      controller.abort();
++    };
++  }, [filters, currentPage, reloadAttempt]);
+ 
+   const pageResetKey = JSON.stringify({
+     ...filters,
+@@ -410,7 +424,20 @@ function App() {
+           )}
+         </div>
+ 
+-        {isLoading ? (
++        {papersError ? (
++          <div
++            role="alert"
++            className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 text-center dark:border-red-900 dark:bg-red-950/30"
++          >
++            <p className="text-sm text-red-700 dark:text-red-300">{papersError}</p>
++            <button
++              onClick={() => setReloadAttempt(attempt => attempt + 1)}
++              className="rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
++            >
++              Retry
++            </button>
++          </div>
++        ) : isLoading ? (
+           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+             {[...Array(9)].map((_, i) => <SkeletonCard key={i} />)}
+           </div>
+@@ -441,7 +468,7 @@ function App() {
+           </div>
+         )}
+ 
+-        {totalPages > 1 && !isLoading && (
++        {totalPages > 1 && !isLoading && !papersError && (
+           <div className="flex justify-center gap-4 mt-6 pt-4 border-t border-stone-200 dark:border-stone-800">
+             <button
+               onClick={() => handlePageChange(currentPage - 1)}
+diff --git a/frontend/src/utils/api.test.ts b/frontend/src/utils/api.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..be4981b2f90bd14a9a69b03bbe9a8c9ba614ba0f
+--- /dev/null
++++ b/frontend/src/utils/api.test.ts
+@@ -0,0 +1,51 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++
++import { fetchCategories, fetchPapers } from './api';
++
++afterEach(() => {
++  vi.unstubAllGlobals();
++});
++
++describe('fetchPapers', () => {
++  it('forwards an abort signal and parses a successful response', async () => {
++    const controller = new AbortController();
++    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
++      papers: [],
++      total_pages: 1,
++      results_count: 0,
++    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
++    vi.stubGlobal('fetch', fetchMock);
++
++    await expect(fetchPapers('page=2', controller.signal)).resolves.toMatchObject({
++      total_pages: 1,
++    });
++    expect(fetchMock).toHaveBeenCalledWith('/api/papers?page=2', {
++      signal: controller.signal,
++    });
++  });
++
++  it('rejects HTTP failures instead of parsing them as paper data', async () => {
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
++      JSON.stringify({ error: 'database unavailable' }),
++      { status: 503, headers: { 'Content-Type': 'application/json' } },
++    )));
++
++    await expect(fetchPapers('page=0')).rejects.toThrow('Failed to fetch papers');
++  });
++});
++
++describe('fetchCategories', () => {
++  it('forwards cancellation to category requests', async () => {
++    const controller = new AbortController();
++    const fetchMock = vi.fn().mockResolvedValue(new Response('[]', {
++      status: 200,
++      headers: { 'Content-Type': 'application/json' },
++    }));
++    vi.stubGlobal('fetch', fetchMock);
++
++    await expect(fetchCategories(controller.signal)).resolves.toEqual([]);
++    expect(fetchMock).toHaveBeenCalledWith('/api/categories', {
++      signal: controller.signal,
++    });
++  });
++});
+diff --git a/frontend/src/utils/api.ts b/frontend/src/utils/api.ts
+index 83b07e4d11e868485025717568c8ab87e6abb7b7..332c30eeb245d57daa604cb73993933cdc6fd5b1 100644
+--- a/frontend/src/utils/api.ts
++++ b/frontend/src/utils/api.ts
+@@ -1,15 +1,18 @@
+ import type { PapersResponse, StatsResponse } from '@/types';
+ 
+-export const fetchPapers = async (queryString: string): Promise<PapersResponse> => {
+-  const response = await fetch(`/api/papers?${queryString}`);
++export const fetchPapers = async (
++  queryString: string,
++  signal?: AbortSignal,
++): Promise<PapersResponse> => {
++  const response = await fetch(`/api/papers?${queryString}`, { signal });
+   if (!response.ok) {
+     throw new Error('Failed to fetch papers');
+   }
+   return response.json();
+ };
+ 
+-export const fetchCategories = async (): Promise<string[]> => {
+-  const response = await fetch('/api/categories');
++export const fetchCategories = async (signal?: AbortSignal): Promise<string[]> => {
++  const response = await fetch('/api/categories', { signal });
+   if (!response.ok) {
+     throw new Error('Failed to fetch categories');
+   }

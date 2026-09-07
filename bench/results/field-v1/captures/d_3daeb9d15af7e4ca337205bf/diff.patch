@@ -1,0 +1,108 @@
+diff --git a/scripts/test-protocol.mjs b/scripts/test-protocol.mjs
+index 0bbdfbc734bb252bfcc271e6ee512fc0b48d7da6..1fc68563b11f5553c4c8500ed0577747d012eea7 100644
+--- a/scripts/test-protocol.mjs
++++ b/scripts/test-protocol.mjs
+@@ -144,6 +144,29 @@ try {
+ check("send callback failure rejects with its cause", callbackSendRejected);
+ check("send callback failure clears pending state", callbackBridge.pending.size === 0);
+ 
++// --- connection waiters settle and release their timers ---
++const timeoutBridge = new GameBridge({ log: () => {} });
++let connectTimedOut = false;
++try {
++    await timeoutBridge.waitForGame(5);
++} catch (ex) {
++    connectTimedOut = ex.message.includes("No game connected");
++}
++check("connection wait timeout rejects", connectTimedOut);
++check("timed-out connection waiter is removed", timeoutBridge.waitingForConnect.size === 0);
++
++const stoppedBridge = new GameBridge({ log: () => {} });
++const stoppedWaiter = stoppedBridge.waitForGame(5000);
++stoppedBridge.stop();
++let stopRejectedWaiter = false;
++try {
++    await stoppedWaiter;
++} catch (ex) {
++    stopRejectedWaiter = ex.message.includes("Bridge stopped");
++}
++check("stopping the bridge rejects connection waiters", stopRejectedWaiter);
++check("stopping the bridge removes connection waiters", stoppedBridge.waitingForConnect.size === 0);
++
+ // --- disconnect fails in-flight calls instead of hanging ---
+ const inflight = bridge.call("observe", {}, 5000);
+ game.terminate();
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index 69ffb08bee4b58d8b539cc858e0b90b78d55a784..80e662c4817fbd82c00f8dcaae13b028a53151c8 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -17,7 +17,8 @@ export class GameBridge {
+         this.nextId = 1;
+         /** @type {Map<number, {resolve: Function, reject: Function, timer: any}>} */
+         this.pending = new Map();
+-        this.waitingForConnect = [];
++        /** @type {Set<{resolve: Function, reject: Function, timer: any}>} */
++        this.waitingForConnect = new Set();
+         this.server = null;
+     }
+ 
+@@ -39,9 +40,12 @@ export class GameBridge {
+         this.socket = socket;
+         this.log("[bridge] game connected");
+ 
+-        const waiters = this.waitingForConnect;
+-        this.waitingForConnect = [];
+-        for (const resolve of waiters) resolve();
++        const waiters = [...this.waitingForConnect];
++        this.waitingForConnect.clear();
++        for (const waiter of waiters) {
++            clearTimeout(waiter.timer);
++            waiter.resolve();
++        }
+ 
+         socket.on("message", raw => this.onMessage(raw));
+         socket.on("close", () => {
+@@ -57,6 +61,7 @@ export class GameBridge {
+ 
+     stop() {
+         this.failAllPending(new Error("Bridge stopped"));
++        this.failAllConnectWaiters(new Error("Bridge stopped"));
+         if (this.socket) this.socket.terminate();
+         if (this.server) this.server.close();
+     }
+@@ -65,14 +70,12 @@ export class GameBridge {
+     waitForGame(timeoutMs = 120_000) {
+         if (this.socket) return Promise.resolve();
+         return new Promise((resolve, reject) => {
+-            const timer = setTimeout(
+-                () => reject(new Error(`No game connected after ${timeoutMs}ms`)),
+-                timeoutMs
+-            );
+-            this.waitingForConnect.push(() => {
+-                clearTimeout(timer);
+-                resolve();
+-            });
++            const waiter = { resolve, reject, timer: null };
++            waiter.timer = setTimeout(() => {
++                this.waitingForConnect.delete(waiter);
++                reject(new Error(`No game connected after ${timeoutMs}ms`));
++            }, timeoutMs);
++            this.waitingForConnect.add(waiter);
+         });
+     }
+ 
+@@ -135,6 +138,14 @@ export class GameBridge {
+         this.pending.clear();
+     }
+ 
++    failAllConnectWaiters(error) {
++        for (const waiter of this.waitingForConnect) {
++            clearTimeout(waiter.timer);
++            waiter.reject(error);
++        }
++        this.waitingForConnect.clear();
++    }
++
+     /**
+      * Sends an RPC request to the game and resolves with its result.
+      * `run` can legitimately take a while, so give it a longer timeout.

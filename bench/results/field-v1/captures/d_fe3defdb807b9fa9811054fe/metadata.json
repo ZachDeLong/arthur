@@ -1,0 +1,31 @@
+{
+  "agentEvidence": "User-directed Codex task; change committed as 581c0726520274aa4a10110ae7615b0e01b9b931",
+  "agentTool": "Codex",
+  "baseCommit": "3e43bd74afdd6b4d18b100c8fd4e21b56f99ff92",
+  "capturedAt": "2026-09-07T07:01:14.930Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/Results.tsx",
+    "src/benchbro/static/assets/index-DneIeDvx.js",
+    "src/benchbro/static/index.html"
+  ],
+  "changeId": "d_fe3defdb807b9fa9811054fe",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/benchbro",
+  "rawDiffSha256": "336c6c8b3861a4813006ffd9e6bd798680399ee7e51c9579d886b98203853728",
+  "relevantSourcePaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/Results.tsx",
+    "src/benchbro/static/assets/index-DneIeDvx.js"
+  ],
+  "repositoryId": "benchbro",
+  "resultCommit": "581c0726520274aa4a10110ae7615b0e01b9b931",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "336c6c8b3861a4813006ffd9e6bd798680399ee7e51c9579d886b98203853728",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

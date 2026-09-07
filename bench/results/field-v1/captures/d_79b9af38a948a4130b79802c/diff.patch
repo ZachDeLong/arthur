@@ -1,0 +1,447 @@
+diff --git a/app.py b/app.py
+index 65405be1ec636e777cad23edec218a3228fa19c2..102a619e36aa313d91a7a60698f8583d806700d7 100644
+--- a/app.py
++++ b/app.py
+@@ -75,6 +75,7 @@ ALLOWED_SORT_OPTIONS = {
+ 
+ # Strict arxiv ID pattern (e.g., 2401.12345 or 2401.12345v1)
+ ARXIV_ID_PATTERN = re.compile(r'^\d{4}\.\d{4,5}(v\d+)?$')
++MAX_READING_LIST_PAPERS = 500
+ 
+ def load_rows(
+     search: str = "",
+@@ -229,6 +230,40 @@ def get_papers():
+     )
+     return jsonify(data)
+ 
++@app.route('/api/papers/by-arxiv-ids', methods=['POST'])
++@limiter.limit(RATE_LIMIT_PAPERS)
++def get_papers_by_arxiv_ids():
++    """Fetch complete paper records for locally saved reading-list IDs."""
++    payload = request.get_json(silent=True)
++    arxiv_ids = payload.get('arxiv_ids') if isinstance(payload, dict) else None
++    if not isinstance(arxiv_ids, list):
++        return jsonify({"error": "arxiv_ids must be an array"}), 400
++    if len(arxiv_ids) > MAX_READING_LIST_PAPERS:
++        return jsonify({"error": f"At most {MAX_READING_LIST_PAPERS} arxiv_ids are allowed"}), 400
++    if any(not isinstance(arxiv_id, str) or not arxiv_id or len(arxiv_id) > 64 for arxiv_id in arxiv_ids):
++        return jsonify({"error": "arxiv_ids must contain non-empty strings of at most 64 characters"}), 400
++
++    unique_ids = list(dict.fromkeys(arxiv_ids))
++    if not unique_ids:
++        return jsonify({"papers": []})
++
++    placeholders = ','.join('?' for _ in unique_ids)
++    with get_db_connection() as conn:
++        rows = conn.execute(f"""
++            SELECT
++              id, COALESCE(arxiv_id, '') AS arxiv_id, title, authors, date,
++              COALESCE(reasoning_category, '') AS reasoning_category,
++              arxiv_link, COALESCE(tldr, '') AS tldr,
++              COALESCE(summary_md, '') AS summary_md,
++              COALESCE(excitement_score, 0) AS excitement_score,
++              COALESCE(excitement_reasoning, '') AS excitement_reasoning,
++              COALESCE(score_breakdown, '') AS score_breakdown,
++              COALESCE(last_scored_at, '') AS last_scored_at
++            FROM papers
++            WHERE arxiv_id IN ({placeholders})
++        """, unique_ids).fetchall()
++    return jsonify({"papers": [dict(row) for row in rows]})
++
+ @app.route('/api/papers/stats')
+ @limiter.limit(RATE_LIMIT_AUTHOR_COUNTS)
+ def get_papers_stats():
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 24eb682bfd4fca4b4dab47d0be858fddfaeb23ff..7e3fce9312fce047477e280c5690c9d81bf2f952 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -237,7 +237,7 @@ function App() {
+   const [activePage, setActivePage] = useState<NavItemId>('papers');
+   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+-  const [expandedId, setExpandedId] = useState<number | null>(null);
++  const [expandedPaper, setExpandedPaper] = useState<Paper | null>(null);
+ 
+   const { bookmarks, toggleBookmark, isBookmarked, clearBookmarks } = useBookmarks();
+   const { readingLists, addToList, removeFromList, getListForPaper, getListNames, getListCount, clearLists } = useReadingLists();
+@@ -382,7 +382,7 @@ function App() {
+           case 'Enter':
+             e.preventDefault();
+             if (paper) {
+-              setExpandedId(expandedId === paper.id ? null : paper.id);
++              setExpandedPaper(expandedPaper?.id === paper.id ? null : paper);
+             }
+             break;
+           case 's':
+@@ -399,14 +399,14 @@ function App() {
+             break;
+           case 'Escape':
+             e.preventDefault();
+-            setExpandedId(null);
++            setExpandedPaper(null);
+             break;
+         }
+       };
+ 
+       window.addEventListener('keydown', handleKeyDown);
+       return () => window.removeEventListener('keydown', handleKeyDown);
+-    }, [focusedIndex, filteredPapers, expandedId]);
++    }, [focusedIndex, filteredPapers, expandedPaper]);
+ 
+     useEffect(() => {
+       setFocusedIndex(0);
+@@ -468,7 +468,7 @@ function App() {
+                     onSelectList={addToList}
+                     isFocused={index === focusedIndex}
+                     onSelect={() => setFocusedIndex(index)}
+-                    onToggleExpand={() => setExpandedId(paper.id)}
++                    onToggleExpand={() => setExpandedPaper(paper)}
+                   />
+                 </div>
+               ))}
+@@ -700,9 +700,8 @@ function App() {
+             {activePage === 'lists' && (
+               <ReadingListsPage
+                 readingLists={readingLists}
+-                papers={papers}
+                 onRemoveFromList={removeFromList}
+-                onExpandPaper={(id) => setExpandedId(id)}
++                onExpandPaper={setExpandedPaper}
+               />
+             )}
+ 
+@@ -810,18 +809,15 @@ function App() {
+       <div className="md:hidden h-16" />
+ 
+       {/* Global Paper Detail Modal */}
+-      {expandedId && (() => {
+-        const expandedPaper = papers.find(p => p.id === expandedId);
+-        if (!expandedPaper) return null;
+-        return (
++      {expandedPaper && (
+           <div className="fixed inset-0 z-50 overflow-y-auto">
+             <div
+               className="fixed inset-0 bg-black/70"
+-              onClick={() => setExpandedId(null)}
++              onClick={() => setExpandedPaper(null)}
+             />
+             <div
+               className="relative min-h-screen flex items-start justify-center p-4 pt-12"
+-              onClick={() => setExpandedId(null)}
++              onClick={() => setExpandedPaper(null)}
+             >
+               <div
+                 className="relative w-full max-w-6xl bg-white dark:bg-stone-900 rounded-xl shadow-2xl animate-fade-in overflow-hidden"
+@@ -850,7 +846,7 @@ function App() {
+                       <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{expandedPaper.authors}</p>
+                     </div>
+                     <button
+-                      onClick={() => setExpandedId(null)}
++                      onClick={() => setExpandedPaper(null)}
+                       className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+                     >
+                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+@@ -934,8 +930,7 @@ function App() {
+               </div>
+             </div>
+           </div>
+-        );
+-      })()}
++      )}
+     </div>
+   );
+ }
+diff --git a/frontend/src/pages/ReadingListsPage.tsx b/frontend/src/pages/ReadingListsPage.tsx
+index 638f7cb67fdd53969b6504095862adc486e62844..bf494561a7eecd3e19b9dbc89c37cf80f6526741 100644
+--- a/frontend/src/pages/ReadingListsPage.tsx
++++ b/frontend/src/pages/ReadingListsPage.tsx
+@@ -1,24 +1,60 @@
+-import { useState, type FC } from 'react';
++import { useEffect, useMemo, useState, type FC } from 'react';
+ import type { Paper } from '@/types';
+ import type { ReadingLists } from '@/hooks';
+-import { getScoreColor } from '@/utils';
++import { fetchPapersByArxivIds, getScoreColor } from '@/utils';
+ 
+ interface ReadingListsPageProps {
+   readingLists: ReadingLists;
+-  papers: Paper[];
+   onRemoveFromList: (arxivId: string, listName: string) => void;
+-  onExpandPaper: (paperId: number) => void;
++  onExpandPaper: (paper: Paper) => void;
+ }
+ 
+ export const ReadingListsPage: FC<ReadingListsPageProps> = ({
+   readingLists,
+-  papers,
+   onRemoveFromList,
+   onExpandPaper,
+ }) => {
+   const [activeList, setActiveList] = useState(Object.keys(readingLists)[0] || 'To Read');
++  const [papersByArxivId, setPapersByArxivId] = useState<Record<string, Paper>>({});
++  const [isLoading, setIsLoading] = useState(false);
++  const [loadError, setLoadError] = useState<string | null>(null);
++  const [retryAttempt, setRetryAttempt] = useState(0);
+ 
+-  const getPaperById = (arxivId: string) => papers.find(p => p.arxiv_id === arxivId);
++  const savedPaperIds = useMemo(
++    () => [...new Set(Object.values(readingLists).flat())],
++    [readingLists],
++  );
++
++  useEffect(() => {
++    if (savedPaperIds.length === 0) {
++      setPapersByArxivId({});
++      setLoadError(null);
++      setIsLoading(false);
++      return;
++    }
++
++    const controller = new AbortController();
++    setIsLoading(true);
++    setLoadError(null);
++    fetchPapersByArxivIds(savedPaperIds, controller.signal)
++      .then(fetchedPapers => {
++        setPapersByArxivId(Object.fromEntries(
++          fetchedPapers.map(paper => [paper.arxiv_id, paper]),
++        ));
++      })
++      .catch(error => {
++        if (error instanceof DOMException && error.name === 'AbortError') return;
++        setLoadError('Could not load your saved papers.');
++      })
++      .finally(() => {
++        if (!controller.signal.aborted) setIsLoading(false);
++      });
++
++    return () => controller.abort();
++  }, [savedPaperIds, retryAttempt]);
++
++  const activePaperIds = readingLists[activeList] ?? [];
++  const hasLoadedPapers = Object.keys(papersByArxivId).length > 0;
+ 
+   return (
+     <div className="max-w-4xl mx-auto px-4 py-4">
+@@ -46,21 +82,51 @@ export const ReadingListsPage: FC<ReadingListsPageProps> = ({
+       </div>
+ 
+       <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+-        {readingLists[activeList]?.length === 0 ? (
++        {activePaperIds.length === 0 ? (
+           <div className="p-12 text-center">
+             <p className="text-stone-500 dark:text-stone-400">No papers in this list yet</p>
+             <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">
+               Add papers from the Papers tab
+             </p>
+           </div>
++        ) : isLoading && !hasLoadedPapers ? (
++          <div className="p-12 text-center text-stone-500 dark:text-stone-400">
++            Loading saved papers…
++          </div>
++        ) : loadError && !hasLoadedPapers ? (
++          <div role="alert" className="p-12 text-center">
++            <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
++            <button
++              onClick={() => setRetryAttempt(attempt => attempt + 1)}
++              className="mt-3 rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
++            >
++              Retry
++            </button>
++          </div>
+         ) : (
+-          readingLists[activeList]?.map(arxivId => {
+-            const paper = getPaperById(arxivId);
+-            if (!paper) return null;
++          activePaperIds.map(arxivId => {
++            const paper = papersByArxivId[arxivId];
++            if (!paper) {
++              return (
++                <div key={arxivId} className="flex items-center justify-between gap-4 p-4 border-b border-stone-100 dark:border-stone-800 last:border-b-0">
++                  <div className="min-w-0">
++                    <p className="font-medium text-stone-700 dark:text-stone-300">{arxivId}</p>
++                    <p className="text-sm text-stone-500 dark:text-stone-400">Paper details are no longer available</p>
++                  </div>
++                  <button
++                    onClick={() => onRemoveFromList(arxivId, activeList)}
++                    className="p-1.5 text-stone-400 hover:text-red-500 transition-colors"
++                    title="Remove from list"
++                  >
++                    ✕
++                  </button>
++                </div>
++              );
++            }
+             return (
+               <div
+                 key={arxivId}
+-                onClick={() => onExpandPaper(paper.id)}
++                onClick={() => onExpandPaper(paper)}
+                 className="p-4 border-b border-stone-100 dark:border-stone-800 last:border-b-0 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors cursor-pointer"
+               >
+                 <div className="flex items-start justify-between gap-4">
+diff --git a/frontend/src/utils/api.test.ts b/frontend/src/utils/api.test.ts
+index e845bda0420e433b4bd7bf005ca155edcbea5eb9..24c19837e8bdf0478d3e82faf02a981afe454ac0 100644
+--- a/frontend/src/utils/api.test.ts
++++ b/frontend/src/utils/api.test.ts
+@@ -1,6 +1,6 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ 
+-import { fetchCategories, fetchPapers, fetchStats, parseStatsResponse } from './api';
++import { fetchCategories, fetchPapers, fetchPapersByArxivIds, fetchStats, parseStatsResponse } from './api';
+ 
+ const statsPaper = {
+   id: 1,
+@@ -13,6 +13,15 @@ const statsPaper = {
+   score_breakdown: 'Novelty: 2, Utility: 1, Results: 2, Access: 1',
+ };
+ 
++const fullPaper = {
++  ...statsPaper,
++  arxiv_id: '2609.00001',
++  tldr: 'Short summary',
++  summary_md: 'Long summary',
++  excitement_reasoning: 'Promising work',
++  last_scored_at: '2026-09-07T12:00:00Z',
++};
++
+ afterEach(() => {
+   vi.unstubAllGlobals();
+ });
+@@ -45,6 +54,33 @@ describe('fetchPapers', () => {
+   });
+ });
+ 
++describe('fetchPapersByArxivIds', () => {
++  it('posts saved IDs and forwards cancellation', async () => {
++    const controller = new AbortController();
++    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
++      papers: [fullPaper],
++    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
++    vi.stubGlobal('fetch', fetchMock);
++
++    await expect(fetchPapersByArxivIds(['2609.00001'], controller.signal)).resolves.toEqual([fullPaper]);
++    expect(fetchMock).toHaveBeenCalledWith('/api/papers/by-arxiv-ids', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ arxiv_ids: ['2609.00001'] }),
++      signal: controller.signal,
++    });
++  });
++
++  it('rejects malformed successful responses', async () => {
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', {
++      status: 200,
++      headers: { 'Content-Type': 'application/json' },
++    })));
++
++    await expect(fetchPapersByArxivIds(['2609.00001'])).rejects.toThrow('Invalid reading-list response');
++  });
++});
++
+ describe('fetchCategories', () => {
+   it('forwards cancellation to category requests', async () => {
+     const controller = new AbortController();
+diff --git a/frontend/src/utils/api.ts b/frontend/src/utils/api.ts
+index 14cb6548b5f975850e630864b7a6b6692db85093..2b0d13ea2813d20496f5992e278aebecbb93c2ac 100644
+--- a/frontend/src/utils/api.ts
++++ b/frontend/src/utils/api.ts
+@@ -1,4 +1,4 @@
+-import type { PapersResponse, StatsPaper, StatsResponse } from '@/types';
++import type { Paper, PapersResponse, StatsPaper, StatsResponse } from '@/types';
+ 
+ const isRecord = (value: unknown): value is Record<string, unknown> =>
+   typeof value === 'object' && value !== null && !Array.isArray(value);
+@@ -42,6 +42,27 @@ export const fetchPapers = async (
+   return response.json();
+ };
+ 
++export const fetchPapersByArxivIds = async (
++  arxivIds: string[],
++  signal?: AbortSignal,
++): Promise<Paper[]> => {
++  const response = await fetch('/api/papers/by-arxiv-ids', {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({ arxiv_ids: arxivIds }),
++    signal,
++  });
++  if (!response.ok) {
++    throw new Error('Failed to fetch reading-list papers');
++  }
++
++  const value: unknown = await response.json();
++  if (!isRecord(value) || !Array.isArray(value.papers)) {
++    throw new Error('Invalid reading-list response');
++  }
++  return value.papers as Paper[];
++};
++
+ export const fetchCategories = async (signal?: AbortSignal): Promise<string[]> => {
+   const response = await fetch('/api/categories', { signal });
+   if (!response.ok) {
+diff --git a/tests/test_api.py b/tests/test_api.py
+index 87527cddfd1e7fed38573e608faf8c354ee80983..489e02d37630822041d7d3e8ff3ba7ff860fb8f5 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -63,6 +63,62 @@ class TestPapersEndpoint:
+         assert response.status_code == 200
+ 
+ 
++class TestReadingListPapersEndpoint:
++    """Tests for fetching complete records behind locally saved IDs."""
++
++    def test_returns_only_requested_papers(self, client, tmp_path, monkeypatch):
++        database_path = tmp_path / 'papers.db'
++        with app_module.sqlite3.connect(database_path) as conn:
++            conn.execute("""
++                CREATE TABLE papers (
++                    id INTEGER PRIMARY KEY,
++                    arxiv_id TEXT,
++                    title TEXT,
++                    authors TEXT,
++                    date TEXT,
++                    reasoning_category TEXT,
++                    arxiv_link TEXT,
++                    tldr TEXT,
++                    summary_md TEXT,
++                    excitement_score INTEGER,
++                    excitement_reasoning TEXT,
++                    score_breakdown TEXT,
++                    last_scored_at TEXT
++                )
++            """)
++            conn.executemany(
++                """
++                INSERT INTO papers (
++                    id, arxiv_id, title, authors, date, reasoning_category,
++                    arxiv_link, tldr, summary_md, excitement_score,
++                    excitement_reasoning, score_breakdown, last_scored_at
++                ) VALUES (?, ?, ?, ?, '', '', '', '', '', 0, '', '', '')
++                """,
++                [
++                    (1, '2609.00001', 'Saved paper', 'Ada Lovelace'),
++                    (2, '2609.00002', 'Unrelated paper', 'Grace Hopper'),
++                ],
++            )
++
++        monkeypatch.setattr(app_module, 'DB_PATH', str(database_path))
++        response = client.post('/api/papers/by-arxiv-ids', json={
++            'arxiv_ids': ['2609.00001', '2609.00001'],
++        })
++
++        assert response.status_code == 200
++        papers = response.get_json()['papers']
++        assert len(papers) == 1
++        assert papers[0]['id'] == 1
++        assert papers[0]['arxiv_id'] == '2609.00001'
++        assert papers[0]['title'] == 'Saved paper'
++        assert papers[0]['authors'] == 'Ada Lovelace'
++
++    @pytest.mark.parametrize('payload', [None, {}, {'arxiv_ids': '2609.00001'}, {'arxiv_ids': ['']}])
++    def test_rejects_malformed_id_requests(self, client, payload):
++        response = client.post('/api/papers/by-arxiv-ids', json=payload)
++        assert response.status_code == 400
++
++
+ class TestCategoriesEndpoint:
+     """Tests for /api/categories endpoint."""

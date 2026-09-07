@@ -1,0 +1,25 @@
+{
+  "batchInputSha256": "4e0730c4f481c401f0be000524309d526c9c3578f0b3bf927928daf019aa93f4",
+  "durationMs": 2288.0242,
+  "inputTokens": 863,
+  "model": "claude-sonnet-5",
+  "outputTokens": 151,
+  "predictions": [
+    {
+      "caseId": "c_2130f4d93b33ed99218161c1",
+      "predictedInvalid": false,
+      "reason": "Route call is a runtime fetch to an API endpoint, not a contract-listed invalid reference"
+    },
+    {
+      "caseId": "c_323d1cd1dc3cd16ae53403ac",
+      "predictedInvalid": true,
+      "reason": "vitest is not installed per contract, so importing it is an invalid reference"
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_323d1cd1dc3cd16ae53403ac\",\"predictedInvalid\":true,\"reason\":\"vitest is not installed per contract, so importing it is an invalid reference\"},{\"caseId\":\"c_2130f4d93b33ed99218161c1\",\"predictedInvalid\":false,\"reason\":\"Route call is a runtime fetch to an API endpoint, not a contract-listed invalid reference\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnBtnKkJMaAeoz6DSc8",
+  "system": "anthropic/claude-sonnet-5"
+}

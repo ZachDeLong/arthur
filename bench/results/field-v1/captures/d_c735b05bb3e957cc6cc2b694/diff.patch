@@ -1,0 +1,394 @@
+diff --git a/src/lib/canvas.test.ts b/src/lib/canvas.test.ts
+index dc8d2e0036cd024ede6c4997fb046da891240236..e550cbcacc80c039410b4488fc9076cd0033501e 100644
+--- a/src/lib/canvas.test.ts
++++ b/src/lib/canvas.test.ts
+@@ -26,11 +26,13 @@ describe('fetchAssignments', () => {
+   })
+ 
+   it('fetches and transforms per-course assignments', async () => {
+-    const assignments = await fetchAssignments()
++    const { assignments, failures } = await fetchAssignments()
+ 
+     expect(assignments).toHaveLength(2)
++    expect(failures).toEqual([])
+     expect(assignments[0]).toMatchObject({
+       id: 'test-instance:1001',
++      instance_id: 'test-instance',
+       name: 'Homework 1',
+       course_name: 'Intro to Computer Science',
+     })
+@@ -42,14 +44,14 @@ describe('fetchAssignments', () => {
+   })
+ 
+   it('handles all_day_date by converting to ISO format', async () => {
+-    const assignments = await fetchAssignments()
++    const { assignments } = await fetchAssignments()
+ 
+     // all_day_date should be converted to ISO format with T23:59:59Z
+     expect(assignments[0].due_at).toBe('2025-02-10T23:59:59Z')
+   })
+ 
+   it('uses start_at/end_at when all_day_date is null', async () => {
+-    const assignments = await fetchAssignments()
++    const { assignments } = await fetchAssignments()
+ 
+     // Should use end_at when all_day_date is null
+     expect(assignments[1].due_at).toBe('2025-02-15T11:00:00Z')
+@@ -83,15 +85,24 @@ describe('fetchAssignments', () => {
+     )
+   })
+ 
+-  it('keeps successful courses when one course returns malformed data', async () => {
++  it('reports a failed course while keeping successful assignments', async () => {
+     server.use(errorHandlers.oneInvalidCourse)
+ 
+-    await expect(fetchAssignments()).resolves.toEqual([
+-      expect.objectContaining({
+-        id: 'test-instance:1002',
+-        course_name: 'Calculus I',
+-      }),
+-    ])
++    await expect(fetchAssignments()).resolves.toEqual({
++      assignments: [
++        expect.objectContaining({
++          id: 'test-instance:1002',
++          course_name: 'Calculus I',
++        }),
++      ],
++      failures: [
++        expect.objectContaining({
++          instanceId: 'test-instance',
++          courseId: '123456',
++          courseName: 'Intro to Computer Science',
++        }),
++      ],
++    })
+   })
+ })
+ 
+diff --git a/src/lib/canvas.ts b/src/lib/canvas.ts
+index b69555aeb8123ee4c7146ad2d65c4300d54a5d13..50a706d7e2e8ad9567b242960cce90c01bad43ee 100644
+--- a/src/lib/canvas.ts
++++ b/src/lib/canvas.ts
+@@ -15,12 +15,31 @@ const AssignmentSchema = z.object({
+ 
+ export interface CanvasAssignment {
+   id: string
++  instance_id: string
+   name: string
+   due_at: string | null
+   course_id: string
+   course_name: string
+ }
+ 
++export interface CanvasSyncFailure {
++  instanceId: string
++  instanceName: string
++  courseId?: string
++  courseName?: string
++  message: string
++}
++
++export interface CanvasSyncResult {
++  assignments: CanvasAssignment[]
++  failures: CanvasSyncFailure[]
++}
++
++interface InstanceFetchResult {
++  assignments: CanvasAssignment[]
++  failures: CanvasSyncFailure[]
++}
++
+ /**
+  * Parse the Link header to find the "next" page URL.
+  */
+@@ -91,7 +110,7 @@ async function fetchAllPages(url: string, headers: Record<string, string>): Prom
+ /**
+  * Fetch assignments from a single Canvas instance
+  */
+-async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssignment[]> {
++async function fetchFromInstance(instance: CanvasInstance): Promise<InstanceFetchResult> {
+   const headers: Record<string, string> = {
+     'Authorization': `Bearer ${instance.token}`,
+     'X-Canvas-Host': instance.url,
+@@ -115,7 +134,7 @@ async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssign
+     .filter((c): c is z.infer<typeof CourseSchema> => c !== null)
+ 
+   if (courses.length === 0) {
+-    return []
++    return { assignments: [], failures: [] }
+   }
+ 
+   // Fetch assignments from each course in parallel
+@@ -144,6 +163,20 @@ async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssign
+   }
+ 
+   const allAssignments: CanvasAssignment[] = []
++  const failures: CanvasSyncFailure[] = []
++
++  courseResults.forEach((result, index) => {
++    if (result.status === 'rejected') {
++      const course = courses[index]
++      failures.push({
++        instanceId: instance.id,
++        instanceName: instance.name,
++        courseId: String(course.id),
++        courseName: course.name,
++        message: result.reason instanceof Error ? result.reason.message : 'Failed to fetch course assignments',
++      })
++    }
++  })
+ 
+   for (const result of successfulCourseRequests) {
+     const { course, assignments } = result.value
+@@ -161,6 +194,7 @@ async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssign
+ 
+       allAssignments.push({
+         id: `${instance.id}:${assignment.id}`,
++        instance_id: instance.id,
+         name: assignment.name,
+         due_at: assignment.due_at,
+         course_id: String(course.id),
+@@ -169,13 +203,13 @@ async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssign
+     }
+   }
+ 
+-  return allAssignments
++  return { assignments: allAssignments, failures }
+ }
+ 
+ /**
+  * Fetch assignments from all configured Canvas instances
+  */
+-export async function fetchAssignments(): Promise<CanvasAssignment[]> {
++export async function fetchAssignments(): Promise<CanvasSyncResult> {
+   const { canvasInstances } = useSettingsStore.getState()
+ 
+   const validInstances = canvasInstances.filter(i => i.url && i.token)
+@@ -191,25 +225,33 @@ export async function fetchAssignments(): Promise<CanvasAssignment[]> {
+ 
+   // Collect all assignments and errors
+   const allAssignments: CanvasAssignment[] = []
+-  const errors: string[] = []
++  const failures: CanvasSyncFailure[] = []
++  let successfulInstances = 0
+ 
+   results.forEach((result, index) => {
+     if (result.status === 'fulfilled') {
+-      allAssignments.push(...result.value)
++      successfulInstances++
++      allAssignments.push(...result.value.assignments)
++      failures.push(...result.value.failures)
+     } else {
+-      errors.push(`${validInstances[index].name}: ${result.reason.message}`)
++      const instance = validInstances[index]
++      failures.push({
++        instanceId: instance.id,
++        instanceName: instance.name,
++        message: result.reason instanceof Error ? result.reason.message : 'Failed to fetch Canvas instance',
++      })
+     }
+   })
+ 
+   // If all instances failed, throw an error
+-  if (allAssignments.length === 0 && errors.length > 0) {
+-    throw new Error(errors.join('; '))
++  if (successfulInstances === 0 && failures.length > 0) {
++    throw new Error(failures.map(failure => `${failure.instanceName}: ${failure.message}`).join('; '))
+   }
+ 
+   // Log warnings for partial failures but still return results
+-  if (errors.length > 0) {
+-    console.warn('Some Canvas instances failed:', errors)
++  if (failures.length > 0) {
++    console.warn('Some Canvas requests failed:', failures)
+   }
+ 
+-  return allAssignments
++  return { assignments: allAssignments, failures }
+ }
+diff --git a/src/schemas/task.ts b/src/schemas/task.ts
+index 2a9b5919ba03d762e931c5b4b81cabd23ecdcf64..1c2d5307a65f8dd853d86986f26e38293369b325 100644
+--- a/src/schemas/task.ts
++++ b/src/schemas/task.ts
+@@ -7,6 +7,8 @@ const TaskSchema = z.object({
+   courseName: z.string(),
+   source: z.enum(['canvas', 'manual']),
+   completed: z.boolean(),
++  canvasInstanceId: z.string().optional(),
++  canvasCourseId: z.string().optional(),
+ })
+ 
+ export type Task = z.infer<typeof TaskSchema>
+diff --git a/src/store/taskStore.test.ts b/src/store/taskStore.test.ts
+index 6ed7da15af9d668d70615b6217e6e16880abf2d9..e9df43227a6ae17169fef3096bbc5d97a450383d 100644
+--- a/src/store/taskStore.test.ts
++++ b/src/store/taskStore.test.ts
+@@ -121,9 +121,10 @@ describe('taskStore', () => {
+           },
+         ],
+       })
+-      vi.mocked(fetchAssignments).mockResolvedValue([
+-        {
++      vi.mocked(fetchAssignments).mockResolvedValue({
++        assignments: [{
+           id: 'school-a:101',
++          instance_id: 'school-a',
+           name: 'Renamed Final Project',
+           due_at: '2025-02-12T12:00:00Z',
+           course_id: '1',
+@@ -131,12 +132,14 @@ describe('taskStore', () => {
+         },
+         {
+           id: 'school-a:202',
++          instance_id: 'school-a',
+           name: 'Final Project',
+           due_at: '2025-02-13T12:00:00Z',
+           course_id: '2',
+           course_name: 'Course B',
+-        },
+-      ])
++        }],
++        failures: [],
++      })
+ 
+       await useTaskStore.getState().syncCanvas(true)
+ 
+@@ -153,6 +156,67 @@ describe('taskStore', () => {
+         }),
+       ])
+     })
++
++    it('retains saved tasks only for Canvas courses that failed to refresh', async () => {
++      useTaskStore.setState({
++        tasks: [
++          {
++            id: 'canvas-school-a:101',
++            title: 'Saved Course A task',
++            dueDate: '2025-02-10T12:00:00Z',
++            courseName: 'Course A',
++            source: 'canvas',
++            completed: true,
++            canvasInstanceId: 'school-a',
++            canvasCourseId: '1',
++          },
++          {
++            id: 'canvas-school-a:202',
++            title: 'Stale Course B task',
++            dueDate: '2025-02-11T12:00:00Z',
++            courseName: 'Course B',
++            source: 'canvas',
++            completed: false,
++            canvasInstanceId: 'school-a',
++            canvasCourseId: '2',
++          },
++          {
++            id: 'manual-1',
++            title: 'Personal task',
++            dueDate: null,
++            courseName: 'Personal',
++            source: 'manual',
++            completed: false,
++          },
++        ],
++      })
++      vi.mocked(fetchAssignments).mockResolvedValue({
++        assignments: [{
++          id: 'school-a:303',
++          instance_id: 'school-a',
++          name: 'Fresh Course B task',
++          due_at: '2025-02-13T12:00:00Z',
++          course_id: '2',
++          course_name: 'Course B',
++        }],
++        failures: [{
++          instanceId: 'school-a',
++          instanceName: 'School A',
++          courseId: '1',
++          courseName: 'Course A',
++          message: 'Canvas API error: 503',
++        }],
++      })
++
++      await useTaskStore.getState().syncCanvas(true)
++
++      expect(useTaskStore.getState().tasks).toEqual([
++        expect.objectContaining({ id: 'canvas-school-a:303', title: 'Fresh Course B task' }),
++        expect.objectContaining({ id: 'canvas-school-a:101', title: 'Saved Course A task', completed: true }),
++        expect.objectContaining({ id: 'manual-1', title: 'Personal task' }),
++      ])
++      expect(useTaskStore.getState().error).toMatch(/previously saved assignments/)
++    })
+   })
+ 
+   describe('reorderTasks', () => {
+diff --git a/src/store/taskStore.ts b/src/store/taskStore.ts
+index 48d5f1800a8d963af8eb052ed1861eed9f64207f..f753316d9295b31849491a047876ac8143eb06d3 100644
+--- a/src/store/taskStore.ts
++++ b/src/store/taskStore.ts
+@@ -1,6 +1,6 @@
+ import { create } from 'zustand'
+ import { persist } from 'zustand/middleware'
+-import { fetchAssignments, type CanvasAssignment } from '../lib/canvas'
++import { fetchAssignments, type CanvasAssignment, type CanvasSyncFailure } from '../lib/canvas'
+ import type { Task } from '../schemas/task'
+ 
+ export type { Task }
+@@ -53,8 +53,8 @@ export const useTaskStore = create<TaskStore>()(
+         set({ syncing: true, error: null })
+ 
+         try {
+-          const assignments = await fetchAssignments()
+-          const canvasTasks = assignments.map(transformToTask)
++          const syncResult = await fetchAssignments()
++          const canvasTasks = syncResult.assignments.map(transformToTask)
+ 
+           // Dedupe canvas tasks by ID
+           const seenIds = new Set<string>()
+@@ -67,6 +67,9 @@ export const useTaskStore = create<TaskStore>()(
+           // Merge: keep manual tasks + completion state, update canvas tasks
+           const { tasks: existingTasks } = get()
+           const manualTasks = existingTasks.filter(t => t.source === 'manual')
++          const staleTasksFromFailures = existingTasks.filter(
++            task => task.source === 'canvas' && syncResult.failures.some(failure => taskMatchesFailure(task, failure))
++          )
+ 
+           // Canvas IDs include both the configured instance and assignment ID.
+           // Titles are not identities: two courses commonly reuse names such as
+@@ -81,11 +84,16 @@ export const useTaskStore = create<TaskStore>()(
+             ...t,
+             completed: completedCanvasIds.has(t.id)
+           }))
++          const refreshedIds = new Set(mergedCanvasTasks.map(task => task.id))
++          const retainedStaleTasks = staleTasksFromFailures.filter(task => !refreshedIds.has(task.id))
+ 
+           set({
+-            tasks: [...mergedCanvasTasks, ...manualTasks],
++            tasks: [...mergedCanvasTasks, ...retainedStaleTasks, ...manualTasks],
+             lastFetched: Date.now(),
+             syncing: false,
++            error: syncResult.failures.length > 0
++              ? 'Some Canvas courses could not be refreshed. Showing their previously saved assignments.'
++              : null,
+           })
+         } catch (err) {
+           set({
+@@ -229,5 +237,18 @@ function transformToTask(assignment: CanvasAssignment): Task {
+     courseName: assignment.course_name,
+     source: 'canvas',
+     completed: false,
++    canvasInstanceId: assignment.instance_id,
++    canvasCourseId: assignment.course_id,
+   }
+ }
++
++function taskMatchesFailure(task: Task, failure: CanvasSyncFailure): boolean {
++  const legacyInstanceId = task.id.startsWith('canvas-')
++    ? task.id.slice('canvas-'.length).split(':')[0]
++    : undefined
++  const instanceId = task.canvasInstanceId ?? legacyInstanceId
++  if (instanceId !== failure.instanceId) return false
++  if (!failure.courseId) return true
++  if (task.canvasCourseId) return task.canvasCourseId === failure.courseId
++  return task.courseName === failure.courseName
++}

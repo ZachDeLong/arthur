@@ -1,0 +1,44 @@
+[
+  {
+    "command": "npm test --prefix frontend",
+    "durationMs": 1653.1843,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "frontend",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:10:17.563Z",
+    "stderr": "",
+    "stdout": "\n> ai-reasoning-hub-frontend@0.0.1 test\n> vitest run\n\n\n RUN  v2.1.9 C:/Users/zachd/.arthur-field-worktrees/ai-reasoning-hub-storage-capture/frontend\n\n ✓ src/utils/queryUtils.test.ts (16 tests) 2ms\n ✓ src/utils/storage.test.ts (7 tests) 3ms\n\n Test Files  2 passed (2)\n      Tests  23 passed (23)\n   Start at  02:10:18\n   Duration  415ms (transform 62ms, setup 0ms, collect 82ms, tests 6ms, environment 0ms, prepare 298ms)\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "py -m pytest -q tests",
+    "durationMs": 3795.9716999999996,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "backend",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:10:19.217Z",
+    "stderr": "",
+    "stdout": ".................................................                        [100%]\r\n49 passed in 2.60s\r\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run type-check --prefix frontend",
+    "durationMs": 1898.6886999999997,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "typescript",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:10:23.013Z",
+    "stderr": "",
+    "stdout": "\n> ai-reasoning-hub-frontend@0.0.1 type-check\n> tsc --noEmit\n\n",
+    "timedOut": false
+  }
+]

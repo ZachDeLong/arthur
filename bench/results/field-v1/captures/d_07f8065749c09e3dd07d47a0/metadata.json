@@ -1,0 +1,32 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit d2edac257f00165d1337c799d08c99c5c722475c",
+  "agentTool": "Codex",
+  "baseCommit": "5a385608f7f82e417e2ccbcf65fca5708b2dc1b8",
+  "capturedAt": "2026-09-07T20:21:53.507Z",
+  "caseCount": 1,
+  "changedPaths": [
+    "agent/bridge-lifecycle.mjs",
+    "agent/run.mjs",
+    "scripts/test-all.mjs",
+    "scripts/test-bridge-lifecycle.mjs"
+  ],
+  "changeId": "d_07f8065749c09e3dd07d47a0",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/shapez-agent/tree/codex/fix-bridge-reconnect-race",
+  "rawDiffSha256": "6329ca8a94103fe2f6116665c08460119f23501fe85d74447d0f83fbf9d3fcc6",
+  "relevantSourcePaths": [
+    "agent/bridge-lifecycle.mjs",
+    "agent/run.mjs",
+    "scripts/test-all.mjs",
+    "scripts/test-bridge-lifecycle.mjs"
+  ],
+  "repositoryId": "shapez-agent",
+  "resultCommit": "d2edac257f00165d1337c799d08c99c5c722475c",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "6329ca8a94103fe2f6116665c08460119f23501fe85d74447d0f83fbf9d3fcc6",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

@@ -1,0 +1,31 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 5c7f93d11e0248e139ae6195f0d9f2d89d0665ec",
+  "agentTool": "Codex",
+  "baseCommit": "14bf1eb8fbb8833beb2a350560a28ab8c85cc502",
+  "capturedAt": "2026-09-07T09:27:25.184Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "package.json",
+    "scripts/fetch-all-campuses.mjs",
+    "scripts/geojson-ring.mjs",
+    "tests/geojson-ring.test.mjs"
+  ],
+  "changeId": "d_84377971dfccc2caf2a80ea5",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/Counselor-Sophie/usa-college-map/tree/codex/reject-unrelated-wikipedia-matches",
+  "rawDiffSha256": "884244cc5fd7a92217b503e942efcd4e2663f92196ddcc4768d4e20c193eb042",
+  "relevantSourcePaths": [
+    "scripts/fetch-all-campuses.mjs",
+    "scripts/geojson-ring.mjs",
+    "tests/geojson-ring.test.mjs"
+  ],
+  "repositoryId": "usa-college-map",
+  "resultCommit": "5c7f93d11e0248e139ae6195f0d9f2d89d0665ec",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "884244cc5fd7a92217b503e942efcd4e2663f92196ddcc4768d4e20c193eb042",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

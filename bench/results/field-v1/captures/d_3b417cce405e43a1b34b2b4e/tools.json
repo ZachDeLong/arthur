@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm run check",
+    "durationMs": 578.8773000000001,
+    "exitCode": 0,
+    "kind": "lint",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T07:07:47.361Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm test",
+    "durationMs": 675.1605,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T07:07:47.940Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ accepts a specific campus building with college evidence (2.4083ms)\n✔ rejects an unrelated building with the same name (0.8338ms)\n✔ rejects a person whose name contains the building name (0.2972ms)\n✔ rejects a generic building name matched to a different campus landmark (1.4183ms)\n✔ matches short college names as words instead of substrings (0.2939ms)\n✔ accepts a college acronym derived from its full name (0.2361ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 119.4294\n",
+    "timedOut": false
+  }
+]

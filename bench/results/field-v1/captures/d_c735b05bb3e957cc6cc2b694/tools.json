@@ -1,0 +1,44 @@
+[
+  {
+    "command": "npm run test:run",
+    "durationMs": 1863.9397,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "vitest",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:29:28.501Z",
+    "stderr": "stderr | src/lib/canvas.test.ts > fetchAssignments > reports a failed course while keeping successful assignments\nSome Canvas requests failed: [\n  {\n    instanceId: 'test-instance',\n    instanceName: 'Test School',\n    courseId: '123456',\n    courseName: 'Intro to Computer Science',\n    message: 'Canvas returned an invalid JSON response'\n  }\n]\n\n",
+    "stdout": "\n> school-checklist@0.0.0 test:run\n> vitest run\n\n\n RUN  v4.0.18 C:/Users/zachd/.arthur-field-worktrees/school-checklist-canvas-host\n\n ✓ api/canvas.test.js (12 tests) 13ms\n ✓ vite.config.test.ts (2 tests) 10ms\n ✓ src/store/taskStore.test.ts (13 tests) 7ms\n ✓ src/utils/dateUtils.test.ts (15 tests) 25ms\n ✓ src/store/settingsValidation.test.ts (4 tests) 5ms\n ✓ src/lib/canvas.test.ts (13 tests) 27ms\n\n Test Files  6 passed (6)\n      Tests  59 passed (59)\n   Start at  13:29:29\n   Duration  1.25s (transform 398ms, setup 1.77s, import 475ms, tests 87ms, environment 3.81s)\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run lint",
+    "durationMs": 2319.7660999999994,
+    "exitCode": 0,
+    "kind": "lint",
+    "name": "eslint",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:29:30.365Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 lint\n> eslint .\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run build",
+    "durationMs": 2075.1036000000004,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "vite",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:29:32.684Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 build\n> vite build\n\nvite v7.3.1 building client environment for production...\ntransforming...\n✓ 540 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   1.00 kB │ gzip:   0.55 kB\ndist/assets/index-C9aBSe_E.css   35.95 kB │ gzip:   6.18 kB\ndist/assets/index-CWYmD_Kv.js   482.39 kB │ gzip: 151.50 kB\n✓ built in 1.42s\n",
+    "timedOut": false
+  }
+]

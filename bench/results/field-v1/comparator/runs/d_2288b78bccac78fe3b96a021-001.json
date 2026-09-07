@@ -1,0 +1,30 @@
+{
+  "batchInputSha256": "0ad362d2bef8a4782a4f4487009f4492054037e15cf7d5da4b74f815b56dd5b8",
+  "durationMs": 2850.4876999999997,
+  "inputTokens": 1360,
+  "model": "claude-sonnet-5",
+  "outputTokens": 245,
+  "predictions": [
+    {
+      "caseId": "c_5c274160247f2bb6a2735a22",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    },
+    {
+      "caseId": "c_76f8dbc5196839bf7c4e6745",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    },
+    {
+      "caseId": "c_a78efe3a9f582c27a63ef203",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_5c274160247f2bb6a2735a22\",\"predictedInvalid\":false,\"reason\":\"process.env access is a runtime environment convention, not a blocking invalid reference\"},{\"caseId\":\"c_a78efe3a9f582c27a63ef203\",\"predictedInvalid\":false,\"reason\":\"process.env access is a runtime environment convention, not a blocking invalid reference\"},{\"caseId\":\"c_76f8dbc5196839bf7c4e6745\",\"predictedInvalid\":false,\"reason\":\"process.env access is a runtime environment convention, not a blocking invalid reference\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnBR5SVQKUUHK7eFrFc",
+  "system": "anthropic/claude-sonnet-5"
+}

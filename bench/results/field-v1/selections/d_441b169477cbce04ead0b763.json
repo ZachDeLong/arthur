@@ -1,0 +1,38 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 0022dc69694abb0347f7f77de4502e1189fb6e42",
+  "agentTool": "Codex",
+  "baseCommit": "c2045faab9adbf9ec5d3e40d07540bebcf76de35",
+  "caseCount": 1,
+  "caseInventorySha256": "6ca00b5417cec724739318b3c93f3bc315eecdcb2e8096395c981a2e423d687a",
+  "changeId": "d_441b169477cbce04ead0b763",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/school-checklist/tree/codex/harden-canvas-host-validation",
+  "rawDiffSha256": "855412e1305f0bbd083ba97f057e997f61400c0806c5d806b9f5f0f62d947378",
+  "relevantSourcePaths": [
+    "src/store/taskStore.test.ts",
+    "src/store/taskStore.ts"
+  ],
+  "repositoryId": "school-checklist",
+  "resultCommit": "0022dc69694abb0347f7f77de4502e1189fb6e42",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T09:29:20.395Z",
+  "standardTools": [
+    {
+      "command": "npm run test:run",
+      "kind": "test",
+      "name": "vitest"
+    },
+    {
+      "command": "npm run lint",
+      "kind": "lint",
+      "name": "eslint"
+    },
+    {
+      "command": "npm run build",
+      "kind": "compiler",
+      "name": "vite"
+    }
+  ],
+  "studyId": "field-v1"
+}

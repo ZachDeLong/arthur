@@ -1,0 +1,93 @@
+diff --git a/src/lib/canvas.test.ts b/src/lib/canvas.test.ts
+index 6fad32c78067abf8dab31103dcaa494bb4cfc1d5..e19032a8adfdbca03c6538fdc23de0bf7582dedc 100644
+--- a/src/lib/canvas.test.ts
++++ b/src/lib/canvas.test.ts
+@@ -67,9 +67,22 @@ describe('fetchAssignments', () => {
+     await expect(fetchAssignments()).rejects.toThrow('Test School: Canvas API error: 500')
+   })
+ 
+-  it('skips courses that return malformed assignment data', async () => {
++  it('throws when every course returns malformed assignment data', async () => {
+     server.use(errorHandlers.invalidJson)
+ 
+-    await expect(fetchAssignments()).resolves.toEqual([])
++    await expect(fetchAssignments()).rejects.toThrow(
++      'Test School: Canvas returned an invalid JSON response'
++    )
++  })
++
++  it('keeps successful courses when one course returns malformed data', async () => {
++    server.use(errorHandlers.oneInvalidCourse)
++
++    await expect(fetchAssignments()).resolves.toEqual([
++      expect.objectContaining({
++        id: 'test-instance:1002',
++        course_name: 'Calculus I',
++      }),
++    ])
+   })
+ })
+diff --git a/src/lib/canvas.ts b/src/lib/canvas.ts
+index b50b975dafc38371cdfd6efe77806a946642445d..5553605b216830be3f2a77bcc959c669551731ee 100644
+--- a/src/lib/canvas.ts
++++ b/src/lib/canvas.ts
+@@ -44,7 +44,12 @@ async function fetchAllPages(url: string, headers: Record<string, string>): Prom
+       throw new Error(`Canvas API error: ${res.status}`)
+     }
+ 
+-    const data: unknown = await res.json()
++    let data: unknown
++    try {
++      data = await res.json()
++    } catch {
++      throw new Error('Canvas returned an invalid JSON response')
++    }
+     if (!Array.isArray(data)) break
+     results.push(...data)
+ 
+@@ -101,11 +106,24 @@ async function fetchFromInstance(instance: CanvasInstance): Promise<CanvasAssign
+     })
+   )
+ 
+-  const allAssignments: CanvasAssignment[] = []
++  const successfulCourseRequests = courseResults.filter(
++    (result): result is PromiseFulfilledResult<{
++      course: z.infer<typeof CourseSchema>
++      assignments: unknown[]
++    }> => result.status === 'fulfilled'
++  )
+ 
+-  for (const result of courseResults) {
+-    if (result.status !== 'fulfilled') continue
++  if (successfulCourseRequests.length === 0) {
++    const firstFailure = courseResults.find(
++      (result): result is PromiseRejectedResult => result.status === 'rejected'
++    )
++    if (firstFailure?.reason instanceof Error) throw firstFailure.reason
++    throw new Error('Failed to fetch assignments from Canvas')
++  }
++
++  const allAssignments: CanvasAssignment[] = []
+ 
++  for (const result of successfulCourseRequests) {
+     const { course, assignments } = result.value
+ 
+     for (const raw of assignments) {
+diff --git a/src/test/mocks/handlers.ts b/src/test/mocks/handlers.ts
+index 643c6ab3c4d4442aa20f60325a5a5fa5e632a0d0..4dd1232a4e471dcf87acb4915f49f0279473fe76 100644
+--- a/src/test/mocks/handlers.ts
++++ b/src/test/mocks/handlers.ts
+@@ -40,4 +40,13 @@ export const errorHandlers = {
+       headers: { 'Content-Type': 'application/json' },
+     })
+   }),
++
++  oneInvalidCourse: http.get('/api/canvas/courses/:courseId/assignments', ({ params }) => {
++    if (String(params.courseId) === '123456') {
++      return new HttpResponse('not valid json', {
++        headers: { 'Content-Type': 'application/json' },
++      })
++    }
++    return HttpResponse.json(mockAssignments.get(String(params.courseId)) ?? [])
++  }),
+ }

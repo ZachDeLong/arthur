@@ -1,0 +1,30 @@
+{
+  "agentEvidence": "Current Codex task transcript; Codex implemented and verified commit 15cc58518d9e256cab1db6107c08cf57bc9e53fd",
+  "agentTool": "Codex",
+  "baseCommit": "e01e128899e1fa830528526a4cdad84ee2d98a43",
+  "capturedAt": "2026-09-07T08:34:09.674Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "src/lib/canvas.test.ts",
+    "src/lib/canvas.ts",
+    "src/test/mocks/handlers.ts"
+  ],
+  "changeId": "d_2d37c18e8e9640cf92ca1d16",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/school-checklist/tree/codex/harden-canvas-host-validation",
+  "rawDiffSha256": "5a3b7dd80d0b3e02393ade8cd377b364c70c3b14e028b4ff16ac8384130ee2e9",
+  "relevantSourcePaths": [
+    "src/lib/canvas.test.ts",
+    "src/lib/canvas.ts",
+    "src/test/mocks/handlers.ts"
+  ],
+  "repositoryId": "school-checklist",
+  "resultCommit": "15cc58518d9e256cab1db6107c08cf57bc9e53fd",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "5a3b7dd80d0b3e02393ade8cd377b364c70c3b14e028b4ff16ac8384130ee2e9",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

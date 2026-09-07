@@ -1,0 +1,39 @@
+[
+  {
+    "caseId": "c_4b93bf33685a2f6020e0bf67",
+    "changeId": "d_441b169477cbce04ead0b763",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, it, expect, beforeEach, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import { fetchAssignments } from '../lib/canvas'"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { useTaskStore } from './taskStore'"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 55,
+      "endColumn": 61,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/taskStore.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "0733fd9ad214ed208be41908966d75de959a1aae3a63f22a8e1902a772e92ab5",
+    "target": "vitest"
+  }
+]

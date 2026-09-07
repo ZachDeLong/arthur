@@ -1,0 +1,86 @@
+[
+  {
+    "caseId": "c_2130f4d93b33ed99218161c1",
+    "changeId": "d_326b836fb89e64ee4edf51d1",
+    "context": [
+      {
+        "changed": false,
+        "line": 13,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 14,
+        "text": "export const fetchCategories = async (signal?: AbortSignal): Promise<string[]> => {"
+      },
+      {
+        "changed": true,
+        "line": 15,
+        "text": "  const response = await fetch('/api/categories', { signal });"
+      },
+      {
+        "changed": false,
+        "line": 16,
+        "text": "  if (!response.ok) {"
+      },
+      {
+        "changed": false,
+        "line": 17,
+        "text": "    throw new Error('Failed to fetch categories');"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 48,
+      "endLine": 15,
+      "line": 15,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "GET /api/categories",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "72112e22e5763b59fc13faa103b0f0b5ac34780a3d5640286a5817025dac9b41",
+    "target": "GET /api/categories"
+  },
+  {
+    "caseId": "c_323d1cd1dc3cd16ae53403ac",
+    "changeId": "d_326b836fb89e64ee4edf51d1",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { fetchCategories, fetchPapers } from './api';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/api.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "28e73a9946e6cf2038502f409d3d8a7e338cd616229a8d869df8d5052108653d",
+    "target": "vitest"
+  }
+]

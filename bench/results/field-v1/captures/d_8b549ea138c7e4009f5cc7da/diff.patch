@@ -1,0 +1,184 @@
+diff --git a/agent/bridge-lifecycle.mjs b/agent/bridge-lifecycle.mjs
+index 27809f4be1d8ff9fbba45d7e786940fa83ce5dd6..51f544bdb549f8fda2c0b1352629684fda59d629 100644
+--- a/agent/bridge-lifecycle.mjs
++++ b/agent/bridge-lifecycle.mjs
+@@ -25,7 +25,7 @@ export function createBridgeLifecycle(bridge) {
+                     shouldUnpause = false;
+                 }
+             } finally {
+-                bridge.stop();
++                await bridge.stop();
+             }
+         },
+     };
+diff --git a/scripts/smoke.mjs b/scripts/smoke.mjs
+index 91351f40aa1335c9e44b8b91f20937a92bd54d83..7dfbe495723f0f6293777545627077ddd212b5eb 100644
+--- a/scripts/smoke.mjs
++++ b/scripts/smoke.mjs
+@@ -78,12 +78,12 @@ async function main() {
+     console.log(await bridge.setPaused(false));
+ 
+     console.log("\nSmoke test finished.");
+-    bridge.stop();
++    await bridge.stop();
+     process.exit(0);
+ }
+ 
+-main().catch(err => {
++main().catch(async err => {
+     console.error("\nSmoke test failed:", err.message);
+-    bridge.stop();
++    await bridge.stop();
+     process.exit(1);
+ });
+diff --git a/scripts/test-agent-loop.mjs b/scripts/test-agent-loop.mjs
+index 44c8464fe3ba7ab24eeb7f9e51601c0c656fac90..682614cc2f229e8c5776f7bb1678a91c9f7e8fae 100644
+--- a/scripts/test-agent-loop.mjs
++++ b/scripts/test-agent-loop.mjs
+@@ -193,7 +193,7 @@ console.log("\n=== refusal path ===");
+ // trips a libuv assertion on Windows.
+ game.close();
+ await new Promise(resolve => game.once("close", resolve));
+-bridge.stop();
++await bridge.stop();
+ await new Promise(resolve => api.close(resolve));
+ 
+ console.log(failures ? `\n${failures} of ${checks} checks FAILED` : `\nAll ${checks} checks passed`);
+diff --git a/scripts/test-protocol.mjs b/scripts/test-protocol.mjs
+index fbb4c415a379a99594b1348404bde972298b0b20..c4fbc64b8a4664676458e5ac46a3a950c1a96f71 100644
+--- a/scripts/test-protocol.mjs
++++ b/scripts/test-protocol.mjs
+@@ -1,5 +1,5 @@
+ // Stubs the game side of the protocol to verify the bridge's RPC layer.
+-import { EventEmitter } from "node:events";
++import { EventEmitter, once } from "node:events";
+ import WebSocket from "ws";
+ import { GameBridge } from "../server/bridge-server.mjs";
+ import { TOOLS, createDispatcher } from "../server/tools.mjs";
+@@ -46,6 +46,14 @@ game.on("message", raw => {
+ 
+ await bridge.waitForGame(5000);
+ 
++let duplicateStartRejected = false;
++try {
++    bridge.start();
++} catch (ex) {
++    duplicateStartRejected = ex.message.includes("already started");
++}
++check("starting an active bridge is rejected", duplicateStartRejected);
++
+ // --- request/response plumbing ---
+ check("ping round-trips", (await bridge.ping()).pong === true);
+ const obs = await bridge.observe({ radius: 25 });
+@@ -172,15 +180,23 @@ check("timed-out connection waiter is removed", timeoutBridge.waitingForConnect.
+ 
+ const stoppedBridge = new GameBridge({ log: () => {} });
+ const stoppedWaiter = stoppedBridge.waitForGame(5000);
+-stoppedBridge.stop();
++const stoppedBridgeClose = stoppedBridge.stop();
+ let stopRejectedWaiter = false;
+ try {
+     await stoppedWaiter;
+ } catch (ex) {
+     stopRejectedWaiter = ex.message.includes("Bridge stopped");
+ }
++await stoppedBridgeClose;
+ check("stopping the bridge rejects connection waiters", stopRejectedWaiter);
+ check("stopping the bridge removes connection waiters", stoppedBridge.waitingForConnect.size === 0);
++let waitAfterStopRejected = false;
++try {
++    await stoppedBridge.waitForGame();
++} catch (ex) {
++    waitAfterStopRejected = ex.message.includes("Bridge stopped");
++}
++check("a stopped bridge does not report a stale connection", waitAfterStopRejected);
+ 
+ // --- waitForInGame uses one timeout budget across connection and polling ---
+ const budgetBridge = new GameBridge({ log: () => {} });
+@@ -211,6 +227,15 @@ let disconnectHandled = false;
+ try { await inflight; } catch (ex) { disconnectHandled = ex.message.includes("disconnected"); }
+ check("disconnect rejects in-flight calls", disconnectHandled);
+ 
+-bridge.stop();
++await bridge.stop();
++check("stop clears live socket and server references", bridge.socket === null && bridge.server === null);
++
++bridge.start();
++await once(bridge.server, "listening");
++check("a fully stopped bridge can restart on the same port", bridge.server.address().port === 8799);
++await bridge.stop();
++await bridge.stop();
++check("stopping an already stopped bridge is harmless", bridge.server === null);
++
+ console.log(failures ? `\n${failures} FAILED` : "\nAll checks passed");
+ process.exit(failures ? 1 : 0);
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index 6d810f00959e12bc7afd9ff49803b1ccf5ea6038..9b32369181ea63875ac2bc11a04bf6b90dd04add 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -29,9 +29,13 @@ export class GameBridge {
+         /** @type {Set<{resolve: Function, reject: Function, timer: any}>} */
+         this.waitingForConnect = new Set();
+         this.server = null;
++        this.stopped = false;
+     }
+ 
+     start() {
++        if (this.server) throw new Error("Bridge server is already started");
++
++        this.stopped = false;
+         this.server = new WebSocketServer({ port: this.port });
+         this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
+ 
+@@ -41,6 +45,10 @@ export class GameBridge {
+     }
+ 
+     handleConnection(socket) {
++        if (this.stopped) {
++            socket.terminate();
++            return;
++        }
+         if (this.socket) {
+             this.log("[bridge] replacing previous connection");
+             this.failAllPending(new Error("Game connection replaced"));
+@@ -69,15 +77,26 @@ export class GameBridge {
+     }
+ 
+     stop() {
++        this.stopped = true;
+         this.failAllPending(new Error("Bridge stopped"));
+         this.failAllConnectWaiters(new Error("Bridge stopped"));
+-        if (this.socket) this.socket.terminate();
+-        if (this.server) this.server.close();
++        const socket = this.socket;
++        this.socket = null;
++        if (socket) socket.terminate();
++
++        const server = this.server;
++        this.server = null;
++        if (!server) return Promise.resolve();
++
++        return new Promise((resolve, reject) => {
++            server.close(error => error ? reject(error) : resolve());
++        });
+     }
+ 
+     /** Resolves once the game process has connected its socket. */
+     waitForGame(timeoutMs = 120_000) {
+-        if (this.socket) return Promise.resolve();
++        if (this.stopped) return Promise.reject(new Error("Bridge stopped"));
++        if (this.socket && this.socket.readyState === this.socket.OPEN) return Promise.resolve();
+         return new Promise((resolve, reject) => {
+             const waiter = { resolve, reject, timer: null };
+             waiter.timer = setTimeout(() => {
+@@ -242,8 +261,8 @@ export class GameBridge {
+ // Run standalone: node server/bridge-server.mjs
+ if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+     const bridge = new GameBridge().start();
+-    process.on("SIGINT", () => {
+-        bridge.stop();
++    process.on("SIGINT", async () => {
++        await bridge.stop();
+         process.exit(0);
+     });
+ }

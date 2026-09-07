@@ -1,0 +1,20 @@
+{
+  "batchInputSha256": "3c51899099978650622af4b596523d6ff424fff2f412019eaabff1ce206784f7",
+  "durationMs": 2042.8114999999998,
+  "inputTokens": 1329,
+  "model": "claude-sonnet-5",
+  "outputTokens": 123,
+  "predictions": [
+    {
+      "caseId": "c_4b93bf33685a2f6020e0bf67",
+      "predictedInvalid": false,
+      "reason": "Root 'vitest' import matches valid exports entry '.' in installed manifest"
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_4b93bf33685a2f6020e0bf67\",\"predictedInvalid\":false,\"reason\":\"Root 'vitest' import matches valid exports entry '.' in installed manifest\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnC4rJvKQYqGreJ4gWc",
+  "system": "anthropic/claude-sonnet-5"
+}

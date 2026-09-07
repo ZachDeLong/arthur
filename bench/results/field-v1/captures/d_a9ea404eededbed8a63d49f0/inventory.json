@@ -1,0 +1,76 @@
+[
+  {
+    "caseId": "c_00375cc3678c0f23e67154bd",
+    "changeId": "d_a9ea404eededbed8a63d49f0",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import handler, { normalizeCanvasHost } from './canvas.js'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "api/canvas.test.js"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "88f2b6df6e5b099b02c4a9c409511aefd5fe9aa89d7b3d2e7932fd1acdab990d",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_ee5133685fce407dc00233a5",
+    "changeId": "d_a9ea404eededbed8a63d49f0",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { server } from '../test/mocks/server'"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { errorHandlers } from '../test/mocks/handlers'"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 66,
+      "endColumn": 72,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/lib/canvas.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "179d83b9181618601837725d27a3ca4bfd080c92f492f419605cc5730794ca58",
+    "target": "vitest"
+  }
+]

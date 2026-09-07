@@ -1,0 +1,13 @@
+{
+  "env": {
+    "definedNames": [
+      "GOOGLE_API_KEY",
+      "OPENAI_API_KEY"
+    ],
+    "filesFound": [
+      ".env.example"
+    ]
+  },
+  "packages": [],
+  "routes": []
+}

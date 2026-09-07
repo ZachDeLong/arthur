@@ -1,0 +1,49 @@
+[
+  {
+    "caseId": "c_adf02e5337e84e4d12ae28a9",
+    "changeId": "d_650ba41b7972ded859e52b4b",
+    "context": [
+      {
+        "changed": false,
+        "line": 21,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 22,
+        "text": "export const fetchStats = async (signal?: AbortSignal): Promise<StatsResponse> => {"
+      },
+      {
+        "changed": true,
+        "line": 23,
+        "text": "  const response = await fetch('/api/papers/stats', { signal });"
+      },
+      {
+        "changed": false,
+        "line": 24,
+        "text": "  if (!response.ok) {"
+      },
+      {
+        "changed": false,
+        "line": 25,
+        "text": "    throw new Error('Failed to fetch stats');"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 50,
+      "endLine": 23,
+      "line": 23,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "GET /api/papers/stats",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "5162b71991825458158f0956847f0fe0e97b609a73717058db44a75d3ad43a82",
+    "target": "GET /api/papers/stats"
+  }
+]

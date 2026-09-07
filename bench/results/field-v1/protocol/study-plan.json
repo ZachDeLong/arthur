@@ -1,0 +1,44 @@
+{
+  "protocolVersion": 1,
+  "status": "activation_by_public_commit",
+  "activation": "First public Git commit containing this exact protocol version",
+  "selection": {
+    "method": "first_consecutive_eligible_changes_after_activation",
+    "minimumIncludedChanges": 50,
+    "minimumRepositories": 5,
+    "maximumChangesPerRepository": 15,
+    "includeBeforePredictions": true,
+    "eligibleLanguages": ["javascript", "typescript"],
+    "excludedRepositories": ["arthur", "arthur benchmark fixtures"],
+    "allowedExclusionReasons": [
+      "not_agent_authored",
+      "no_javascript_or_typescript_change",
+      "project_state_not_reproducible",
+      "reference_evidence_removed_by_required_redaction",
+      "repository_cap_reached",
+      "duplicate_change"
+    ]
+  },
+  "review": {
+    "independentReviewersPerCase": 2,
+    "thirdReviewerForDisagreement": true,
+    "reviewersBlindToDetectorIdentity": true,
+    "checkerImplementersMayLabel": false,
+    "labels": ["valid", "actionable_invalid", "ignored", "uncertain"]
+  },
+  "decision": {
+    "minimumIncrementalActionableDefects": 5,
+    "minimumBlockingPrecision": 0.98,
+    "maximumP95LatencyMs": 3000,
+    "minimumExternalDevelopersKeepingEnabled": 3,
+    "allConditionsRequired": true,
+    "failureAction": "freeze_checker_expansion"
+  },
+  "publication": {
+    "publishNegativeResults": true,
+    "publishExclusions": true,
+    "publishFrozenPredictionsBeforeLabels": true,
+    "retainRawLabelsAndAdjudication": true,
+    "clusterStatisticsBy": ["diff", "repository"]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "agentEvidence": "User-directed Codex task; change committed as 16574fbb29644ce1d5e7ff2ddcf3f7269e27bf0c",
+  "agentTool": "Codex",
+  "baseCommit": "83875bf35143b4eeca7c9b186f4fd4400db1e7cd",
+  "capturedAt": "2026-09-07T07:07:48.814Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "package.json",
+    "scripts/enrich-campuses.mjs",
+    "scripts/wikipedia-match.mjs",
+    "tests/wikipedia-match.test.mjs"
+  ],
+  "changeId": "d_3b417cce405e43a1b34b2b4e",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/Counselor-Sophie/usa-college-map",
+  "rawDiffSha256": "63dab3cc3764ce3148409e8ea7bbcdae1c209d96db1282fb3cf38e9025271d0a",
+  "relevantSourcePaths": [
+    "scripts/enrich-campuses.mjs",
+    "scripts/wikipedia-match.mjs",
+    "tests/wikipedia-match.test.mjs"
+  ],
+  "repositoryId": "usa-college-map",
+  "resultCommit": "16574fbb29644ce1d5e7ff2ddcf3f7269e27bf0c",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "63dab3cc3764ce3148409e8ea7bbcdae1c209d96db1282fb3cf38e9025271d0a",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

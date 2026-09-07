@@ -1,0 +1,75 @@
+diff --git a/scripts/test-protocol.mjs b/scripts/test-protocol.mjs
+index 71f6a9404aa89024f5de08d55c63168ea2923942..0bbdfbc734bb252bfcc271e6ee512fc0b48d7da6 100644
+--- a/scripts/test-protocol.mjs
++++ b/scripts/test-protocol.mjs
+@@ -115,6 +115,35 @@ const [{ id: newCallId }] = newSocket.sent;
+ reconnectBridge.onMessage(JSON.stringify({ id: newCallId, ok: true, result: "new response" }));
+ check("stale close leaves new-socket calls alive", (await newCall) === "new response");
+ 
++// --- send failures reject immediately and release pending state ---
++const throwingSocket = new FakeSocket();
++throwingSocket.send = () => { throw new Error("socket write failed"); };
++const throwingBridge = new GameBridge({ log: () => {} });
++throwingBridge.handleConnection(throwingSocket);
++let synchronousSendRejected = false;
++try {
++    await throwingBridge.call("sync-send-failure", {}, 5000);
++} catch (ex) {
++    synchronousSendRejected = ex.message.includes("socket write failed");
++}
++check("synchronous send failure rejects with its cause", synchronousSendRejected);
++check("synchronous send failure clears pending state", throwingBridge.pending.size === 0);
++
++const callbackSocket = new FakeSocket();
++callbackSocket.send = (_raw, callback) => {
++    queueMicrotask(() => callback(new Error("send callback failed")));
++};
++const callbackBridge = new GameBridge({ log: () => {} });
++callbackBridge.handleConnection(callbackSocket);
++let callbackSendRejected = false;
++try {
++    await callbackBridge.call("callback-send-failure", {}, 5000);
++} catch (ex) {
++    callbackSendRejected = ex.message.includes("send callback failed");
++}
++check("send callback failure rejects with its cause", callbackSendRejected);
++check("send callback failure clears pending state", callbackBridge.pending.size === 0);
++
+ // --- disconnect fails in-flight calls instead of hanging ---
+ const inflight = bridge.call("observe", {}, 5000);
+ game.terminate();
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index 263b63fab3285cc5de758e30986dcd2b7e099ed4..69ffb08bee4b58d8b539cc858e0b90b78d55a784 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -144,6 +144,7 @@ export class GameBridge {
+             return Promise.reject(new Error("No game connected"));
+         }
+ 
++        const socket = this.socket;
+         const id = this.nextId++;
+         return new Promise((resolve, reject) => {
+             const timer = setTimeout(() => {
+@@ -152,7 +153,22 @@ export class GameBridge {
+             }, timeoutMs);
+ 
+             this.pending.set(id, { resolve, reject, timer });
+-            this.socket.send(JSON.stringify({ id, method, params }));
++            const failSend = error => {
++                if (!error) return;
++                const entry = this.pending.get(id);
++                if (!entry) return;
++
++                this.pending.delete(id);
++                clearTimeout(entry.timer);
++                const message = error instanceof Error ? error.message : String(error);
++                reject(new Error(`Failed to send ${method}: ${message}`));
++            };
++
++            try {
++                socket.send(JSON.stringify({ id, method, params }), failSend);
++            } catch (error) {
++                failSend(error);
++            }
+         });
+     }

@@ -1,0 +1,9 @@
+{
+  "baseCommit": "e364059e1dce9e8041dd9dc191c1a7a0400a1d18",
+  "candidateId": "x_5f8b84a888e048806c03db1e",
+  "note": "AI-authored responsive drawer change modified only index.html; retained and pushed, but preregistered field-v1 admits JavaScript/TypeScript source diffs.",
+  "reason": "no_javascript_or_typescript_change",
+  "recordedAt": "2026-09-07T20:08:58.526Z",
+  "repositoryId": "usa-college-map",
+  "resultCommit": "9d075da086192d47ef3020f9841ffd938c7b0e80"
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 588.3379,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:27:23.733Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ uses all campuses by default (0.8657ms)\n✔ parses the supported options in either order (0.159ms)\n✔ rejects missing, non-numeric, zero, and negative limits (0.48ms)\n✔ rejects unsafe, repeated, and unknown options (0.1666ms)\n✔ closes a valid open polygon ring (1.4525ms)\n✔ does not close an already closed ring twice (0.1842ms)\n✔ rejects missing and non-finite coordinates (0.2343ms)\n✔ rejects rings without three distinct positions (0.1324ms)\n✔ accepts a normal Overpass payload, including an empty result (0.5888ms)\n✔ rejects HTTP-200 error remarks so the caller retries (0.5957ms)\n✔ rejects malformed payloads instead of treating them as empty data (0.1862ms)\n✔ returns parsed JSON and sends the project user agent (1.601ms)\n✔ treats a 404 as a definitive missing resource (0.2153ms)\n✔ throws on transient HTTP failures so callers can retry (0.3203ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.6737ms)\n✔ accepts a specific campus building with college evidence (1.5874ms)\n✔ rejects an unrelated building with the same name (0.3377ms)\n✔ rejects a person whose name contains the building name (1.1592ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1244ms)\n✔ matches short college names as words instead of substrings (0.0809ms)\n✔ accepts a college acronym derived from its full name (0.0764ms)\n✔ does not infer the college from a shared word in the building name (0.0888ms)\n✔ still accepts an explicit single-token college phrase (0.082ms)\nℹ tests 23\nℹ suites 0\nℹ pass 23\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 132.976\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 718.1397999999999,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:27:24.322Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

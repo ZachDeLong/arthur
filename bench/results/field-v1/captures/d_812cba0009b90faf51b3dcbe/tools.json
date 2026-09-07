@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 493.7151000000001,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:55:21.885Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ accepts a specific campus building with college evidence (1.1355ms)\n✔ rejects an unrelated building with the same name (0.384ms)\n✔ rejects a person whose name contains the building name (0.7183ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1123ms)\n✔ matches short college names as words instead of substrings (0.072ms)\n✔ accepts a college acronym derived from its full name (0.0746ms)\n✔ does not infer the college from a shared word in the building name (0.0691ms)\n✔ still accepts an explicit single-token college phrase (0.1478ms)\nℹ tests 8\nℹ suites 0\nℹ pass 8\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 81.1885\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 509.6623999999997,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:55:22.378Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs\n\n",
+    "timedOut": false
+  }
+]

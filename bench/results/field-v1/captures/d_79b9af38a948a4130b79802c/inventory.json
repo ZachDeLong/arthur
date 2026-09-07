@@ -1,0 +1,86 @@
+[
+  {
+    "caseId": "c_84404ca18f825a00998f3753",
+    "changeId": "d_79b9af38a948a4130b79802c",
+    "context": [
+      {
+        "changed": true,
+        "line": 47,
+        "text": "  signal?: AbortSignal,"
+      },
+      {
+        "changed": true,
+        "line": 48,
+        "text": "): Promise<Paper[]> => {"
+      },
+      {
+        "changed": true,
+        "line": 49,
+        "text": "  const response = await fetch('/api/papers/by-arxiv-ids', {"
+      },
+      {
+        "changed": true,
+        "line": 50,
+        "text": "    method: 'POST',"
+      },
+      {
+        "changed": true,
+        "line": 51,
+        "text": "    headers: { 'Content-Type': 'application/json' },"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 57,
+      "endLine": 49,
+      "line": 49,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "POST /api/papers/by-arxiv-ids",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "95087d3e5de3111346ef27e59b519ccde11d46d4a68e0ce11490ac1e1b2e1783",
+    "target": "POST /api/papers/by-arxiv-ids"
+  },
+  {
+    "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+    "changeId": "d_79b9af38a948a4130b79802c",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useEffect, useMemo, useState, type FC } from 'react';"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import type { Paper } from '@/types';"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import type { ReadingLists } from '@/hooks';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 56,
+      "endColumn": 61,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/pages/ReadingListsPage.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "c03298425d7ffedc2965376ac60b4fbc58ea7ffcacb0689b23d65ec064920127",
+    "target": "react"
+  }
+]

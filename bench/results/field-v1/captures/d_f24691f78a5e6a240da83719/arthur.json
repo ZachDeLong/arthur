@@ -1,0 +1,85 @@
+{
+  "activationCommit": "2d914e5e41637726dbb440dda4aed47ea148febb",
+  "analysisDurationMs": 18.153300000000172,
+  "checkerBuildSha256": "ebd920ecee65504abe59a4c188e1820dba128f23a58100b64c24a48b8f76ecd1",
+  "compiledBuildSha256": "b1cc37cb84452fca75a44f190d685707bf3706fba05a04eec34c4f07e995045f",
+  "durationMs": 362.4919,
+  "predictions": [],
+  "report": {
+    "findings": [],
+    "projectDir": "ai-reasoning-hub-storage-capture",
+    "schemaVersion": "1.1",
+    "summary": {
+      "checkerResults": [
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "paths",
+          "displayName": "File Paths",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "schema",
+          "displayName": "Prisma Schema",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "sqlSchema",
+          "displayName": "SQL/Drizzle Schema",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "imports",
+          "displayName": "Imports",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "env",
+          "displayName": "Env Variables",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "routes",
+          "displayName": "API Routes",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "supabaseSchema",
+          "displayName": "Supabase Schema",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "expressRoutes",
+          "displayName": "Express/Fastify Routes",
+          "findings": 0
+        }
+      ],
+      "totalChecked": 0,
+      "totalErrors": 0,
+      "totalFindings": 0,
+      "totalWarnings": 0
+    },
+    "timestamp": "2026-09-07T20:14:07.612Z"
+  },
+  "runtime": {
+    "arch": "x64",
+    "node": "v24.14.0",
+    "platform": "win32"
+  },
+  "system": "arthur",
+  "unmatchedFindings": []
+}

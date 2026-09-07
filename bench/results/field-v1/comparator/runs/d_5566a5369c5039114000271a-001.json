@@ -1,0 +1,25 @@
+{
+  "batchInputSha256": "e581177af7ccfae5b1ddf64d9ac5a166a9bd05e7bd11b10ced7489eabbfc0850",
+  "durationMs": 2697.3717000000015,
+  "inputTokens": 2304,
+  "model": "claude-sonnet-5",
+  "outputTokens": 158,
+  "predictions": [
+    {
+      "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+      "predictedInvalid": false,
+      "reason": "vitest is installed and exports '.' entry with import condition resolving to dist/index.js; import valid."
+    },
+    {
+      "caseId": "c_66368da4645ca52d8436d47b",
+      "predictedInvalid": false,
+      "reason": "zod is installed and exports '.' entry supports named import { z } via index.js; import valid."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_3bc9a89bf01b44ec86b83cf3\",\"predictedInvalid\":false,\"reason\":\"vitest is installed and exports '.' entry with import condition resolving to dist/index.js; import valid.\"},{\"caseId\":\"c_66368da4645ca52d8436d47b\",\"predictedInvalid\":false,\"reason\":\"zod is installed and exports '.' entry supports named import { z } via index.js; import valid.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnCDbuKW5kx4AYFSMxU",
+  "system": "anthropic/claude-sonnet-5"
+}

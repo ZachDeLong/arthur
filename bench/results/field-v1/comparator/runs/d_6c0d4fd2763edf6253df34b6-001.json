@@ -1,0 +1,20 @@
+{
+  "batchInputSha256": "cde7df405dddaea9c3240dd8c5b6d42106b6f5703941b64fb886ba8cf8ffa70a",
+  "durationMs": 1965.2740000000013,
+  "inputTokens": 1388,
+  "model": "claude-sonnet-5",
+  "outputTokens": 95,
+  "predictions": [
+    {
+      "caseId": "c_9766ef6250c4d053eeab5fbe",
+      "predictedInvalid": false,
+      "reason": "Root export '.' with named exports (afterEach, describe, expect, it, vi) is valid per vitest's declared exports map."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_9766ef6250c4d053eeab5fbe\",\"predictedInvalid\":false,\"reason\":\"Root export '.' with named exports (afterEach, describe, expect, it, vi) is valid per vitest's declared exports map.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnCYdeD7fUQHghLxKws",
+  "system": "anthropic/claude-sonnet-5"
+}

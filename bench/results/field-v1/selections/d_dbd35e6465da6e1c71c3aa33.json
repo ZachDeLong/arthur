@@ -1,0 +1,37 @@
+{
+  "agentEvidence": "Current Codex task transcript; Codex implemented and verified commit 9196ad0fda14695dc82813578d0ef0ea18fb4c72",
+  "agentTool": "Codex",
+  "baseCommit": "b7b2a36a29918eec98e6fe01e81cab5cc0bca3fe",
+  "caseCount": 1,
+  "caseInventorySha256": "2185fa627c20fa9155e42653839cdf72a10f95c8362320f4197faf7e4d33d877",
+  "changeId": "d_dbd35e6465da6e1c71c3aa33",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/ai-reasoning-hub/tree/codex/recover-corrupt-local-storage",
+  "rawDiffSha256": "980448b12bced8017b05dbe05532e66c238e444dad1ed6bebbcabf458c14099b",
+  "relevantSourcePaths": [
+    "frontend/src/App.tsx",
+    "frontend/src/hooks/useBookmarks.ts",
+    "frontend/src/hooks/useReadingLists.ts",
+    "frontend/src/utils/index.ts",
+    "frontend/src/utils/storage.test.ts",
+    "frontend/src/utils/storage.ts"
+  ],
+  "repositoryId": "ai-reasoning-hub",
+  "resultCommit": "9196ad0fda14695dc82813578d0ef0ea18fb4c72",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T08:32:15.854Z",
+  "standardTools": [
+    {
+      "command": "npm --prefix frontend run type-check",
+      "kind": "compiler",
+      "name": "typecheck"
+    },
+    {
+      "command": "npm --prefix frontend test",
+      "kind": "test",
+      "name": "storage"
+    }
+  ],
+  "studyId": "field-v1"
+}

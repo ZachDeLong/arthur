@@ -1,0 +1,229 @@
+diff --git a/package.json b/package.json
+index 0fb039f5f83a36e48655bf1ca0a906d427702d88..225824436636fcee8e9696e3c48b7d5854f71c4a 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/fetch-timeout.js && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/campus-fetch.js b/scripts/campus-fetch.js
+index 1c0498300446dbfcb542aa09d8550750437437d4..9973711cf18f9df1b46f920aea236d61fed6b8dd 100644
+--- a/scripts/campus-fetch.js
++++ b/scripts/campus-fetch.js
+@@ -1,5 +1,7 @@
+-export async function fetchCampusFeatureCollection(url, fetchImpl = fetch) {
+-  const response = await fetchImpl(url, { cache: 'no-cache' });
++import { fetchWithTimeout } from './fetch-timeout.js';
++
++export async function fetchCampusFeatureCollection(url, fetchImpl = fetch, timeoutMs) {
++  const response = await fetchWithTimeout(url, { cache: 'no-cache' }, fetchImpl, timeoutMs);
+   if (response.status === 404) return null;
+   if (!response.ok) {
+     throw new Error(`HTTP ${response.status} fetching ${url}`);
+diff --git a/scripts/fetch-all-campuses.mjs b/scripts/fetch-all-campuses.mjs
+index 4c75e1feb373ec1177adf2108bdb329816eb43b8..a4ca9622750ac7ca9b47527be07fa9782449a3dd 100644
+--- a/scripts/fetch-all-campuses.mjs
++++ b/scripts/fetch-all-campuses.mjs
+@@ -9,6 +9,7 @@
+ 
+ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+ import { parseFetchOptions } from './fetch-options.mjs';
++import { fetchWithTimeout } from './fetch-timeout.js';
+ import { geometryToLinearRing } from './geojson-ring.mjs';
+ import { validateOverpassResponse } from './overpass-response.mjs';
+ 
+@@ -20,6 +21,7 @@ const OVERPASS_ENDPOINTS = [
+ const BUFFER_KM = 1.5;            // half-side of the bbox in km
+ const CONCURRENCY = 3;            // parallel college fetches
+ const MAX_RETRY = 3;
++const REQUEST_TIMEOUT_MS = 120_000;
+ 
+ // Mirror of the client classifier — keep in sync with index.html.
+ function classify(t) {
+@@ -78,7 +80,7 @@ async function queryOverpass(body) {
+   for (const url of OVERPASS_ENDPOINTS) {
+     for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+       try {
+-        const res = await fetch(url, {
++        const res = await fetchWithTimeout(url, {
+           method: 'POST',
+           body: 'data=' + encodeURIComponent(body),
+           headers: {
+@@ -86,7 +88,7 @@ async function queryOverpass(body) {
+             'Accept': 'application/json',
+             'User-Agent': 'usa-college-map/1.0 (https://github.com/Counselor-Sophie/usa-college-map)',
+           },
+-        });
++        }, fetch, REQUEST_TIMEOUT_MS);
+         if (res.status === 429 || res.status === 504 || res.status === 502) {
+           lastErr = new Error(`${res.status} @ ${url}`);
+           await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+diff --git a/scripts/fetch-timeout.js b/scripts/fetch-timeout.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a35e92a38de7179b5d638faf5db44b1b1f83fce5
+--- /dev/null
++++ b/scripts/fetch-timeout.js
+@@ -0,0 +1,30 @@
++const DEFAULT_TIMEOUT_MS = 15_000;
++
++export async function fetchWithTimeout(
++  url,
++  options = {},
++  fetchImpl = fetch,
++  timeoutMs = DEFAULT_TIMEOUT_MS,
++) {
++  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
++    throw new Error('Fetch timeout must be a positive finite number');
++  }
++
++  const controller = new AbortController();
++  let timedOut = false;
++  const timeout = setTimeout(() => {
++    timedOut = true;
++    controller.abort();
++  }, timeoutMs);
++
++  try {
++    return await fetchImpl(url, { ...options, signal: controller.signal });
++  } catch (cause) {
++    if (timedOut) {
++      throw new Error(`Timed out after ${timeoutMs}ms fetching ${url}`, { cause });
++    }
++    throw cause;
++  } finally {
++    clearTimeout(timeout);
++  }
++}
+diff --git a/scripts/wiki-fetch.mjs b/scripts/wiki-fetch.mjs
+index 6e356d26966324458fea8fc0b4a55a419dfbf3f5..d337176a77e56f75c25f90fcb87817859095b3a6 100644
+--- a/scripts/wiki-fetch.mjs
++++ b/scripts/wiki-fetch.mjs
+@@ -1,9 +1,11 @@
++import { fetchWithTimeout } from './fetch-timeout.js';
++
+ const USER_AGENT = 'usa-college-map/1.0 (https://github.com/Counselor-Sophie/usa-college-map)';
+ 
+-export async function fetchJSON(url, fetchImpl = fetch) {
+-  const response = await fetchImpl(url, {
++export async function fetchJSON(url, fetchImpl = fetch, timeoutMs) {
++  const response = await fetchWithTimeout(url, {
+     headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' },
+-  });
++  }, fetchImpl, timeoutMs);
+ 
+   if (response.status === 404) return null;
+   if (!response.ok) {
+diff --git a/tests/campus-fetch.test.mjs b/tests/campus-fetch.test.mjs
+index e3c953bb78a48e80cd01a36694d277a00365881c..1638484cb3c7aa85289c91a24733f764897a1b2b 100644
+--- a/tests/campus-fetch.test.mjs
++++ b/tests/campus-fetch.test.mjs
+@@ -6,7 +6,8 @@ import { fetchCampusFeatureCollection } from '../scripts/campus-fetch.js';
+ test('loads and validates a campus FeatureCollection', async () => {
+   const expected = { type: 'FeatureCollection', features: [] };
+   const fetchMock = async (_url, options) => {
+-    assert.deepEqual(options, { cache: 'no-cache' });
++    assert.equal(options.cache, 'no-cache');
++    assert.ok(options.signal instanceof AbortSignal);
+     return new Response(JSON.stringify(expected), {
+       status: 200,
+       headers: { 'Content-Type': 'application/json' },
+@@ -16,6 +17,17 @@ test('loads and validates a campus FeatureCollection', async () => {
+   assert.deepEqual(await fetchCampusFeatureCollection('/campus.geojson', fetchMock), expected);
+ });
+ 
++test('times out a campus request so a later load can retry', async () => {
++  const neverResponds = async (_url, { signal }) => new Promise((resolve, reject) => {
++    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
++  });
++
++  await assert.rejects(
++    fetchCampusFeatureCollection('/campus.geojson', neverResponds, 10),
++    /Timed out after 10ms/,
++  );
++});
++
+ test('treats only a 404 as definitively missing campus data', async () => {
+   const fetchMock = async () => new Response('missing', { status: 404 });
+   assert.equal(await fetchCampusFeatureCollection('/missing.geojson', fetchMock), null);
+diff --git a/tests/fetch-timeout.test.mjs b/tests/fetch-timeout.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e81263b5e3602367feb196fd6c551225a5191ee0
+--- /dev/null
++++ b/tests/fetch-timeout.test.mjs
+@@ -0,0 +1,48 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { fetchWithTimeout } from '../scripts/fetch-timeout.js';
++
++test('passes request options and an abort signal to fetch', async () => {
++  let requestOptions;
++  const expected = { ok: true };
++
++  const result = await fetchWithTimeout(
++    'https://example.test/data',
++    { headers: { Accept: 'application/json' } },
++    async (_url, options) => {
++      requestOptions = options;
++      return expected;
++    },
++    100,
++  );
++
++  assert.equal(result, expected);
++  assert.equal(requestOptions.headers.Accept, 'application/json');
++  assert.ok(requestOptions.signal instanceof AbortSignal);
++  assert.equal(requestOptions.signal.aborted, false);
++});
++
++test('aborts a request that exceeds its deadline', async () => {
++  const neverResponds = async (_url, { signal }) => new Promise((resolve, reject) => {
++    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
++  });
++
++  await assert.rejects(
++    fetchWithTimeout('https://example.test/hangs', {}, neverResponds, 10),
++    /Timed out after 10ms fetching https:\/\/example\.test\/hangs/,
++  );
++});
++
++test('rejects invalid deadlines before starting a request', async () => {
++  let called = false;
++  const fetchMock = async () => {
++    called = true;
++  };
++
++  await assert.rejects(
++    fetchWithTimeout('https://example.test/data', {}, fetchMock, 0),
++    /positive finite number/,
++  );
++  assert.equal(called, false);
++});
+diff --git a/tests/wiki-fetch.test.mjs b/tests/wiki-fetch.test.mjs
+index fae525b82be950f8ba6b3321e69a2015ec6fb1b6..e87ed9bd80c49a19a3f2fb80ecf89ab659385675 100644
+--- a/tests/wiki-fetch.test.mjs
++++ b/tests/wiki-fetch.test.mjs
+@@ -17,6 +17,18 @@ test('returns parsed JSON and sends the project user agent', async () => {
+   assert.deepEqual(result, { found: true });
+   assert.match(requestOptions.headers['User-Agent'], /usa-college-map/);
+   assert.equal(requestOptions.headers.Accept, 'application/json');
++  assert.ok(requestOptions.signal instanceof AbortSignal);
++});
++
++test('times out a Wikipedia request instead of stalling the enrichment run', async () => {
++  const neverResponds = async (_url, { signal }) => new Promise((resolve, reject) => {
++    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
++  });
++
++  await assert.rejects(
++    fetchJSON('https://example.test/hangs', neverResponds, 10),
++    /Timed out after 10ms/,
++  );
+ });
+ 
+ test('treats a 404 as a definitive missing resource', async () => {

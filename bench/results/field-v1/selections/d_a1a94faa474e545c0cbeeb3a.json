@@ -1,0 +1,33 @@
+{
+  "agentEvidence": "User-directed Codex task; change committed as 80d5dac6df1b56ce09a13f60f6776ad60510f799",
+  "agentTool": "Codex",
+  "baseCommit": "d7691140e68acff74a531e6667e3165bc66fcc10",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_a1a94faa474e545c0cbeeb3a",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/shapez-agent",
+  "rawDiffSha256": "2fdb1b8dfc61ba50d46e88bb0cc46f271087500e122488c149b19a26855c1e48",
+  "relevantSourcePaths": [
+    "scripts/test-protocol.mjs",
+    "server/bridge-server.mjs"
+  ],
+  "repositoryId": "shapez-agent",
+  "resultCommit": "80d5dac6df1b56ce09a13f60f6776ad60510f799",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T08:19:17.377Z",
+  "standardTools": [
+    {
+      "command": "npm run build",
+      "kind": "compiler",
+      "name": "build"
+    },
+    {
+      "command": "npm test",
+      "kind": "test",
+      "name": "all"
+    }
+  ],
+  "studyId": "field-v1"
+}

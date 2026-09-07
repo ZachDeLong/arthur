@@ -1,0 +1,93 @@
+diff --git a/mod/agent-bridge.js b/mod/agent-bridge.js
+index 9e32391752343f133c380e3b52e8bf159fbe2f07..ef6a9e7965dda67fe53fd9fa92de5c8f133a0efd 100644
+--- a/mod/agent-bridge.js
++++ b/mod/agent-bridge.js
+@@ -243,12 +243,24 @@ class Mod extends shapez.Mod {
+             } catch (ex) {
+                 failures.push({ index: i, spec: entities[i], error: String(ex.message || ex) });
+                 if (atomic) {
+-                    for (const p of placed) {
++                    const rollbackFailures = [];
++                    for (const p of [...placed].reverse()) {
+                         const e = this.root.entityMgr.findByUid(p.uid, false);
+-                        if (e) this.root.logic.tryDeleteBuilding(e);
++                        if (!e) continue;
++                        try {
++                            if (!this.root.logic.tryDeleteBuilding(e)) rollbackFailures.push(p);
++                        } catch {
++                            rollbackFailures.push(p);
++                        }
+                     }
++
++                    const rollbackStatus = rollbackFailures.length
++                        ? "; rollback incomplete for " + rollbackFailures
++                            .map(p => "(" + p.x + "," + p.y + ")")
++                            .join(", ")
++                        : " (rolled back)";
+                     throw new Error(
+-                        "Atomic batch failed at index " + i + ": " + String(ex.message || ex) + " (rolled back)"
++                        "Atomic batch failed at index " + i + ": " + String(ex.message || ex) + rollbackStatus
+                     );
+                 }
+             }
+diff --git a/scripts/test-connect.mjs b/scripts/test-connect.mjs
+index 5c01463b4933fcc413faf69b1947ce22a9b1c104..9b0ee14a8203e15b08d24bbbdb64d67313299f99 100644
+--- a/scripts/test-connect.mjs
++++ b/scripts/test-connect.mjs
+@@ -277,6 +277,56 @@ console.log("\n=== run duration validation ===");
+     }
+ }
+ 
++console.log("\n=== atomic placement rollback ===");
++{
++    const root = makeRoot();
++    const place = root.logic.tryPlaceBuilding;
++    let attempts = 0;
++    root.logic.tryPlaceBuilding = options => (++attempts === 3 ? null : place(options));
++    const mod = newMod(root);
++    let message = "";
++    try {
++        mod.placeMany({
++            entities: [
++                { type: "belt", x: 10, y: 10 },
++                { type: "belt", x: 11, y: 10 },
++                { type: "belt", x: 12, y: 10 },
++            ],
++            atomic: true,
++        });
++    } catch (ex) {
++        message = ex.message;
++    }
++    check("successful rollback is reported", message.includes("(rolled back)"), message);
++    check("successful rollback leaves no placed entities", root.tiles.size === 0, String(root.tiles.size) + " remain");
++}
++{
++    const root = makeRoot();
++    const place = root.logic.tryPlaceBuilding;
++    const remove = root.logic.tryDeleteBuilding;
++    let attempts = 0;
++    let removals = 0;
++    root.logic.tryPlaceBuilding = options => (++attempts === 3 ? null : place(options));
++    root.logic.tryDeleteBuilding = entity => (++removals === 1 ? false : remove(entity));
++    const mod = newMod(root);
++    let message = "";
++    try {
++        mod.placeMany({
++            entities: [
++                { type: "belt", x: 20, y: 20 },
++                { type: "belt", x: 21, y: 20 },
++                { type: "belt", x: 22, y: 20 },
++            ],
++            atomic: true,
++        });
++    } catch (ex) {
++        message = ex.message;
++    }
++    check("failed rollback is not reported as complete", message.includes("rollback incomplete"), message);
++    check("failed rollback identifies the entity left behind", message.includes("(21,20)"), message);
++    check("rollback still removes the other placed entities", root.tiles.size === 1, String(root.tiles.size) + " remain");
++}
++
+ // patch.pos is the centroid of a patch's tiles, so it is fractional and can sit
+ // on a tile with no resource on it. Miners must go on an actual resource tile.
+ console.log("\n=== resource patch anchoring ===");

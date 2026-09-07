@@ -1,0 +1,20 @@
+{
+  "batchInputSha256": "2233463bdffbbf326198d7c9e09c69a933e2acd40eda0bb2c73e457e81b943a1",
+  "durationMs": 2300.7547,
+  "inputTokens": 624,
+  "model": "claude-sonnet-5",
+  "outputTokens": 134,
+  "predictions": [
+    {
+      "caseId": "c_ca844fa0c54fa565ea518ea0",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention with a fallback default, not an invalid blocking reference to a defined project symbol."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_ca844fa0c54fa565ea518ea0\",\"predictedInvalid\":false,\"reason\":\"process.env access is a runtime environment convention with a fallback default, not an invalid blocking reference to a defined project symbol.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnBF7ApHzickvVZcUM1",
+  "system": "anthropic/claude-sonnet-5"
+}

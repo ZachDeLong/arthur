@@ -1,0 +1,115 @@
+diff --git a/src/store/taskStore.test.ts b/src/store/taskStore.test.ts
+index 81e50c328564f5fd3155f992ee85a11628fe3572..23ff143692a4f616122935678cc9031bb36e37bb 100644
+--- a/src/store/taskStore.test.ts
++++ b/src/store/taskStore.test.ts
+@@ -1,6 +1,11 @@
+-import { describe, it, expect, beforeEach } from 'vitest'
++import { describe, it, expect, beforeEach, vi } from 'vitest'
++import { fetchAssignments } from '../lib/canvas'
+ import { useTaskStore } from './taskStore'
+ 
++vi.mock('../lib/canvas', () => ({
++  fetchAssignments: vi.fn(),
++}))
++
+ describe('taskStore', () => {
+   beforeEach(() => {
+     // Reset store state before each test
+@@ -13,6 +18,7 @@ describe('taskStore', () => {
+       customOrder: [],
+       customCourses: [],
+     })
++    vi.mocked(fetchAssignments).mockReset()
+   })
+ 
+   describe('addManualTask', () => {
+@@ -81,6 +87,62 @@ describe('taskStore', () => {
+     })
+   })
+ 
++  describe('syncCanvas', () => {
++    it('preserves completion by assignment identity, not a shared title', async () => {
++      useTaskStore.setState({
++        tasks: [
++          {
++            id: 'canvas-school-a:101',
++            title: 'Final Project',
++            dueDate: '2025-02-10T12:00:00Z',
++            courseName: 'Course A',
++            source: 'canvas',
++            completed: true,
++          },
++          {
++            id: 'canvas-school-a:202',
++            title: 'Final Project',
++            dueDate: '2025-02-11T12:00:00Z',
++            courseName: 'Course B',
++            source: 'canvas',
++            completed: false,
++          },
++        ],
++      })
++      vi.mocked(fetchAssignments).mockResolvedValue([
++        {
++          id: 'school-a:101',
++          name: 'Renamed Final Project',
++          due_at: '2025-02-12T12:00:00Z',
++          course_id: '1',
++          course_name: 'Course A',
++        },
++        {
++          id: 'school-a:202',
++          name: 'Final Project',
++          due_at: '2025-02-13T12:00:00Z',
++          course_id: '2',
++          course_name: 'Course B',
++        },
++      ])
++
++      await useTaskStore.getState().syncCanvas(true)
++
++      expect(useTaskStore.getState().tasks).toEqual([
++        expect.objectContaining({
++          id: 'canvas-school-a:101',
++          title: 'Renamed Final Project',
++          completed: true,
++        }),
++        expect.objectContaining({
++          id: 'canvas-school-a:202',
++          title: 'Final Project',
++          completed: false,
++        }),
++      ])
++    })
++  })
++
+   describe('reorderTasks', () => {
+     it('reorders tasks based on drag position', () => {
+       useTaskStore.setState({
+diff --git a/src/store/taskStore.ts b/src/store/taskStore.ts
+index 35f919c67bc36d4bbf39764257f446931750d31b..b08c274ba672bd333c941161bc5e82cb1620bf7c 100644
+--- a/src/store/taskStore.ts
++++ b/src/store/taskStore.ts
+@@ -68,14 +68,18 @@ export const useTaskStore = create<TaskStore>()(
+           const { tasks: existingTasks } = get()
+           const manualTasks = existingTasks.filter(t => t.source === 'manual')
+ 
+-          // Check completion by assignment name (more stable than ID)
+-          const completedNames = new Set(
+-            existingTasks.filter(t => t.completed).map(t => t.title)
++          // Canvas IDs include both the configured instance and assignment ID.
++          // Titles are not identities: two courses commonly reuse names such as
++          // "Final Project" or "Week 1 Discussion".
++          const completedCanvasIds = new Set(
++            existingTasks
++              .filter(t => t.source === 'canvas' && t.completed)
++              .map(t => t.id)
+           )
+ 
+           const mergedCanvasTasks = uniqueCanvasTasks.map(t => ({
+             ...t,
+-            completed: completedNames.has(t.title)
++            completed: completedCanvasIds.has(t.id)
+           }))
+ 
+           set({

@@ -1,0 +1,30 @@
+[
+  {
+    "command": "py -m pytest -q",
+    "durationMs": 6953.666899999999,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "pytest",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:42:40.794Z",
+    "stderr": "",
+    "stdout": "........................                                                 [100%]\r\n24 passed in 5.92s\r\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run build --prefix frontend",
+    "durationMs": 2515.031000000001,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "frontend",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:42:47.748Z",
+    "stderr": "Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:\n  npx update-browserslist-db@latest\n  Why you should do it regularly: https://github.com/browserslist/update-db#readme\n",
+    "stdout": "\n> benchbro-frontend@0.1.0 build\n> tsc && vite build\n\nvite v6.4.1 building for production...\ntransforming...\n✓ 46 modules transformed.\nrendering chunks...\ncomputing gzip size...\n../src/benchbro/static/index.html                   0.44 kB │ gzip:  0.30 kB\n../src/benchbro/static/assets/index-gvfCc3I8.css   15.26 kB │ gzip:  3.48 kB\n../src/benchbro/static/assets/index-BAbJmBiX.js   255.03 kB │ gzip: 79.15 kB\n✓ built in 1.12s\n",
+    "timedOut": false
+  }
+]

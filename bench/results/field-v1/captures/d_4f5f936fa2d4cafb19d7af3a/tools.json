@@ -1,0 +1,44 @@
+[
+  {
+    "command": "npm run test:run",
+    "durationMs": 1811.0705,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "vitest",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:50:43.275Z",
+    "stderr": "stderr | src/lib/canvas.test.ts > fetchAssignments > reports a failed course while keeping successful assignments\nSome Canvas requests failed: [\n  {\n    instanceId: 'test-instance',\n    instanceName: 'Test School',\n    courseId: '123456',\n    courseName: 'Intro to Computer Science',\n    message: 'Canvas returned an invalid JSON response'\n  }\n]\n\nstderr | src/lib/canvas.test.ts > fetchAssignments > reports malformed course records instead of treating them as an empty course list\nSome Canvas requests failed: [\n  {\n    instanceId: 'test-instance',\n    instanceName: 'Test School',\n    courseId: '123456',\n    message: 'Canvas returned malformed course data'\n  },\n  {\n    instanceId: 'test-instance',\n    instanceName: 'Test School',\n    message: 'Canvas returned malformed course data'\n  }\n]\n\n",
+    "stdout": "\n> school-checklist@0.0.0 test:run\n> vitest run\n\n\n RUN  v4.0.18 C:/Users/zachd/.arthur-field-worktrees/school-checklist-canvas-host\n\n ✓ api/canvas.test.js (12 tests) 11ms\n ✓ vite.config.test.ts (2 tests) 8ms\n ✓ src/utils/dateUtils.test.ts (15 tests) 20ms\n ✓ src/store/taskStore.test.ts (13 tests) 7ms\n ✓ src/store/settingsValidation.test.ts (4 tests) 6ms\n ✓ src/lib/canvas.test.ts (15 tests) 25ms\n\n Test Files  6 passed (6)\n      Tests  61 passed (61)\n   Start at  13:50:43\n   Duration  1.19s (transform 345ms, setup 1.65s, import 412ms, tests 76ms, environment 3.73s)\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run lint",
+    "durationMs": 2290.7935,
+    "exitCode": 0,
+    "kind": "lint",
+    "name": "eslint",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:50:45.086Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 lint\n> eslint .\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run build",
+    "durationMs": 2089.2667999999994,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "vite",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T20:50:47.376Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 build\n> vite build\n\nvite v7.3.1 building client environment for production...\ntransforming...\n✓ 540 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   1.00 kB │ gzip:   0.55 kB\ndist/assets/index-C9aBSe_E.css   35.95 kB │ gzip:   6.18 kB\ndist/assets/index-DWFxRiLJ.js   482.77 kB │ gzip: 151.61 kB\n✓ built in 1.43s\n",
+    "timedOut": false
+  }
+]

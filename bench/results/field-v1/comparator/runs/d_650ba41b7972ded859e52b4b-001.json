@@ -1,0 +1,20 @@
+{
+  "batchInputSha256": "f34d90754865c2a9feaaef1c4685a49a43a41349d8c03471ca971fe46925981a",
+  "durationMs": 1775.8293000000012,
+  "inputTokens": 618,
+  "model": "claude-sonnet-5",
+  "outputTokens": 89,
+  "predictions": [
+    {
+      "caseId": "c_adf02e5337e84e4d12ae28a9",
+      "predictedInvalid": true,
+      "reason": "No routes are defined in the ground-truth contract, so GET /api/papers/stats has no matching backend route."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_adf02e5337e84e4d12ae28a9\",\"predictedInvalid\":true,\"reason\":\"No routes are defined in the ground-truth contract, so GET /api/papers/stats has no matching backend route.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnCQuKH1bjvKeHuTXUn",
+  "system": "anthropic/claude-sonnet-5"
+}

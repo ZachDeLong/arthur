@@ -1,0 +1,266 @@
+{
+  "batches": [
+    {
+      "artifactPath": "comparator/runs/d_05933ddea8a63000ba3a42b5-001.json",
+      "artifactSha256": "cf3def2276c51e46e05638908950ec5050eeec051cb8baf5495600febe1e318d",
+      "batchInputSha256": "e5c4e7cffcf62aba0b4f39a9dbdfa8a706f83122016b319391a3c957d7507b5e",
+      "durationMs": 2071.9503,
+      "inputTokens": 804,
+      "model": "claude-sonnet-5",
+      "outputTokens": 158,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnB6VzeRjrxpr566BiZ"
+    },
+    {
+      "artifactPath": "comparator/runs/d_07f8065749c09e3dd07d47a0-001.json",
+      "artifactSha256": "bbaf4ce8ad8ca2604fcd277717e13b8522d95d94a944bb7d97eab60a2de1f654",
+      "batchInputSha256": "2233463bdffbbf326198d7c9e09c69a933e2acd40eda0bb2c73e457e81b943a1",
+      "durationMs": 2300.7547,
+      "inputTokens": 624,
+      "model": "claude-sonnet-5",
+      "outputTokens": 134,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnBF7ApHzickvVZcUM1"
+    },
+    {
+      "artifactPath": "comparator/runs/d_2288b78bccac78fe3b96a021-001.json",
+      "artifactSha256": "76c80547a441f8887bfb36cc9866c3b25f16b3e8921425ae14e43abba4af9120",
+      "batchInputSha256": "0ad362d2bef8a4782a4f4487009f4492054037e15cf7d5da4b74f815b56dd5b8",
+      "durationMs": 2850.4876999999997,
+      "inputTokens": 1360,
+      "model": "claude-sonnet-5",
+      "outputTokens": 245,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnBR5SVQKUUHK7eFrFc"
+    },
+    {
+      "artifactPath": "comparator/runs/d_234a11cdde187ec80b063729-001.json",
+      "artifactSha256": "787e4a413596e3bce4e9e345cef77c910e8099f2a97deea2407030e933c2f493",
+      "batchInputSha256": "1a61ce03df29f7601aa8e6eaf0d1afe143599170271725c566abcaaa8f93290e",
+      "durationMs": 1752.2518999999993,
+      "inputTokens": 574,
+      "model": "claude-sonnet-5",
+      "outputTokens": 102,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnBd3XTeWav4zCyGHWq"
+    },
+    {
+      "artifactPath": "comparator/runs/d_2392793e535e3cc29cfd36ea-001.json",
+      "artifactSha256": "ae0388b4d832c9676c2aa1d79810fa0702c0621db2a91fb08a38f5f782d859aa",
+      "batchInputSha256": "871dcc4af8a655059a2ee8ad01e6559833809d696d452546dd52c9e754b79c21",
+      "durationMs": 1943.0805,
+      "inputTokens": 562,
+      "model": "claude-sonnet-5",
+      "outputTokens": 107,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnBkbT5go1hAEr81xsG"
+    },
+    {
+      "artifactPath": "comparator/runs/d_326b836fb89e64ee4edf51d1-001.json",
+      "artifactSha256": "2dfba3b283cbbc5286294ac52aef459f9374241397ff84737c1f2a0185a28fa7",
+      "batchInputSha256": "4e0730c4f481c401f0be000524309d526c9c3578f0b3bf927928daf019aa93f4",
+      "durationMs": 2288.0242,
+      "inputTokens": 863,
+      "model": "claude-sonnet-5",
+      "outputTokens": 151,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnBtnKkJMaAeoz6DSc8"
+    },
+    {
+      "artifactPath": "comparator/runs/d_441b169477cbce04ead0b763-001.json",
+      "artifactSha256": "7fdc8bf384e490b545deb5d0f825507ed477cc47c7ed38b48a558739f72b1c04",
+      "batchInputSha256": "3c51899099978650622af4b596523d6ff424fff2f412019eaabff1ce206784f7",
+      "durationMs": 2042.8114999999998,
+      "inputTokens": 1329,
+      "model": "claude-sonnet-5",
+      "outputTokens": 123,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnC4rJvKQYqGreJ4gWc"
+    },
+    {
+      "artifactPath": "comparator/runs/d_5566a5369c5039114000271a-001.json",
+      "artifactSha256": "db111a4fde2f95093ffa94bd2714a18604a06cb0545caf615c01c6d229417ffd",
+      "batchInputSha256": "e581177af7ccfae5b1ddf64d9ac5a166a9bd05e7bd11b10ced7489eabbfc0850",
+      "durationMs": 2697.3717000000015,
+      "inputTokens": 2304,
+      "model": "claude-sonnet-5",
+      "outputTokens": 158,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCDbuKW5kx4AYFSMxU"
+    },
+    {
+      "artifactPath": "comparator/runs/d_650ba41b7972ded859e52b4b-001.json",
+      "artifactSha256": "59092be2e6366f46a7f07d9b083c59657fd4c8a0935d4a7e8de73ea732e6b459",
+      "batchInputSha256": "f34d90754865c2a9feaaef1c4685a49a43a41349d8c03471ca971fe46925981a",
+      "durationMs": 1775.8293000000012,
+      "inputTokens": 618,
+      "model": "claude-sonnet-5",
+      "outputTokens": 89,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCQuKH1bjvKeHuTXUn"
+    },
+    {
+      "artifactPath": "comparator/runs/d_6c0d4fd2763edf6253df34b6-001.json",
+      "artifactSha256": "391e308501f0e8c4c47ee68c0461f7aebe321ebe93997f27c68c67806b2e5c5a",
+      "batchInputSha256": "cde7df405dddaea9c3240dd8c5b6d42106b6f5703941b64fb886ba8cf8ffa70a",
+      "durationMs": 1965.2740000000013,
+      "inputTokens": 1388,
+      "model": "claude-sonnet-5",
+      "outputTokens": 95,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCYdeD7fUQHghLxKws"
+    },
+    {
+      "artifactPath": "comparator/runs/d_79b9af38a948a4130b79802c-001.json",
+      "artifactSha256": "997b73bd61175f7f38a4b125519797d2773b0ac8020e94717f78e1637605e5da",
+      "batchInputSha256": "c621c923b22f198445f2fa0ca14289812c6fa96dc824fbcd167448a9ab2f8c0d",
+      "durationMs": 1904.9328000000023,
+      "inputTokens": 893,
+      "model": "claude-sonnet-5",
+      "outputTokens": 137,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCgwxA4D1Ub5aQj4VN"
+    },
+    {
+      "artifactPath": "comparator/runs/d_a9ea404eededbed8a63d49f0-001.json",
+      "artifactSha256": "0db7c4deae88df0c412cc4da9bac7b298b234a217cc3c200e0d1addb0dbb057e",
+      "batchInputSha256": "0b64c6b3b407edf92052eb44ff5e9551d41ef730e743581502c842de457d4e8b",
+      "durationMs": 2271.510900000001,
+      "inputTokens": 1551,
+      "model": "claude-sonnet-5",
+      "outputTokens": 153,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCqA4sCzE8N6wFJvbf"
+    },
+    {
+      "artifactPath": "comparator/runs/d_dbd35e6465da6e1c71c3aa33-001.json",
+      "artifactSha256": "cd4f7c2e3e7eaffbc945f796fc5eb1b421785b310cf3cdd710a98e044ff84f8e",
+      "batchInputSha256": "4896b9f68023a1756210f0e32cbe66a25a803f4666fce8acbf64213d917734c6",
+      "durationMs": 1972.1612000000023,
+      "inputTokens": 541,
+      "model": "claude-sonnet-5",
+      "outputTokens": 119,
+      "requestedModel": "claude-sonnet-5",
+      "responseId": "msg_011CepnCzrUBoowo36VABwFb"
+    }
+  ],
+  "createdAt": "2026-09-07T21:21:45.767Z",
+  "durationMs": 27836.440700000006,
+  "estimatedCostUsd": 0.044532,
+  "inputTokens": 13411,
+  "model": "claude-sonnet-5",
+  "outputTokens": 1771,
+  "predictions": [
+    {
+      "caseId": "c_00375cc3678c0f23e67154bd",
+      "predictedInvalid": false,
+      "reason": "Importing named exports from root 'vitest' entry, which resolves via package.json exports; valid and installed."
+    },
+    {
+      "caseId": "c_2072a3929f4c718d83b473de",
+      "predictedInvalid": true,
+      "reason": "Contract confirms 'vitest' package is not installed, making this live import an actionable invalid reference."
+    },
+    {
+      "caseId": "c_2130f4d93b33ed99218161c1",
+      "predictedInvalid": false,
+      "reason": "Route call is a runtime fetch to an API endpoint, not a contract-listed invalid reference"
+    },
+    {
+      "caseId": "c_2947d44da97f1de10c7f8352",
+      "predictedInvalid": true,
+      "reason": "Imports 'vitest', which is not installed per contract, making this an unresolvable module reference."
+    },
+    {
+      "caseId": "c_323d1cd1dc3cd16ae53403ac",
+      "predictedInvalid": true,
+      "reason": "vitest is not installed per contract, so importing it is an invalid reference"
+    },
+    {
+      "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+      "predictedInvalid": false,
+      "reason": "vitest is installed and exports '.' entry with import condition resolving to dist/index.js; import valid."
+    },
+    {
+      "caseId": "c_4b93bf33685a2f6020e0bf67",
+      "predictedInvalid": false,
+      "reason": "Root 'vitest' import matches valid exports entry '.' in installed manifest"
+    },
+    {
+      "caseId": "c_5c274160247f2bb6a2735a22",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    },
+    {
+      "caseId": "c_66368da4645ca52d8436d47b",
+      "predictedInvalid": false,
+      "reason": "zod is installed and exports '.' entry supports named import { z } via index.js; import valid."
+    },
+    {
+      "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+      "predictedInvalid": true,
+      "reason": "Contract confirms 'react' package is not installed, making this live import an actionable invalid reference."
+    },
+    {
+      "caseId": "c_76f8dbc5196839bf7c4e6745",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    },
+    {
+      "caseId": "c_84404ca18f825a00998f3753",
+      "predictedInvalid": false,
+      "reason": "No route contract violations listed; empty contract provides no basis for invalidity."
+    },
+    {
+      "caseId": "c_9766ef6250c4d053eeab5fbe",
+      "predictedInvalid": false,
+      "reason": "Root export '.' with named exports (afterEach, describe, expect, it, vi) is valid per vitest's declared exports map."
+    },
+    {
+      "caseId": "c_9807a485e8aed74c2529df2a",
+      "predictedInvalid": true,
+      "reason": "Contract states 'react' package is not installed, so this import reference is invalid."
+    },
+    {
+      "caseId": "c_a78efe3a9f582c27a63ef203",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+    },
+    {
+      "caseId": "c_adf02e5337e84e4d12ae28a9",
+      "predictedInvalid": true,
+      "reason": "No routes are defined in the ground-truth contract, so GET /api/papers/stats has no matching backend route."
+    },
+    {
+      "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+      "predictedInvalid": true,
+      "reason": "Contract states react package is not installed, so import is invalid."
+    },
+    {
+      "caseId": "c_ca844fa0c54fa565ea518ea0",
+      "predictedInvalid": false,
+      "reason": "process.env access is a runtime environment convention with a fallback default, not an invalid blocking reference to a defined project symbol."
+    },
+    {
+      "caseId": "c_e93ebe77d3edecffbb4cb4b3",
+      "predictedInvalid": true,
+      "reason": "vitest is not installed per contract, so importing it is an invalid reference."
+    },
+    {
+      "caseId": "c_ee5133685fce407dc00233a5",
+      "predictedInvalid": false,
+      "reason": "Root 'vitest' import matches installed package's exports map; not an invalid reference."
+    }
+  ],
+  "pricing": {
+    "inputUsdPerMillion": 2,
+    "outputUsdPerMillion": 10,
+    "source": "Anthropic Claude API pricing and model versioning docs, accessed 2026-09-07: https://platform.claude.com/docs/en/about-claude/pricing ; https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions"
+  },
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "requestedModel": "claude-sonnet-5",
+  "schemaVersion": 1,
+  "studyId": "field-v1",
+  "system": "anthropic/claude-sonnet-5"
+}

@@ -1,0 +1,157 @@
+diff --git a/frontend/src/pages/TrendsPage.tsx b/frontend/src/pages/TrendsPage.tsx
+index bc307d332dbe9daa70f119f61d70728d3adfed57..aeab22430341411831b58290c8cd66b46d2e5c07 100644
+--- a/frontend/src/pages/TrendsPage.tsx
++++ b/frontend/src/pages/TrendsPage.tsx
+@@ -1,5 +1,5 @@
+ import { useState, useEffect, useMemo, type FC } from 'react';
+-import type { Paper } from '@/types';
++import type { StatsPaper } from '@/types';
+ import { getScoreColor, fetchStats } from '@/utils';
+ import { ChartComponent } from '@/components/charts';
+ import { ScoreBreakdownChips } from '@/components/ui';
+@@ -26,7 +26,7 @@ const categoryColors = [
+ ];
+ 
+ export const TrendsPage: FC = () => {
+-  const [allPapers, setAllPapers] = useState<Paper[] | null>(null);
++  const [allPapers, setAllPapers] = useState<StatsPaper[] | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [reloadAttempt, setReloadAttempt] = useState(0);
+diff --git a/frontend/src/types/paper.ts b/frontend/src/types/paper.ts
+index 1ab7342549cd73bf4d680f4d811f8a7db38c4cf3..552273b0e97cc893cb860e3f26c6a7d78f5f9f23 100644
+--- a/frontend/src/types/paper.ts
++++ b/frontend/src/types/paper.ts
+@@ -21,5 +21,17 @@ export interface PapersResponse {
+ }
+ 
+ export interface StatsResponse {
+-  papers: Paper[];
++  papers: StatsPaper[];
+ }
++
++export type StatsPaper = Pick<
++  Paper,
++  | 'id'
++  | 'title'
++  | 'authors'
++  | 'date'
++  | 'reasoning_category'
++  | 'arxiv_link'
++  | 'excitement_score'
++  | 'score_breakdown'
++>;
+diff --git a/frontend/src/utils/api.test.ts b/frontend/src/utils/api.test.ts
+index 6133db85067255450de46c67a3a8bf9f6fa594f3..e845bda0420e433b4bd7bf005ca155edcbea5eb9 100644
+--- a/frontend/src/utils/api.test.ts
++++ b/frontend/src/utils/api.test.ts
+@@ -1,6 +1,17 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ 
+-import { fetchCategories, fetchPapers, fetchStats } from './api';
++import { fetchCategories, fetchPapers, fetchStats, parseStatsResponse } from './api';
++
++const statsPaper = {
++  id: 1,
++  title: 'Reasoning Paper',
++  authors: 'Ada Lovelace',
++  date: '2026-09-07',
++  reasoning_category: 'Reasoning',
++  arxiv_link: 'https://arxiv.org/abs/2609.00001',
++  excitement_score: 6,
++  score_breakdown: 'Novelty: 2, Utility: 1, Results: 2, Access: 1',
++};
+ 
+ afterEach(() => {
+   vi.unstubAllGlobals();
+@@ -53,15 +64,38 @@ describe('fetchCategories', () => {
+ describe('fetchStats', () => {
+   it('forwards cancellation to the all-papers statistics request', async () => {
+     const controller = new AbortController();
+-    const fetchMock = vi.fn().mockResolvedValue(new Response('{"papers":[]}', {
++    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ papers: [statsPaper] }), {
+       status: 200,
+       headers: { 'Content-Type': 'application/json' },
+     }));
+     vi.stubGlobal('fetch', fetchMock);
+ 
+-    await expect(fetchStats(controller.signal)).resolves.toEqual({ papers: [] });
++    await expect(fetchStats(controller.signal)).resolves.toEqual({ papers: [statsPaper] });
+     expect(fetchMock).toHaveBeenCalledWith('/api/papers/stats', {
+       signal: controller.signal,
+     });
+   });
++
++  it('rejects malformed successful responses instead of passing them to Trends', async () => {
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
++      papers: [{ ...statsPaper, date: 'not-a-date' }],
++    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
++
++    await expect(fetchStats()).rejects.toThrow('Invalid stats response');
++  });
++});
++
++describe('parseStatsResponse', () => {
++  it('accepts the lightweight stats endpoint shape', () => {
++    expect(parseStatsResponse({ papers: [statsPaper] })).toEqual({ papers: [statsPaper] });
++  });
++
++  it.each([
++    { papers: 'not-an-array' },
++    { papers: [{ ...statsPaper, excitement_score: 8 }] },
++    { papers: [{ ...statsPaper, authors: null }] },
++    { papers: [{ ...statsPaper, id: 1.5 }] },
++  ])('rejects invalid stats payload %#', payload => {
++    expect(() => parseStatsResponse(payload)).toThrow('Invalid stats response');
++  });
+ });
+diff --git a/frontend/src/utils/api.ts b/frontend/src/utils/api.ts
+index 95603e6575e584624340fa482a2be85b3c743b06..14cb6548b5f975850e630864b7a6b6692db85093 100644
+--- a/frontend/src/utils/api.ts
++++ b/frontend/src/utils/api.ts
+@@ -1,4 +1,35 @@
+-import type { PapersResponse, StatsResponse } from '@/types';
++import type { PapersResponse, StatsPaper, StatsResponse } from '@/types';
++
++const isRecord = (value: unknown): value is Record<string, unknown> =>
++  typeof value === 'object' && value !== null && !Array.isArray(value);
++
++const isStatsPaper = (value: unknown): value is StatsPaper => {
++  if (!isRecord(value)) return false;
++
++  const stringFields = [
++    'title',
++    'authors',
++    'date',
++    'reasoning_category',
++    'arxiv_link',
++    'score_breakdown',
++  ] as const;
++  if (!stringFields.every(field => typeof value[field] === 'string')) return false;
++
++  const score = value.excitement_score;
++  if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > 7) return false;
++  if (typeof value.id !== 'number' || !Number.isSafeInteger(value.id)) return false;
++
++  const date = value.date;
++  return typeof date === 'string' && (date === '' || !Number.isNaN(Date.parse(date)));
++};
++
++export const parseStatsResponse = (value: unknown): StatsResponse => {
++  if (!isRecord(value) || !Array.isArray(value.papers) || !value.papers.every(isStatsPaper)) {
++    throw new Error('Invalid stats response');
++  }
++  return { papers: value.papers };
++};
+ 
+ export const fetchPapers = async (
+   queryString: string,
+@@ -24,7 +55,7 @@ export const fetchStats = async (signal?: AbortSignal): Promise<StatsResponse> =
+   if (!response.ok) {
+     throw new Error('Failed to fetch stats');
+   }
+-  return response.json();
++  return parseStatsResponse(await response.json());
+ };
+ 
+ export const fetchBibtex = async (arxivId: string): Promise<string> => {

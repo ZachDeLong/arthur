@@ -1,0 +1,138 @@
+diff --git a/package.json b/package.json
+index dd769ab951c0a010ecb60fd54dd4da4672fbd09f..bfb4cc2e5d6dfc549dacc8ffbe553b1fe9d93236 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/enrich-campuses.mjs b/scripts/enrich-campuses.mjs
+index 585b3d9c95ad583d8c693e1199104847f819b4d9..1d2d63cacc9719b5a7725d3a0c33352017b8ee56 100644
+--- a/scripts/enrich-campuses.mjs
++++ b/scripts/enrich-campuses.mjs
+@@ -9,6 +9,7 @@
+ 
+ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+ import path from 'node:path';
++import { parseEnrichOptions } from './enrich-options.mjs';
+ import { isRelevantMatch } from './wikipedia-match.mjs';
+ import { fetchJSON } from './wiki-fetch.mjs';
+ 
+@@ -169,9 +170,8 @@ async function enrichCampus(slug, force) {
+   let data;
+   try {
+     data = JSON.parse(readFileSync(file, 'utf8'));
+-  } catch {
+-    console.error(`  ! couldn't read ${file}`);
+-    return;
++  } catch (cause) {
++    throw new Error(`Couldn't read ${file}`, { cause });
+   }
+ 
+   const collegeName = COLLEGE_NAME[slug] || slug;
+@@ -225,14 +225,10 @@ async function enrichCampus(slug, force) {
+ 
+ async function main() {
+   const args = process.argv.slice(2);
+-  const force = args.includes('--force');
+-  const slugs = args.filter((a) => !a.startsWith('--'));
+-
+-  const targets = slugs.length
+-    ? slugs
+-    : readdirSync(BATCH_DIR)
+-        .filter((f) => f.endsWith('.geojson'))
+-        .map((f) => f.replace(/\.geojson$/, ''));
++  const availableSlugs = readdirSync(BATCH_DIR)
++    .filter((f) => f.endsWith('.geojson'))
++    .map((f) => f.replace(/\.geojson$/, ''));
++  const { force, targets } = parseEnrichOptions(args, availableSlugs);
+ 
+   console.log(`Enriching ${targets.length} campus(es) (force=${force})...`);
+   for (const slug of targets) {
+diff --git a/scripts/enrich-options.mjs b/scripts/enrich-options.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf5f8d22cd799e7c1d61beb70c635740daf81915
+--- /dev/null
++++ b/scripts/enrich-options.mjs
+@@ -0,0 +1,28 @@
++export function parseEnrichOptions(args, availableSlugs) {
++  const available = new Set(availableSlugs);
++  const targets = [];
++  let force = false;
++
++  for (const arg of args) {
++    if (arg === '--force') {
++      if (force) throw new Error('--force may only be provided once');
++      force = true;
++      continue;
++    }
++    if (arg.startsWith('--')) {
++      throw new Error(`Unknown option: ${arg}`);
++    }
++    if (!available.has(arg)) {
++      throw new Error(`Unknown campus slug: ${arg}`);
++    }
++    if (targets.includes(arg)) {
++      throw new Error(`Campus slug may only be provided once: ${arg}`);
++    }
++    targets.push(arg);
++  }
++
++  return {
++    force,
++    targets: targets.length ? targets : [...availableSlugs],
++  };
++}
+diff --git a/tests/enrich-options.test.mjs b/tests/enrich-options.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..58874a74ab5a3296c7fd1f9612a66b4fcdfc0913
+--- /dev/null
++++ b/tests/enrich-options.test.mjs
+@@ -0,0 +1,42 @@
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import test from 'node:test';
++import { fileURLToPath } from 'node:url';
++import path from 'node:path';
++
++import { parseEnrichOptions } from '../scripts/enrich-options.mjs';
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
++
++test('parses force and explicit campus targets', () => {
++  assert.deepEqual(
++    parseEnrichOptions(['--force', 'mit'], ['mit', 'stanford-university']),
++    { force: true, targets: ['mit'] },
++  );
++});
++
++test('uses every available campus when no slug is specified', () => {
++  assert.deepEqual(
++    parseEnrichOptions([], ['mit', 'stanford-university']),
++    { force: false, targets: ['mit', 'stanford-university'] },
++  );
++});
++
++test('rejects unknown options before enrichment starts', () => {
++  assert.throws(
++    () => parseEnrichOptions(['--froce'], ['mit']),
++    /Unknown option: --froce/,
++  );
++});
++
++test('rejects missing campus files instead of reporting success', () => {
++  const result = spawnSync(
++    process.execPath,
++    ['scripts/enrich-campuses.mjs', 'not-a-real-campus'],
++    { cwd: ROOT, encoding: 'utf8' },
++  );
++
++  assert.notEqual(result.status, 0);
++  assert.match(result.stderr, /Unknown campus slug: not-a-real-campus/);
++  assert.doesNotMatch(result.stdout, /Done\./);
++});

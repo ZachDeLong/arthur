@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "bytes": 516,
+      "content": "{\n  \"name\": \"usa-college-map\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"check\": \"node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\",\n    \"test\": \"node --test\"\n  }\n}\n",
+      "encoding": "utf8",
+      "path": "package.json",
+      "rawSha256": "dc97bfe971deb342ba0ab7f66536230b33edb95bc2e12e45483719eae230c20a",
+      "redactionCount": 0,
+      "storedSha256": "dc97bfe971deb342ba0ab7f66536230b33edb95bc2e12e45483719eae230c20a"
+    }
+  ],
+  "schemaVersion": 1
+}

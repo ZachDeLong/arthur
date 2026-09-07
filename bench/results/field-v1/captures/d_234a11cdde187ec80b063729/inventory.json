@@ -1,0 +1,39 @@
+[
+  {
+    "caseId": "c_9807a485e8aed74c2529df2a",
+    "changeId": "d_234a11cdde187ec80b063729",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useCallback, useEffect, useRef, useState } from \"react\";"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { useNavigate } from \"react-router-dom\";"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { fetchBackends, fetchBenchmarks, startSession } from \"../api/client\";"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 59,
+      "endColumn": 64,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/pages/NewEval.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "benchbro",
+    "sourceSha256": "005edd0f1fb04029ff91de567542081bc2a604b0cb757a42d2747ff247959361",
+    "target": "react"
+  }
+]

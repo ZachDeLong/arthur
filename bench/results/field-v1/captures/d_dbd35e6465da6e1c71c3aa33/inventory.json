@@ -1,0 +1,39 @@
+[
+  {
+    "caseId": "c_2947d44da97f1de10c7f8352",
+    "changeId": "d_dbd35e6465da6e1c71c3aa33",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import {"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "  readJsonStorage,"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/storage.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "250675eb9be6be8965f902cdd1c97f8e6693461c3202b2efaf3067f230b5397f",
+    "target": "vitest"
+  }
+]

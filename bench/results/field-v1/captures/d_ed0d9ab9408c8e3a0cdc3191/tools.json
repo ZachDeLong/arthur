@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 543.6146000000001,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:59:09.991Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ uses all campuses by default (1.0931ms)\n✔ parses the supported options in either order (0.2914ms)\n✔ rejects missing, non-numeric, zero, and negative limits (0.5711ms)\n✔ rejects unsafe, repeated, and unknown options (0.1443ms)\n✔ returns parsed JSON and sends the project user agent (1.3001ms)\n✔ treats a 404 as a definitive missing resource (0.1357ms)\n✔ throws on transient HTTP failures so callers can retry (0.6022ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.8487ms)\n✔ accepts a specific campus building with college evidence (1.7533ms)\n✔ rejects an unrelated building with the same name (0.3126ms)\n✔ rejects a person whose name contains the building name (0.9312ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1289ms)\n✔ matches short college names as words instead of substrings (0.0831ms)\n✔ accepts a college acronym derived from its full name (0.1794ms)\n✔ does not infer the college from a shared word in the building name (0.2408ms)\n✔ still accepts an explicit single-token college phrase (0.1087ms)\nℹ tests 16\nℹ suites 0\nℹ pass 16\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 101.1448\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 603.683,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:59:10.535Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

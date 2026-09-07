@@ -1,0 +1,34 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 6c357060a66d2036240423afcf3981db2529c358",
+  "agentTool": "Codex",
+  "baseCommit": "5e07cdad4fc1b354127ac77fe0a506b65a1b619b",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_c239974f22560ba80c36bc00",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/benchbro/tree/codex/fix-run-detail-contract",
+  "rawDiffSha256": "ae0fb20a473e87ec91e5508b214806a1c31bf3ac16b599e6776bf2e3f9d39df1",
+  "relevantSourcePaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/Results.tsx",
+    "src/benchbro/static/assets/index-DJINKNMg.js"
+  ],
+  "repositoryId": "benchbro",
+  "resultCommit": "6c357060a66d2036240423afcf3981db2529c358",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T09:33:36.008Z",
+  "standardTools": [
+    {
+      "command": "py -m pytest -q",
+      "kind": "test",
+      "name": "pytest"
+    },
+    {
+      "command": "npm run build --prefix frontend",
+      "kind": "compiler",
+      "name": "frontend"
+    }
+  ],
+  "studyId": "field-v1"
+}

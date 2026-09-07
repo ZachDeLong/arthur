@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 550.4924000000001,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:58:15.502Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ returns parsed JSON and sends the project user agent (0.882ms)\n✔ treats a 404 as a definitive missing resource (0.1019ms)\n✔ throws on transient HTTP failures so callers can retry (0.6905ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.6039ms)\n✔ accepts a specific campus building with college evidence (1.7744ms)\n✔ rejects an unrelated building with the same name (0.5429ms)\n✔ rejects a person whose name contains the building name (0.8043ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1337ms)\n✔ matches short college names as words instead of substrings (0.0861ms)\n✔ accepts a college acronym derived from its full name (0.1226ms)\n✔ does not infer the college from a shared word in the building name (0.1158ms)\n✔ still accepts an explicit single-token college phrase (0.0844ms)\nℹ tests 12\nℹ suites 0\nℹ pass 12\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 96.8236\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 575.0466000000001,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:58:16.053Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

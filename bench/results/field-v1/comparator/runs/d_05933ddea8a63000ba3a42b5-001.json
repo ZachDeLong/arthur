@@ -1,0 +1,25 @@
+{
+  "batchInputSha256": "e5c4e7cffcf62aba0b4f39a9dbdfa8a706f83122016b319391a3c957d7507b5e",
+  "durationMs": 2071.9503,
+  "inputTokens": 804,
+  "model": "claude-sonnet-5",
+  "outputTokens": 158,
+  "predictions": [
+    {
+      "caseId": "c_2072a3929f4c718d83b473de",
+      "predictedInvalid": true,
+      "reason": "Contract confirms 'vitest' package is not installed, making this live import an actionable invalid reference."
+    },
+    {
+      "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+      "predictedInvalid": true,
+      "reason": "Contract confirms 'react' package is not installed, making this live import an actionable invalid reference."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_732f8ec0b39a895f2f2e5ba1\",\"predictedInvalid\":true,\"reason\":\"Contract confirms 'react' package is not installed, making this live import an actionable invalid reference.\"},{\"caseId\":\"c_2072a3929f4c718d83b473de\",\"predictedInvalid\":true,\"reason\":\"Contract confirms 'vitest' package is not installed, making this live import an actionable invalid reference.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnB6VzeRjrxpr566BiZ",
+  "system": "anthropic/claude-sonnet-5"
+}

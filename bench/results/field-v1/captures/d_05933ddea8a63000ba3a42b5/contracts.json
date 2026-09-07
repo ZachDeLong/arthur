@@ -1,0 +1,22 @@
+{
+  "env": {
+    "definedNames": [
+      "GOOGLE_API_KEY",
+      "OPENAI_API_KEY"
+    ],
+    "filesFound": [
+      ".env.example"
+    ]
+  },
+  "packages": [
+    {
+      "installed": false,
+      "packageName": "react"
+    },
+    {
+      "installed": false,
+      "packageName": "vitest"
+    }
+  ],
+  "routes": []
+}

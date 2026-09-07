@@ -1,0 +1,235 @@
+diff --git a/src/store/settingsStore.ts b/src/store/settingsStore.ts
+index 0e01fd4d7437119ef71f741cc92a7576f9b39e53..b9886fc2d8fd5555cc3bbc8dce9b4684f4e29d59 100644
+--- a/src/store/settingsStore.ts
++++ b/src/store/settingsStore.ts
+@@ -1,36 +1,11 @@
+ import { create } from 'zustand'
+ import { persist } from 'zustand/middleware'
++import { sanitizePersistedSettings, type CanvasInstance, type Theme } from './settingsValidation'
+ 
+-export interface CanvasInstance {
+-  id: string
+-  name: string
+-  url: string
+-  token: string
+-}
+-
+-type Theme = 'light' | 'dark'
++export type { CanvasInstance } from './settingsValidation'
+ 
+ const STORAGE_KEY = 'school-checklist-settings'
+ 
+-function getStoredSettings(): { theme: Theme; timeframeDays: number; canvasInstances: CanvasInstance[]; soundEnabled: boolean; confettiEnabled: boolean } {
+-  try {
+-    const raw = localStorage.getItem(STORAGE_KEY)
+-    if (raw) {
+-      const parsed = JSON.parse(raw)
+-      return {
+-        theme: parsed.state?.theme || 'dark',
+-        timeframeDays: parsed.state?.timeframeDays || 7,
+-        canvasInstances: parsed.state?.canvasInstances || [],
+-        soundEnabled: parsed.state?.soundEnabled ?? true,
+-        confettiEnabled: parsed.state?.confettiEnabled ?? true,
+-      }
+-    }
+-  } catch { /* ignore invalid stored settings */ }
+-  return { theme: 'dark', timeframeDays: 7, canvasInstances: [], soundEnabled: true, confettiEnabled: true }
+-}
+-
+-const stored = getStoredSettings()
+-
+ interface SettingsState {
+   canvasInstances: CanvasInstance[]
+   theme: Theme
+@@ -49,19 +24,16 @@ interface SettingsState {
+   setSetupPromptDismissed: (dismissed: boolean) => void
+   setMinimalMode: (minimal: boolean) => void
+   isConfigured: () => boolean
+-  // Legacy getters for backwards compatibility
+-  canvasToken: string
+-  canvasUrl: string
+ }
+ 
+ export const useSettingsStore = create<SettingsState>()(
+   persist(
+     (set, get) => ({
+-      canvasInstances: stored.canvasInstances,
+-      theme: stored.theme,
+-      timeframeDays: stored.timeframeDays,
+-      soundEnabled: stored.soundEnabled,
+-      confettiEnabled: stored.confettiEnabled,
++      canvasInstances: [],
++      theme: 'dark',
++      timeframeDays: 7,
++      soundEnabled: true,
++      confettiEnabled: true,
+       setupPromptDismissed: false,
+       minimalMode: false,
+ 
+@@ -110,16 +82,6 @@ export const useSettingsStore = create<SettingsState>()(
+         const { canvasInstances } = get()
+         return canvasInstances.length > 0 && canvasInstances.some(i => i.url && i.token)
+       },
+-
+-      // Legacy getters - return first instance for backwards compatibility
+-      get canvasToken() {
+-        const { canvasInstances } = get()
+-        return canvasInstances[0]?.token || ''
+-      },
+-      get canvasUrl() {
+-        const { canvasInstances } = get()
+-        return canvasInstances[0]?.url || ''
+-      },
+     }),
+     {
+       name: STORAGE_KEY,
+@@ -132,8 +94,15 @@ export const useSettingsStore = create<SettingsState>()(
+         setupPromptDismissed: state.setupPromptDismissed,
+         minimalMode: state.minimalMode,
+       }),
++      merge: (persistedState, currentState) => ({
++        ...currentState,
++        ...sanitizePersistedSettings(persistedState),
++      }),
+       onRehydrateStorage: () => {
+-        return (state) => {
++        return (state, error) => {
++          if (error) {
++            console.error('Failed to restore saved settings:', error)
++          }
+           if (state?.theme) {
+             document.documentElement.setAttribute('data-theme', state.theme)
+           }
+diff --git a/src/store/settingsValidation.test.ts b/src/store/settingsValidation.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8f40d9c856fe6ccfc3db16cbd2fdd7c01896258
+--- /dev/null
++++ b/src/store/settingsValidation.test.ts
+@@ -0,0 +1,59 @@
++import { describe, expect, it } from 'vitest'
++import { sanitizePersistedSettings } from './settingsValidation'
++
++describe('sanitizePersistedSettings', () => {
++  it('preserves valid persisted settings', () => {
++    const settings = sanitizePersistedSettings({
++      theme: 'light',
++      timeframeDays: 30,
++      soundEnabled: false,
++      confettiEnabled: true,
++      setupPromptDismissed: true,
++      minimalMode: false,
++      canvasInstances: [
++        { id: 'school-1', name: 'IVC', url: 'ivc.instructure.com', token: 'secret' },
++      ],
++    })
++
++    expect(settings).toEqual({
++      theme: 'light',
++      timeframeDays: 30,
++      soundEnabled: false,
++      confettiEnabled: true,
++      setupPromptDismissed: true,
++      minimalMode: false,
++      canvasInstances: [
++        { id: 'school-1', name: 'IVC', url: 'ivc.instructure.com', token: 'secret' },
++      ],
++    })
++  })
++
++  it('drops invalid fields without losing unrelated valid preferences', () => {
++    expect(sanitizePersistedSettings({
++      theme: 'sepia',
++      timeframeDays: 0,
++      soundEnabled: false,
++      confettiEnabled: 'yes',
++      canvasInstances: { id: 'not-an-array' },
++    })).toEqual({ soundEnabled: false })
++  })
++
++  it('salvages valid Canvas instances and removes duplicate IDs', () => {
++    expect(sanitizePersistedSettings({
++      canvasInstances: [
++        { id: 'school-1', name: 'IVC', url: 'ivc.instructure.com', token: 'first' },
++        { id: 'school-1', name: 'Duplicate', url: 'duplicate.instructure.com', token: 'second' },
++        { id: '', name: 'Missing ID', url: 'bad.instructure.com', token: 'third' },
++        null,
++      ],
++    }).canvasInstances).toEqual([
++      { id: 'school-1', name: 'IVC', url: 'ivc.instructure.com', token: 'first' },
++    ])
++  })
++
++  it('rejects non-object persisted state', () => {
++    expect(sanitizePersistedSettings(null)).toEqual({})
++    expect(sanitizePersistedSettings([])).toEqual({})
++    expect(sanitizePersistedSettings('broken')).toEqual({})
++  })
++})
+diff --git a/src/store/settingsValidation.ts b/src/store/settingsValidation.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d192dc74d5930e53e96cc204e2cf2796587cfcca
+--- /dev/null
++++ b/src/store/settingsValidation.ts
+@@ -0,0 +1,62 @@
++import { z } from 'zod'
++
++export interface CanvasInstance {
++  id: string
++  name: string
++  url: string
++  token: string
++}
++
++export type Theme = 'light' | 'dark'
++
++export interface PersistedSettings {
++  canvasInstances: CanvasInstance[]
++  theme: Theme
++  timeframeDays: number
++  soundEnabled: boolean
++  confettiEnabled: boolean
++  setupPromptDismissed: boolean
++  minimalMode: boolean
++}
++
++const CanvasInstanceSchema = z.object({
++  id: z.string().min(1),
++  name: z.string(),
++  url: z.string(),
++  token: z.string(),
++})
++
++const ThemeSchema = z.enum(['light', 'dark'])
++const TimeframeSchema = z.number().int().min(1).max(120)
++const BooleanSchema = z.boolean()
++
++/** Keeps valid persisted fields while rejecting values that could break the UI. */
++export function sanitizePersistedSettings(value: unknown): Partial<PersistedSettings> {
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
++
++  const raw = value as Record<string, unknown>
++  const sanitized: Partial<PersistedSettings> = {}
++
++  const theme = ThemeSchema.safeParse(raw.theme)
++  if (theme.success) sanitized.theme = theme.data
++
++  const timeframeDays = TimeframeSchema.safeParse(raw.timeframeDays)
++  if (timeframeDays.success) sanitized.timeframeDays = timeframeDays.data
++
++  for (const key of ['soundEnabled', 'confettiEnabled', 'setupPromptDismissed', 'minimalMode'] as const) {
++    const parsed = BooleanSchema.safeParse(raw[key])
++    if (parsed.success) sanitized[key] = parsed.data
++  }
++
++  if (Array.isArray(raw.canvasInstances)) {
++    const seenIds = new Set<string>()
++    sanitized.canvasInstances = raw.canvasInstances.flatMap((candidate) => {
++      const parsed = CanvasInstanceSchema.safeParse(candidate)
++      if (!parsed.success || seenIds.has(parsed.data.id)) return []
++      seenIds.add(parsed.data.id)
++      return [parsed.data]
++    })
++  }
++
++  return sanitized
++}

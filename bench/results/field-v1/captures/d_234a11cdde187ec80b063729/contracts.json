@@ -1,0 +1,13 @@
+{
+  "env": {
+    "definedNames": [],
+    "filesFound": []
+  },
+  "packages": [
+    {
+      "installed": false,
+      "packageName": "react"
+    }
+  ],
+  "routes": []
+}

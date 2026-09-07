@@ -1,0 +1,822 @@
+[
+  {
+    "caseId": "c_00375cc3678c0f23e67154bd",
+    "changeId": "d_a9ea404eededbed8a63d49f0",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import handler, { normalizeCanvasHost } from './canvas.js'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "api/canvas.test.js"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "88f2b6df6e5b099b02c4a9c409511aefd5fe9aa89d7b3d2e7932fd1acdab990d",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_2072a3929f4c718d83b473de",
+    "changeId": "d_05933ddea8a63000ba3a42b5",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { writeClipboardText } from './clipboard';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 43,
+      "endColumn": 49,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/clipboard.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "ab452699687731571a837deb1cfb8bba98727a07cfb389fa78d756f3bba82ce5",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_2130f4d93b33ed99218161c1",
+    "changeId": "d_326b836fb89e64ee4edf51d1",
+    "context": [
+      {
+        "changed": false,
+        "line": 13,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 14,
+        "text": "export const fetchCategories = async (signal?: AbortSignal): Promise<string[]> => {"
+      },
+      {
+        "changed": true,
+        "line": 15,
+        "text": "  const response = await fetch('/api/categories', { signal });"
+      },
+      {
+        "changed": false,
+        "line": 16,
+        "text": "  if (!response.ok) {"
+      },
+      {
+        "changed": false,
+        "line": 17,
+        "text": "    throw new Error('Failed to fetch categories');"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 48,
+      "endLine": 15,
+      "line": 15,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "GET /api/categories",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "72112e22e5763b59fc13faa103b0f0b5ac34780a3d5640286a5817025dac9b41",
+    "target": "GET /api/categories"
+  },
+  {
+    "caseId": "c_2947d44da97f1de10c7f8352",
+    "changeId": "d_dbd35e6465da6e1c71c3aa33",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import {"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "  readJsonStorage,"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/storage.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "250675eb9be6be8965f902cdd1c97f8e6693461c3202b2efaf3067f230b5397f",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_323d1cd1dc3cd16ae53403ac",
+    "changeId": "d_326b836fb89e64ee4edf51d1",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { fetchCategories, fetchPapers } from './api';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/api.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "28e73a9946e6cf2038502f409d3d8a7e338cd616229a8d869df8d5052108653d",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+    "changeId": "d_5566a5369c5039114000271a",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import { sanitizePersistedSettings } from './settingsValidation'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 39,
+      "endColumn": 45,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/settingsValidation.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "c67975dee8fc4c93f9b492b79f98ac92d3e705f91d92701c2be4428e178298d0",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_4b93bf33685a2f6020e0bf67",
+    "changeId": "d_441b169477cbce04ead0b763",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, it, expect, beforeEach, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import { fetchAssignments } from '../lib/canvas'"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { useTaskStore } from './taskStore'"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 55,
+      "endColumn": 61,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/taskStore.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "0733fd9ad214ed208be41908966d75de959a1aae3a63f22a8e1902a772e92ab5",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_5c274160247f2bb6a2735a22",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": false,
+        "line": 20,
+        "text": "// both on your own runs."
+      },
+      {
+        "changed": false,
+        "line": 21,
+        "text": "const EFFORT = process.env.AGENT_EFFORT || \"high\";"
+      },
+      {
+        "changed": true,
+        "line": 22,
+        "text": "const MAX_TURNS = readIntegerEnv(\"AGENT_MAX_TURNS\", process.env.AGENT_MAX_TURNS, 40);"
+      },
+      {
+        "changed": false,
+        "line": 23,
+        "text": ""
+      },
+      {
+        "changed": false,
+        "line": 24,
+        "text": "// Opus 5's safety classifiers can decline a request outright; this re-serves it"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 53,
+      "endColumn": 80,
+      "endLine": 22,
+      "line": 22,
+      "path": "agent/run.mjs"
+    },
+    "raw": "process.env.AGENT_MAX_TURNS",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "850021aac1a0266f86439581be7fed21af2d203aed1526d417a724223091e2bc",
+    "target": "AGENT_MAX_TURNS"
+  },
+  {
+    "caseId": "c_66368da4645ca52d8436d47b",
+    "changeId": "d_5566a5369c5039114000271a",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { z } from 'zod'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "export interface CanvasInstance {"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 20,
+      "endColumn": 23,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/store/settingsValidation.ts"
+    },
+    "raw": "zod",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "2bf0fa6f41c5f80162dcef39c25abd91d2307d6a920c55e689354ba7103f8992",
+    "target": "zod"
+  },
+  {
+    "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+    "changeId": "d_05933ddea8a63000ba3a42b5",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useState, useEffect, useMemo, useRef, useCallback, type FC } from 'react';"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { marked } from 'marked';"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import DOMPurify from 'dompurify';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 77,
+      "endColumn": 82,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/App.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "5bb21c635510332a36f56a73d2c0c3c6fcd34d8cdc248b386b2cecd37146ca70",
+    "target": "react"
+  },
+  {
+    "caseId": "c_76f8dbc5196839bf7c4e6745",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": true,
+        "line": 15,
+        "text": "import { readIntegerEnv } from \"./env.mjs\";"
+      },
+      {
+        "changed": false,
+        "line": 16,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 17,
+        "text": "const PORT = readIntegerEnv(\"MOD_PORT\", process.env.MOD_PORT, 3006, { max: 65_535 });"
+      },
+      {
+        "changed": false,
+        "line": 18,
+        "text": "const ROOT = join(dirname(fileURLToPath(import.meta.url)), \"..\");"
+      },
+      {
+        "changed": false,
+        "line": 19,
+        "text": "const MOD_DIR = join(ROOT, \"mod\");"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 41,
+      "endColumn": 61,
+      "endLine": 17,
+      "line": 17,
+      "path": "server/serve-mod.mjs"
+    },
+    "raw": "process.env.MOD_PORT",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "f63a6592d3a32d5cd82b05d872f4c9c59d4a7385250b9f5c6c1fe598e5e4dc3a",
+    "target": "MOD_PORT"
+  },
+  {
+    "caseId": "c_84404ca18f825a00998f3753",
+    "changeId": "d_79b9af38a948a4130b79802c",
+    "context": [
+      {
+        "changed": true,
+        "line": 47,
+        "text": "  signal?: AbortSignal,"
+      },
+      {
+        "changed": true,
+        "line": 48,
+        "text": "): Promise<Paper[]> => {"
+      },
+      {
+        "changed": true,
+        "line": 49,
+        "text": "  const response = await fetch('/api/papers/by-arxiv-ids', {"
+      },
+      {
+        "changed": true,
+        "line": 50,
+        "text": "    method: 'POST',"
+      },
+      {
+        "changed": true,
+        "line": 51,
+        "text": "    headers: { 'Content-Type': 'application/json' },"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 57,
+      "endLine": 49,
+      "line": 49,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "POST /api/papers/by-arxiv-ids",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "95087d3e5de3111346ef27e59b519ccde11d46d4a68e0ce11490ac1e1b2e1783",
+    "target": "POST /api/papers/by-arxiv-ids"
+  },
+  {
+    "caseId": "c_9766ef6250c4d053eeab5fbe",
+    "changeId": "d_6c0d4fd2763edf6253df34b6",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { PassThrough } from 'node:stream'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import type { IncomingMessage, ServerResponse } from 'node:http'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 4,
+        "text": "import { canvasProxyMiddleware } from './canvas-proxy'"
+      },
+      {
+        "changed": true,
+        "line": 5,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 3,
+      "line": 3,
+      "path": "vite.config.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "11b2edebff242884333a02da1750d7feb38d40741cf3a387c778c758997deb19",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_9807a485e8aed74c2529df2a",
+    "changeId": "d_234a11cdde187ec80b063729",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useCallback, useEffect, useRef, useState } from \"react\";"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { useNavigate } from \"react-router-dom\";"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { fetchBackends, fetchBenchmarks, startSession } from \"../api/client\";"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 59,
+      "endColumn": 64,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/pages/NewEval.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "benchbro",
+    "sourceSha256": "005edd0f1fb04029ff91de567542081bc2a604b0cb757a42d2747ff247959361",
+    "target": "react"
+  },
+  {
+    "caseId": "c_a78efe3a9f582c27a63ef203",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": true,
+        "line": 8,
+        "text": "import { readIntegerEnv } from \"./env.mjs\";"
+      },
+      {
+        "changed": false,
+        "line": 9,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 10,
+        "text": "const PORT = readIntegerEnv(\"BRIDGE_PORT\", process.env.BRIDGE_PORT, 8765, { max: 65_535 });"
+      },
+      {
+        "changed": false,
+        "line": 11,
+        "text": "const DEFAULT_TIMEOUT_MS = 30_000;"
+      },
+      {
+        "changed": false,
+        "line": 12,
+        "text": "export const MAX_RUN_SECONDS = 300;"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 44,
+      "endColumn": 67,
+      "endLine": 10,
+      "line": 10,
+      "path": "server/bridge-server.mjs"
+    },
+    "raw": "process.env.BRIDGE_PORT",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "4576bbc1de8250518d3cce85df90b2644b6fb90978c7f4501db36791e7c61c77",
+    "target": "BRIDGE_PORT"
+  },
+  {
+    "caseId": "c_adf02e5337e84e4d12ae28a9",
+    "changeId": "d_650ba41b7972ded859e52b4b",
+    "context": [
+      {
+        "changed": false,
+        "line": 21,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 22,
+        "text": "export const fetchStats = async (signal?: AbortSignal): Promise<StatsResponse> => {"
+      },
+      {
+        "changed": true,
+        "line": 23,
+        "text": "  const response = await fetch('/api/papers/stats', { signal });"
+      },
+      {
+        "changed": false,
+        "line": 24,
+        "text": "  if (!response.ok) {"
+      },
+      {
+        "changed": false,
+        "line": 25,
+        "text": "    throw new Error('Failed to fetch stats');"
+      }
+    ],
+    "domain": "routes",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 33,
+      "endColumn": 50,
+      "endLine": 23,
+      "line": 23,
+      "path": "frontend/src/utils/api.ts"
+    },
+    "raw": "GET /api/papers/stats",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "5162b71991825458158f0956847f0fe0e97b609a73717058db44a75d3ad43a82",
+    "target": "GET /api/papers/stats"
+  },
+  {
+    "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+    "changeId": "d_79b9af38a948a4130b79802c",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useEffect, useMemo, useState, type FC } from 'react';"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import type { Paper } from '@/types';"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import type { ReadingLists } from '@/hooks';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 56,
+      "endColumn": 61,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/pages/ReadingListsPage.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "c03298425d7ffedc2965376ac60b4fbc58ea7ffcacb0689b23d65ec064920127",
+    "target": "react"
+  },
+  {
+    "caseId": "c_ca844fa0c54fa565ea518ea0",
+    "changeId": "d_07f8065749c09e3dd07d47a0",
+    "context": [
+      {
+        "changed": true,
+        "line": 84,
+        "text": "            fallbacks: FALLBACKS,"
+      },
+      {
+        "changed": true,
+        "line": 85,
+        "text": "            tools,"
+      },
+      {
+        "changed": true,
+        "line": 86,
+        "text": "            messages: [{ role: \"user\", content: initialTask(process.env.AGENT_GOAL || \"\") }],"
+      },
+      {
+        "changed": true,
+        "line": 87,
+        "text": "            max_iterations: MAX_TURNS,"
+      },
+      {
+        "changed": true,
+        "line": 88,
+        "text": "        });"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 61,
+      "endColumn": 83,
+      "endLine": 86,
+      "line": 86,
+      "path": "agent/run.mjs"
+    },
+    "raw": "process.env.AGENT_GOAL",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "0495fe3d655de34d7b98cf39ef4a08f27c04d0485c7ffa78854e5acaeb43cac9",
+    "target": "AGENT_GOAL"
+  },
+  {
+    "caseId": "c_e93ebe77d3edecffbb4cb4b3",
+    "changeId": "d_2392793e535e3cc29cfd36ea",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { parseMinScoreParam, parsePageParam, parseSortParam } from './queryUtils';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 39,
+      "endColumn": 45,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/queryUtils.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "f71c612ed41ba7555f083c2c56beb40246c016857dee7be29e5cae23e8569bac",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_ee5133685fce407dc00233a5",
+    "changeId": "d_a9ea404eededbed8a63d49f0",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { server } from '../test/mocks/server'"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import { errorHandlers } from '../test/mocks/handlers'"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 66,
+      "endColumn": 72,
+      "endLine": 1,
+      "line": 1,
+      "path": "src/lib/canvas.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "179d83b9181618601837725d27a3ca4bfd080c92f492f419605cc5730794ca58",
+    "target": "vitest"
+  }
+]

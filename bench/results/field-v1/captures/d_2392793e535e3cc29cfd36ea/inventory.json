@@ -1,0 +1,39 @@
+[
+  {
+    "caseId": "c_e93ebe77d3edecffbb4cb4b3",
+    "changeId": "d_2392793e535e3cc29cfd36ea",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { parseMinScoreParam, parsePageParam, parseSortParam } from './queryUtils';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 39,
+      "endColumn": 45,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/queryUtils.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "f71c612ed41ba7555f083c2c56beb40246c016857dee7be29e5cae23e8569bac",
+    "target": "vitest"
+  }
+]

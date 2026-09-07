@@ -1,0 +1,102 @@
+[
+  {
+    "caseId": "c_00375cc3678c0f23e67154bd",
+    "predictedInvalid": false,
+    "reason": "Importing named exports from root 'vitest' entry, which resolves via package.json exports; valid and installed."
+  },
+  {
+    "caseId": "c_2072a3929f4c718d83b473de",
+    "predictedInvalid": true,
+    "reason": "Contract confirms 'vitest' package is not installed, making this live import an actionable invalid reference."
+  },
+  {
+    "caseId": "c_2130f4d93b33ed99218161c1",
+    "predictedInvalid": false,
+    "reason": "Route call is a runtime fetch to an API endpoint, not a contract-listed invalid reference"
+  },
+  {
+    "caseId": "c_2947d44da97f1de10c7f8352",
+    "predictedInvalid": true,
+    "reason": "Imports 'vitest', which is not installed per contract, making this an unresolvable module reference."
+  },
+  {
+    "caseId": "c_323d1cd1dc3cd16ae53403ac",
+    "predictedInvalid": true,
+    "reason": "vitest is not installed per contract, so importing it is an invalid reference"
+  },
+  {
+    "caseId": "c_3bc9a89bf01b44ec86b83cf3",
+    "predictedInvalid": false,
+    "reason": "vitest is installed and exports '.' entry with import condition resolving to dist/index.js; import valid."
+  },
+  {
+    "caseId": "c_4b93bf33685a2f6020e0bf67",
+    "predictedInvalid": false,
+    "reason": "Root 'vitest' import matches valid exports entry '.' in installed manifest"
+  },
+  {
+    "caseId": "c_5c274160247f2bb6a2735a22",
+    "predictedInvalid": false,
+    "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+  },
+  {
+    "caseId": "c_66368da4645ca52d8436d47b",
+    "predictedInvalid": false,
+    "reason": "zod is installed and exports '.' entry supports named import { z } via index.js; import valid."
+  },
+  {
+    "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+    "predictedInvalid": true,
+    "reason": "Contract confirms 'react' package is not installed, making this live import an actionable invalid reference."
+  },
+  {
+    "caseId": "c_76f8dbc5196839bf7c4e6745",
+    "predictedInvalid": false,
+    "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+  },
+  {
+    "caseId": "c_84404ca18f825a00998f3753",
+    "predictedInvalid": false,
+    "reason": "No route contract violations listed; empty contract provides no basis for invalidity."
+  },
+  {
+    "caseId": "c_9766ef6250c4d053eeab5fbe",
+    "predictedInvalid": false,
+    "reason": "Root export '.' with named exports (afterEach, describe, expect, it, vi) is valid per vitest's declared exports map."
+  },
+  {
+    "caseId": "c_9807a485e8aed74c2529df2a",
+    "predictedInvalid": true,
+    "reason": "Contract states 'react' package is not installed, so this import reference is invalid."
+  },
+  {
+    "caseId": "c_a78efe3a9f582c27a63ef203",
+    "predictedInvalid": false,
+    "reason": "process.env access is a runtime environment convention, not a blocking invalid reference"
+  },
+  {
+    "caseId": "c_adf02e5337e84e4d12ae28a9",
+    "predictedInvalid": true,
+    "reason": "No routes are defined in the ground-truth contract, so GET /api/papers/stats has no matching backend route."
+  },
+  {
+    "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+    "predictedInvalid": true,
+    "reason": "Contract states react package is not installed, so import is invalid."
+  },
+  {
+    "caseId": "c_ca844fa0c54fa565ea518ea0",
+    "predictedInvalid": false,
+    "reason": "process.env access is a runtime environment convention with a fallback default, not an invalid blocking reference to a defined project symbol."
+  },
+  {
+    "caseId": "c_e93ebe77d3edecffbb4cb4b3",
+    "predictedInvalid": true,
+    "reason": "vitest is not installed per contract, so importing it is an invalid reference."
+  },
+  {
+    "caseId": "c_ee5133685fce407dc00233a5",
+    "predictedInvalid": false,
+    "reason": "Root 'vitest' import matches installed package's exports map; not an invalid reference."
+  }
+]

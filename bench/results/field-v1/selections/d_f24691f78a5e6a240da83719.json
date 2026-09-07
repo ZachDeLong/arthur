@@ -1,0 +1,40 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit a907b8b33e97de31b0ffc55944be99f62870b5e3",
+  "agentTool": "Codex",
+  "baseCommit": "ac8ff3ba319fe2f119e79dde095a68cf6c19a3c9",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_f24691f78a5e6a240da83719",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/ai-reasoning-hub/tree/codex/export-all-filtered-papers",
+  "rawDiffSha256": "95fe2e4f10f91a39d1c9040077d84ec329036094b59081bdeb3b3981292f01a5",
+  "relevantSourcePaths": [
+    "frontend/src/pages/TrendsPage.tsx",
+    "frontend/src/types/paper.ts",
+    "frontend/src/utils/api.test.ts",
+    "frontend/src/utils/api.ts"
+  ],
+  "repositoryId": "ai-reasoning-hub",
+  "resultCommit": "a907b8b33e97de31b0ffc55944be99f62870b5e3",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T20:14:07.534Z",
+  "standardTools": [
+    {
+      "command": "npm test --prefix frontend",
+      "kind": "test",
+      "name": "frontend"
+    },
+    {
+      "command": "py -m pytest -q tests",
+      "kind": "test",
+      "name": "backend"
+    },
+    {
+      "command": "npm run type-check --prefix frontend",
+      "kind": "compiler",
+      "name": "typescript"
+    }
+  ],
+  "studyId": "field-v1"
+}

@@ -1,0 +1,36 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit c811d1e0260786a449a91f0e81be1c7e5655cce6",
+  "agentTool": "Codex",
+  "baseCommit": "76c19834ce752b840a1bc4bbf6cc19f05b5e1f71",
+  "capturedAt": "2026-09-07T21:11:35.662Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/NewEval.tsx",
+    "src/benchbro/adapters/detection.py",
+    "src/benchbro/api/routes_models.py",
+    "src/benchbro/api/routes_sessions.py",
+    "src/benchbro/static/assets/index-CF917vVv.js",
+    "src/benchbro/static/index.html",
+    "tests/test_adapters.py",
+    "tests/test_api.py"
+  ],
+  "changeId": "d_0ba57861bd28bac4273e4ebd",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/benchbro/tree/codex/fix-run-detail-contract",
+  "rawDiffSha256": "998bc5448288c52db590eaf866b5618a58d339f84c491ac877784c2839eb7bad",
+  "relevantSourcePaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/NewEval.tsx",
+    "src/benchbro/static/assets/index-CF917vVv.js"
+  ],
+  "repositoryId": "benchbro",
+  "resultCommit": "c811d1e0260786a449a91f0e81be1c7e5655cce6",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "998bc5448288c52db590eaf866b5618a58d339f84c491ac877784c2839eb7bad",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

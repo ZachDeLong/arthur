@@ -1,0 +1,36 @@
+{
+  "agentEvidence": "Current Codex transcript and immutable commit 4c20c11d801964223884bb31e083b090f9936946",
+  "agentTool": "Codex",
+  "baseCommit": "f1126850047bffcb62ff2187404b6ea9cc9592d2",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_24912a67f126d168d05dc414",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/shapez-agent/tree/codex/fix-bridge-reconnect-race",
+  "rawDiffSha256": "715f14cdcbc491be832c994fb6a22f70b437c56f802812d2192d31ce2fe3576b",
+  "relevantSourcePaths": [
+    "scripts/atomic-write.mjs",
+    "scripts/build.mjs",
+    "scripts/install-mod.mjs",
+    "scripts/test-all.mjs",
+    "scripts/test-atomic-write.mjs"
+  ],
+  "repositoryId": "shapez-agent",
+  "resultCommit": "4c20c11d801964223884bb31e083b090f9936946",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T09:31:35.680Z",
+  "standardTools": [
+    {
+      "command": "npm test",
+      "kind": "test",
+      "name": "node"
+    },
+    {
+      "command": "npm run build",
+      "kind": "compiler",
+      "name": "mod"
+    }
+  ],
+  "studyId": "field-v1"
+}

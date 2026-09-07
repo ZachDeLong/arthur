@@ -1,0 +1,130 @@
+diff --git a/agent/run.mjs b/agent/run.mjs
+index b0a127c4331e99b54a218ba4cdba1dd17b8ee373..3c96e17c91f425062552269ebaa2126d1a8e628e 100644
+--- a/agent/run.mjs
++++ b/agent/run.mjs
+@@ -10,6 +10,7 @@
+ import Anthropic from "@anthropic-ai/sdk";
+ import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
+ import { GameBridge } from "../server/bridge-server.mjs";
++import { readIntegerEnv } from "../server/env.mjs";
+ import { TOOLS, createDispatcher } from "../server/tools.mjs";
+ import { SYSTEM_PROMPT, initialTask } from "./prompt.mjs";
+ 
+@@ -18,7 +19,7 @@ const MODEL = "claude-opus-5";
+ // is the cheaper starting point for a loop that runs many turns. Worth testing
+ // both on your own runs.
+ const EFFORT = process.env.AGENT_EFFORT || "high";
+-const MAX_TURNS = Number(process.env.AGENT_MAX_TURNS || 40);
++const MAX_TURNS = readIntegerEnv("AGENT_MAX_TURNS", process.env.AGENT_MAX_TURNS, 40);
+ 
+ // Opus 5's safety classifiers can decline a request outright; this re-serves it
+ // on another model inside the same call instead of returning the refusal.
+diff --git a/scripts/test-all.mjs b/scripts/test-all.mjs
+index aa00a42d0e6487d28d0b064714820367b7d387ed..d2254fbe98ead05b5918cde9752181849e285f9b 100644
+--- a/scripts/test-all.mjs
++++ b/scripts/test-all.mjs
+@@ -11,6 +11,7 @@ const SUITES = [
+     ["connect / port resolution", "test-connect.mjs"],
+     ["agent loop", "test-agent-loop.mjs"],
+     ["atomic file writes", "test-atomic-write.mjs"],
++    ["environment settings", "test-env.mjs"],
+ ];
+ 
+ let failed = 0;
+diff --git a/scripts/test-env.mjs b/scripts/test-env.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..da0adf240377575f97a299c848a061ee533ce273
+--- /dev/null
++++ b/scripts/test-env.mjs
+@@ -0,0 +1,37 @@
++import assert from "node:assert/strict";
++import { readIntegerEnv } from "../server/env.mjs";
++
++let checks = 0;
++function check(name, fn) {
++    fn();
++    checks++;
++    console.log(`  ✓ ${name}`);
++}
++
++check("uses the default when a setting is absent", () => {
++    assert.equal(readIntegerEnv("AGENT_MAX_TURNS", undefined, 40), 40);
++    assert.equal(readIntegerEnv("AGENT_MAX_TURNS", "  ", 40), 40);
++});
++
++check("accepts trimmed integers within the configured range", () => {
++    assert.equal(readIntegerEnv("BRIDGE_PORT", " 8766 ", 8765, { max: 65_535 }), 8766);
++    assert.equal(readIntegerEnv("AGENT_MAX_TURNS", "1", 40), 1);
++});
++
++for (const rawValue of ["0", "-1", "2.5", "1e3", "NaN", "Infinity", "65536"]) {
++    check(`rejects invalid port value ${JSON.stringify(rawValue)}`, () => {
++        assert.throws(
++            () => readIntegerEnv("BRIDGE_PORT", rawValue, 8765, { max: 65_535 }),
++            error => error instanceof Error && error.message.includes("BRIDGE_PORT") && error.message.includes(rawValue),
++        );
++    });
++}
++
++check("rejects integers larger than JavaScript can represent safely", () => {
++    assert.throws(
++        () => readIntegerEnv("AGENT_MAX_TURNS", "9007199254740992", 40),
++        /AGENT_MAX_TURNS must be an integer/,
++    );
++});
++
++console.log(`\n${checks} environment-setting checks passed`);
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index c69ad4a9b4ab9626747e01cef76df80eca0768c5..6d810f00959e12bc7afd9ff49803b1ccf5ea6038 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -5,8 +5,9 @@
+ // first (that's a page reload, not a second player).
+ 
+ import { WebSocketServer } from "ws";
++import { readIntegerEnv } from "./env.mjs";
+ 
+-const PORT = Number(process.env.BRIDGE_PORT || 8765);
++const PORT = readIntegerEnv("BRIDGE_PORT", process.env.BRIDGE_PORT, 8765, { max: 65_535 });
+ const DEFAULT_TIMEOUT_MS = 30_000;
+ export const MAX_RUN_SECONDS = 300;
+ 
+diff --git a/server/env.mjs b/server/env.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5217190a9b9001a4a53df16e8ea0db3d9745ee99
+--- /dev/null
++++ b/server/env.mjs
+@@ -0,0 +1,19 @@
++/**
++ * Reads an optional integer environment setting with explicit bounds.
++ * Empty values preserve the documented default; malformed values fail before
++ * a server starts or an agent run consumes them.
++ */
++export function readIntegerEnv(name, rawValue, defaultValue, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
++    const text = rawValue?.trim();
++    if (!text) return defaultValue;
++
++    if (!/^\d+$/.test(text)) {
++        throw new Error(`${name} must be an integer between ${min} and ${max}; received ${JSON.stringify(rawValue)}`);
++    }
++
++    const value = Number(text);
++    if (!Number.isSafeInteger(value) || value < min || value > max) {
++        throw new Error(`${name} must be an integer between ${min} and ${max}; received ${JSON.stringify(rawValue)}`);
++    }
++    return value;
++}
+diff --git a/server/serve-mod.mjs b/server/serve-mod.mjs
+index 847f6f642267113ba4377d363fa4b0e997f5050e..13380c104d2fec3140da6e587b775b24f93fb03f 100644
+--- a/server/serve-mod.mjs
++++ b/server/serve-mod.mjs
+@@ -12,8 +12,9 @@ import { createServer } from "node:http";
+ import { readFile } from "node:fs/promises";
+ import { fileURLToPath } from "node:url";
+ import { dirname, join, basename } from "node:path";
++import { readIntegerEnv } from "./env.mjs";
+ 
+-const PORT = Number(process.env.MOD_PORT || 3006);
++const PORT = readIntegerEnv("MOD_PORT", process.env.MOD_PORT, 3006, { max: 65_535 });
+ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+ const MOD_DIR = join(ROOT, "mod");

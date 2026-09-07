@@ -1,0 +1,20 @@
+{
+  "batchInputSha256": "1a61ce03df29f7601aa8e6eaf0d1afe143599170271725c566abcaaa8f93290e",
+  "durationMs": 1752.2518999999993,
+  "inputTokens": 574,
+  "model": "claude-sonnet-5",
+  "outputTokens": 102,
+  "predictions": [
+    {
+      "caseId": "c_9807a485e8aed74c2529df2a",
+      "predictedInvalid": true,
+      "reason": "Contract states 'react' package is not installed, so this import reference is invalid."
+    }
+  ],
+  "promptSha256": "854a938412fc28e181e072f17ff8d2c110c0463ef4fbbb8028e381f5bc592906",
+  "provider": "anthropic",
+  "rawOutput": "{\"predictions\":[{\"caseId\":\"c_9807a485e8aed74c2529df2a\",\"predictedInvalid\":true,\"reason\":\"Contract states 'react' package is not installed, so this import reference is invalid.\"}]}",
+  "requestedModel": "claude-sonnet-5",
+  "responseId": "msg_011CepnBd3XTeWav4zCyGHWq",
+  "system": "anthropic/claude-sonnet-5"
+}

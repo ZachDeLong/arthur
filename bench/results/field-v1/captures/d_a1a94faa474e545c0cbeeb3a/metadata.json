@@ -1,0 +1,28 @@
+{
+  "agentEvidence": "User-directed Codex task; change committed as 80d5dac6df1b56ce09a13f60f6776ad60510f799",
+  "agentTool": "Codex",
+  "baseCommit": "d7691140e68acff74a531e6667e3165bc66fcc10",
+  "capturedAt": "2026-09-07T08:19:19.645Z",
+  "caseCount": 0,
+  "changedPaths": [
+    "scripts/test-protocol.mjs",
+    "server/bridge-server.mjs"
+  ],
+  "changeId": "d_a1a94faa474e545c0cbeeb3a",
+  "cliLatencyMeasured": true,
+  "developerId": "zachd",
+  "diffRedactionCount": 0,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/shapez-agent",
+  "rawDiffSha256": "2fdb1b8dfc61ba50d46e88bb0cc46f271087500e122488c149b19a26855c1e48",
+  "relevantSourcePaths": [
+    "scripts/test-protocol.mjs",
+    "server/bridge-server.mjs"
+  ],
+  "repositoryId": "shapez-agent",
+  "resultCommit": "80d5dac6df1b56ce09a13f60f6776ad60510f799",
+  "schemaVersion": 1,
+  "sourceRedactionCount": 0,
+  "storedDiffSha256": "2fdb1b8dfc61ba50d46e88bb0cc46f271087500e122488c149b19a26855c1e48",
+  "worktreeCleanAfter": true,
+  "worktreeCleanBefore": true
+}

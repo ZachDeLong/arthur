@@ -1,0 +1,122 @@
+diff --git a/src/lib/canvas.test.ts b/src/lib/canvas.test.ts
+index e19032a8adfdbca03c6538fdc23de0bf7582dedc..dc8d2e0036cd024ede6c4997fb046da891240236 100644
+--- a/src/lib/canvas.test.ts
++++ b/src/lib/canvas.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+ import { server } from '../test/mocks/server'
+ import { errorHandlers } from '../test/mocks/handlers'
+-import { fetchAssignments } from './canvas'
++import { fetchAssignments, rewriteCanvasNextLink } from './canvas'
+ import { useSettingsStore } from '../store/settingsStore'
+ 
+ describe('fetchAssignments', () => {
+@@ -67,6 +67,14 @@ describe('fetchAssignments', () => {
+     await expect(fetchAssignments()).rejects.toThrow('Test School: Canvas API error: 500')
+   })
+ 
++  it('rejects an unsafe pagination link before following it', async () => {
++    server.use(errorHandlers.invalidPaginationLink)
++
++    await expect(fetchAssignments()).rejects.toThrow(
++      'Test School: Canvas returned an invalid pagination link'
++    )
++  })
++
+   it('throws when every course returns malformed assignment data', async () => {
+     server.use(errorHandlers.invalidJson)
+ 
+@@ -86,3 +94,30 @@ describe('fetchAssignments', () => {
+     ])
+   })
+ })
++
++describe('rewriteCanvasNextLink', () => {
++  it('rewrites absolute and root-relative Canvas API links through the proxy', () => {
++    expect(rewriteCanvasNextLink(
++      'https://school.instructure.com/api/v1/courses?page=2&per_page=100'
++    )).toBe('/api/canvas/courses?page=2&per_page=100')
++    expect(rewriteCanvasNextLink('/api/v1/courses?page=3')).toBe(
++      '/api/canvas/courses?page=3'
++    )
++  })
++
++  it('strips an unexpected upstream host instead of sending it the Canvas token', () => {
++    expect(rewriteCanvasNextLink(
++      'https://attacker.example/api/v1/courses?page=2'
++    )).toBe('/api/canvas/courses?page=2')
++  })
++
++  it.each([
++    'https://attacker.example/collect?page=2',
++    'javascript:alert(1)',
++    '/not-the-canvas-api?page=2',
++  ])('rejects pagination links outside the Canvas API: %s', (link) => {
++    expect(() => rewriteCanvasNextLink(link)).toThrow(
++      'Canvas returned an invalid pagination link'
++    )
++  })
++})
+diff --git a/src/lib/canvas.ts b/src/lib/canvas.ts
+index 5553605b216830be3f2a77bcc959c669551731ee..b69555aeb8123ee4c7146ad2d65c4300d54a5d13 100644
+--- a/src/lib/canvas.ts
++++ b/src/lib/canvas.ts
+@@ -30,6 +30,29 @@ function parseNextLink(linkHeader: string | null): string | null {
+   return match?.[1] ?? null
+ }
+ 
++/**
++ * Convert Canvas pagination URLs back into a same-origin proxy request.
++ * Never return an upstream URL because the caller attaches the Canvas token.
++ */
++export function rewriteCanvasNextLink(nextLink: string): string {
++  let parsed: URL
++  try {
++    parsed = new URL(nextLink, 'https://canvas.invalid')
++  } catch {
++    throw new Error('Canvas returned an invalid pagination link')
++  }
++
++  if (
++    (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') ||
++    (parsed.pathname !== '/api/v1' && !parsed.pathname.startsWith('/api/v1/'))
++  ) {
++    throw new Error('Canvas returned an invalid pagination link')
++  }
++
++  const apiPath = parsed.pathname.slice('/api/v1'.length) || '/'
++  return `/api/canvas${apiPath}${parsed.search}`
++}
++
+ /**
+  * Fetch all pages from a paginated Canvas API endpoint.
+  */
+@@ -56,8 +79,7 @@ async function fetchAllPages(url: string, headers: Record<string, string>): Prom
+     const linkHeader = res.headers.get('Link')
+     const nextLink = parseNextLink(linkHeader)
+     if (nextLink) {
+-      // Canvas returns absolute URLs; rewrite to go through our proxy
+-      nextUrl = nextLink.replace(/^https?:\/\/[^/]+\/api\/v1/, '/api/canvas')
++      nextUrl = rewriteCanvasNextLink(nextLink)
+     } else {
+       nextUrl = null
+     }
+diff --git a/src/test/mocks/handlers.ts b/src/test/mocks/handlers.ts
+index 4dd1232a4e471dcf87acb4915f49f0279473fe76..a0314a3462ddebee6d448ec0ce4e8b79d26a072d 100644
+--- a/src/test/mocks/handlers.ts
++++ b/src/test/mocks/handlers.ts
+@@ -35,6 +35,14 @@ export const errorHandlers = {
+     return new HttpResponse(null, { status: 500 })
+   }),
+ 
++  invalidPaginationLink: http.get('/api/canvas/courses', () => {
++    return HttpResponse.json(mockCourses, {
++      headers: {
++        Link: '<https://attacker.example/collect?page=2>; rel="next"',
++      },
++    })
++  }),
++
+   invalidJson: http.get('/api/canvas/courses/:courseId/assignments', () => {
+     return new HttpResponse('not valid json', {
+       headers: { 'Content-Type': 'application/json' },

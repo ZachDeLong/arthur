@@ -1,0 +1,90 @@
+diff --git a/package.json b/package.json
+index 05ceababba2608a7d7d0a21ceb77c6c8693a05e0..1209e5ae038c01f09a6e95b024c082a8ce77f802 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/fetch-all-campuses.mjs b/scripts/fetch-all-campuses.mjs
+index 2811f96f1a34955be2f906462ecb7b2e487343fe..c460183b168d5d2637a28076bc75f8f8384a19ec 100644
+--- a/scripts/fetch-all-campuses.mjs
++++ b/scripts/fetch-all-campuses.mjs
+@@ -9,6 +9,7 @@
+ 
+ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+ import { parseFetchOptions } from './fetch-options.mjs';
++import { validateOverpassResponse } from './overpass-response.mjs';
+ 
+ const OVERPASS_ENDPOINTS = [
+   'https://overpass.kumi.systems/api/interpreter',
+@@ -94,7 +95,7 @@ async function queryOverpass(body) {
+           lastErr = new Error(`HTTP ${res.status} @ ${url}`);
+           break;
+         }
+-        return await res.json();
++        return validateOverpassResponse(await res.json(), url);
+       } catch (err) {
+         lastErr = err;
+         await new Promise((r) => setTimeout(r, 1000));
+diff --git a/scripts/overpass-response.mjs b/scripts/overpass-response.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..d68c338f9b9251405e88cb0332800ba70043b365
+--- /dev/null
++++ b/scripts/overpass-response.mjs
+@@ -0,0 +1,11 @@
++export function validateOverpassResponse(payload, endpoint) {
++  if (typeof payload !== 'object' || payload === null || !Array.isArray(payload.elements)) {
++    throw new Error(`Malformed Overpass response from ${endpoint}`);
++  }
++
++  if (typeof payload.remark === 'string' && payload.remark.trim()) {
++    throw new Error(`Overpass error from ${endpoint}: ${payload.remark.trim()}`);
++  }
++
++  return payload;
++}
+diff --git a/tests/overpass-response.test.mjs b/tests/overpass-response.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..eda0791fab83718b93aaea4d31a87a2d49d08435
+--- /dev/null
++++ b/tests/overpass-response.test.mjs
+@@ -0,0 +1,33 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { validateOverpassResponse } from '../scripts/overpass-response.mjs';
++
++const endpoint = 'https://overpass.example/api/interpreter';
++
++test('accepts a normal Overpass payload, including an empty result', () => {
++  const populated = { version: 0.6, elements: [{ type: 'way', id: 1 }] };
++  const empty = { version: 0.6, elements: [] };
++
++  assert.equal(validateOverpassResponse(populated, endpoint), populated);
++  assert.equal(validateOverpassResponse(empty, endpoint), empty);
++});
++
++test('rejects HTTP-200 error remarks so the caller retries', () => {
++  assert.throws(
++    () => validateOverpassResponse({
++      elements: [],
++      remark: 'runtime error: Query timed out in "query" at line 3',
++    }, endpoint),
++    /Overpass error.*timed out/
++  );
++});
++
++test('rejects malformed payloads instead of treating them as empty data', () => {
++  for (const payload of [null, [], {}, { elements: null }, { elements: {} }]) {
++    assert.throws(
++      () => validateOverpassResponse(payload, endpoint),
++      /Malformed Overpass response/
++    );
++  }
++});

@@ -1,0 +1,255 @@
+diff --git a/README.md b/README.md
+index 7ae434f576ba8bb21ef2ac57f1e8e012228398db..07cf060874d323a03585977ae93006a2314dd71b 100644
+--- a/README.md
++++ b/README.md
+@@ -66,6 +66,8 @@ npm run dev
+ 
+ Note: Canvas sync won't work locally without the Vercel Edge Function. For local testing, deploy to Vercel first.
+ 
++The proxy accepts `*.instructure.com` hosts by default. To support a school's custom Canvas domain, set `CANVAS_ALLOWED_HOSTS` to a comma-separated list of exact hostnames in the Vercel deployment.
++
+ ### Deploy to Vercel
+ 
+ 1. Fork this repo
+diff --git a/api/canvas.js b/api/canvas.js
+index 87bb0d43ee84ff196b180a656a536849ca266255..9f7760fe1ef9ad4b5fcf2774ffa411e47495d327 100644
+--- a/api/canvas.js
++++ b/api/canvas.js
+@@ -2,6 +2,27 @@ export const config = {
+   runtime: 'edge',
+ }
+ 
++const HOSTNAME_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
++
++function configuredCanvasHosts() {
++  const value = globalThis.process?.env?.CANVAS_ALLOWED_HOSTS ?? ''
++  return value.split(',').map((host) => host.trim()).filter(Boolean)
++}
++
++/**
++ * Accept Canvas-owned hosts by default and exact, deployment-configured custom
++ * domains. The header must contain only a DNS hostname, never a URL or port.
++ */
++export function normalizeCanvasHost(rawHost, additionalHosts = configuredCanvasHosts()) {
++  const hostname = rawHost?.trim().toLowerCase()
++  if (!hostname || !HOSTNAME_PATTERN.test(hostname)) return null
++
++  const isInstructureHost = hostname === 'instructure.com' || hostname.endsWith('.instructure.com')
++  const isConfiguredHost = additionalHosts.some((host) => host.trim().toLowerCase() === hostname)
++
++  return isInstructureHost || isConfiguredHost ? hostname : null
++}
++
+ export default async function handler(req) {
+   const url = new URL(req.url)
+ 
+@@ -18,16 +39,17 @@ export default async function handler(req) {
+   }
+ 
+   // Get the Canvas domain from header
+-  const canvasHost = req.headers.get('x-canvas-host')
+-  if (!canvasHost) {
++  const rawCanvasHost = req.headers.get('x-canvas-host')
++  if (!rawCanvasHost) {
+     return new Response(JSON.stringify({ error: 'Missing X-Canvas-Host header' }), {
+       status: 400,
+       headers: { 'Content-Type': 'application/json' },
+     })
+   }
+ 
+-  // Validate the host
+-  if (!canvasHost.includes('instructure.com') && !canvasHost.includes('canvas')) {
++  // Validate and normalize before using user-controlled input in an outbound URL.
++  const canvasHost = normalizeCanvasHost(rawCanvasHost)
++  if (!canvasHost) {
+     return new Response(JSON.stringify({ error: 'Invalid Canvas host' }), {
+       status: 400,
+       headers: { 'Content-Type': 'application/json' },
+diff --git a/api/canvas.test.js b/api/canvas.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..5a57d1c0989778b65df4e9323460c301d3a59cb4
+--- /dev/null
++++ b/api/canvas.test.js
+@@ -0,0 +1,69 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import handler, { normalizeCanvasHost } from './canvas.js'
++
++function requestFor(host) {
++  return {
++    method: 'GET',
++    url: 'https://checklist.example/api/canvas/courses?enrollment_state=active',
++    headers: new Headers({
++      'Authorization': 'Bearer test-token',
++      'X-Canvas-Host': host,
++    }),
++  }
++}
++
++afterEach(() => {
++  vi.unstubAllGlobals()
++})
++
++describe('normalizeCanvasHost', () => {
++  it('accepts Canvas-owned subdomains and normalizes case', () => {
++    expect(normalizeCanvasHost('  IVC-New.Instructure.com  ', [])).toBe('ivc-new.instructure.com')
++  })
++
++  it('accepts an exact custom domain only when configured', () => {
++    expect(normalizeCanvasHost('canvas.school.edu', ['canvas.school.edu'])).toBe('canvas.school.edu')
++    expect(normalizeCanvasHost('canvas.school.edu', [])).toBeNull()
++  })
++
++  it.each([
++    'instructure.com.attacker.test',
++    'canvas-attacker.test',
++    'https://school.instructure.com',
++    'school.instructure.com/path',
++    'school.instructure.com:443',
++    'school.instructure.com@127.0.0.1',
++    'canvas',
++  ])('rejects unsafe host input: %s', (host) => {
++    expect(normalizeCanvasHost(host, [])).toBeNull()
++  })
++})
++
++describe('Canvas proxy', () => {
++  it('rejects a deceptive hostname without making an outbound request', async () => {
++    const fetchMock = vi.fn()
++    vi.stubGlobal('fetch', fetchMock)
++
++    const response = await handler(requestFor('instructure.com.attacker.test'))
++
++    expect(response.status).toBe(400)
++    await expect(response.json()).resolves.toEqual({ error: 'Invalid Canvas host' })
++    expect(fetchMock).not.toHaveBeenCalled()
++  })
++
++  it('forwards a valid host using its normalized hostname', async () => {
++    const fetchMock = vi.fn().mockResolvedValue(new Response('[]', {
++      status: 200,
++      headers: { 'Content-Type': 'application/json' },
++    }))
++    vi.stubGlobal('fetch', fetchMock)
++
++    const response = await handler(requestFor('IVC-New.Instructure.com'))
++
++    expect(response.status).toBe(200)
++    expect(fetchMock).toHaveBeenCalledWith(
++      'https://ivc-new.instructure.com/api/v1/courses?enrollment_state=active',
++      expect.objectContaining({ method: 'GET' }),
++    )
++  })
++})
+diff --git a/src/lib/canvas.test.ts b/src/lib/canvas.test.ts
+index 7432918a2d26e75d8dd4a000d41e7faae8f50055..6fad32c78067abf8dab31103dcaa494bb4cfc1d5 100644
+--- a/src/lib/canvas.test.ts
++++ b/src/lib/canvas.test.ts
+@@ -1,4 +1,4 @@
+-import { describe, it, expect, beforeEach } from 'vitest'
++import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+ import { server } from '../test/mocks/server'
+ import { errorHandlers } from '../test/mocks/handlers'
+ import { fetchAssignments } from './canvas'
+@@ -6,6 +6,9 @@ import { useSettingsStore } from '../store/settingsStore'
+ 
+ describe('fetchAssignments', () => {
+   beforeEach(() => {
++    vi.useFakeTimers()
++    vi.setSystemTime(new Date('2025-02-01T12:00:00Z'))
++
+     // Set up mock settings before each test
+     useSettingsStore.setState({
+       canvasInstances: [{
+@@ -14,10 +17,15 @@ describe('fetchAssignments', () => {
+         token: 'test-token',
+         url: 'test.instructure.com',
+       }],
++      timeframeDays: 30,
+     })
+   })
+ 
+-  it('fetches and transforms calendar events into assignments', async () => {
++  afterEach(() => {
++    vi.useRealTimers()
++  })
++
++  it('fetches and transforms per-course assignments', async () => {
+     const assignments = await fetchAssignments()
+ 
+     expect(assignments).toHaveLength(2)
+@@ -50,18 +58,18 @@ describe('fetchAssignments', () => {
+   it('throws error on 401 unauthorized', async () => {
+     server.use(errorHandlers.unauthorized)
+ 
+-    await expect(fetchAssignments()).rejects.toThrow('Invalid token for Test School')
++    await expect(fetchAssignments()).rejects.toThrow('Test School: Invalid Canvas token')
+   })
+ 
+   it('throws error on server errors', async () => {
+     server.use(errorHandlers.serverError)
+ 
+-    await expect(fetchAssignments()).rejects.toThrow('Canvas API error 500')
++    await expect(fetchAssignments()).rejects.toThrow('Test School: Canvas API error: 500')
+   })
+ 
+-  it('throws error on invalid JSON response', async () => {
++  it('skips courses that return malformed assignment data', async () => {
+     server.use(errorHandlers.invalidJson)
+ 
+-    await expect(fetchAssignments()).rejects.toThrow('Failed to parse calendar events')
++    await expect(fetchAssignments()).resolves.toEqual([])
+   })
+ })
+diff --git a/src/test/mocks/handlers.ts b/src/test/mocks/handlers.ts
+index d0eb4d0bc5953eac44f19c3a4f3624a4f7514b99..643c6ab3c4d4442aa20f60325a5a5fa5e632a0d0 100644
+--- a/src/test/mocks/handlers.ts
++++ b/src/test/mocks/handlers.ts
+@@ -5,24 +5,10 @@ const mockCourses = [
+   { id: 789012, name: 'Calculus I' },
+ ]
+ 
+-const mockCalendarEvents = [
+-  {
+-    id: '1001',
+-    title: 'Homework 1',
+-    all_day_date: '2025-02-10',
+-    start_at: null,
+-    end_at: null,
+-    context_name: 'Intro to Computer Science',
+-  },
+-  {
+-    id: '1002',
+-    title: 'Quiz 2',
+-    all_day_date: null,
+-    start_at: '2025-02-15T10:00:00Z',
+-    end_at: '2025-02-15T11:00:00Z',
+-    context_name: 'Calculus I',
+-  },
+-]
++const mockAssignments = new Map([
++  ['123456', [{ id: 1001, name: 'Homework 1', due_at: '2025-02-10T23:59:59Z' }]],
++  ['789012', [{ id: 1002, name: 'Quiz 2', due_at: '2025-02-15T11:00:00Z' }]],
++])
+ 
+ export const handlers = [
+   http.get('/api/canvas/courses', ({ request }) => {
+@@ -35,8 +21,8 @@ export const handlers = [
+     return HttpResponse.json([])
+   }),
+ 
+-  http.get('/api/canvas/calendar_events', () => {
+-    return HttpResponse.json(mockCalendarEvents)
++  http.get('/api/canvas/courses/:courseId/assignments', ({ params }) => {
++    return HttpResponse.json(mockAssignments.get(String(params.courseId)) ?? [])
+   }),
+ ]
+ 
+@@ -49,7 +35,7 @@ export const errorHandlers = {
+     return new HttpResponse(null, { status: 500 })
+   }),
+ 
+-  invalidJson: http.get('/api/canvas/calendar_events', () => {
++  invalidJson: http.get('/api/canvas/courses/:courseId/assignments', () => {
+     return new HttpResponse('not valid json', {
+       headers: { 'Content-Type': 'application/json' },
+     })

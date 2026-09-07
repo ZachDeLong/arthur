@@ -1,0 +1,73 @@
+diff --git a/scripts/test-protocol.mjs b/scripts/test-protocol.mjs
+index 1fc68563b11f5553c4c8500ed0577747d012eea7..553de9ea4d75bd593b55586572b64ac26dffcbb2 100644
+--- a/scripts/test-protocol.mjs
++++ b/scripts/test-protocol.mjs
+@@ -167,6 +167,28 @@ try {
+ check("stopping the bridge rejects connection waiters", stopRejectedWaiter);
+ check("stopping the bridge removes connection waiters", stoppedBridge.waitingForConnect.size === 0);
+ 
++// --- waitForInGame uses one timeout budget across connection and polling ---
++const budgetBridge = new GameBridge({ log: () => {} });
++const mainMenuSocket = new FakeSocket();
++mainMenuSocket.send = (raw, callback) => {
++    const { id } = JSON.parse(raw);
++    callback?.();
++    queueMicrotask(() => {
++        budgetBridge.onMessage(JSON.stringify({ id, ok: true, result: { inGame: false } }));
++    });
++};
++const budgetStarted = Date.now();
++setTimeout(() => budgetBridge.handleConnection(mainMenuSocket), 70);
++let inGameTimedOut = false;
++try {
++    await budgetBridge.waitForInGame({ timeoutMs: 100, pollMs: 5 });
++} catch (ex) {
++    inGameTimedOut = ex.message.includes("main menu");
++}
++const budgetElapsed = Date.now() - budgetStarted;
++check("in-game wait reports its timeout", inGameTimedOut);
++check("connection time counts against the in-game timeout", budgetElapsed < 140, `${budgetElapsed}ms`);
++
+ // --- disconnect fails in-flight calls instead of hanging ---
+ const inflight = bridge.call("observe", {}, 5000);
+ game.terminate();
+diff --git a/server/bridge-server.mjs b/server/bridge-server.mjs
+index 80e662c4817fbd82c00f8dcaae13b028a53151c8..a0fbbae6788b164bcae122201024b85d919e5333 100644
+--- a/server/bridge-server.mjs
++++ b/server/bridge-server.mjs
+@@ -87,22 +87,32 @@ export class GameBridge {
+      * fails. Poll until it reports in-game.
+      */
+     async waitForInGame({ timeoutMs = 600_000, pollMs = 1000, onWait } = {}) {
+-        await this.waitForGame(timeoutMs);
+         const deadline = Date.now() + timeoutMs;
++        await this.waitForGame(timeoutMs);
+         let announced = false;
+ 
+         for (;;) {
+-            const status = await this.ping().catch(() => null);
++            const remainingBeforePing = deadline - Date.now();
++            if (remainingBeforePing <= 0) {
++                throw new Error(`Still at the main menu after ${Math.round(timeoutMs / 1000)}s`);
++            }
++
++            const status = await this.call(
++                "ping",
++                {},
++                Math.min(DEFAULT_TIMEOUT_MS, remainingBeforePing)
++            ).catch(() => null);
+             if (status?.inGame) return status;
+ 
+             if (!announced && onWait) {
+                 onWait();
+                 announced = true;
+             }
+-            if (Date.now() > deadline) {
++            const remaining = deadline - Date.now();
++            if (remaining <= 0) {
+                 throw new Error(`Still at the main menu after ${Math.round(timeoutMs / 1000)}s`);
+             }
+-            await new Promise(resolve => setTimeout(resolve, pollMs));
++            await new Promise(resolve => setTimeout(resolve, Math.min(pollMs, remaining)));
+         }
+     }

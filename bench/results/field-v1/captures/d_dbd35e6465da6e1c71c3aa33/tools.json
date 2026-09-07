@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm --prefix frontend run type-check",
+    "durationMs": 2016.5095999999999,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "typecheck",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:32:35.819Z",
+    "stderr": "",
+    "stdout": "\n> ai-reasoning-hub-frontend@0.0.1 type-check\n> tsc --noEmit\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm --prefix frontend test",
+    "durationMs": 1591.2399999999998,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "storage",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T08:32:37.836Z",
+    "stderr": "",
+    "stdout": "\n> ai-reasoning-hub-frontend@0.0.1 test\n> vitest run\n\n\n RUN  v2.1.9 C:/Users/zachd/.arthur-field-worktrees/ai-reasoning-hub-storage-capture/frontend\n\n ✓ src/utils/storage.test.ts (7 tests) 4ms\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  01:32:38\n   Duration  770ms (transform 37ms, setup 0ms, collect 37ms, tests 4ms, environment 0ms, prepare 140ms)\n\n",
+    "timedOut": false
+  }
+]

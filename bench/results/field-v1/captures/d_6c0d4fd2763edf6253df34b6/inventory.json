@@ -1,0 +1,49 @@
+[
+  {
+    "caseId": "c_9766ef6250c4d053eeab5fbe",
+    "changeId": "d_6c0d4fd2763edf6253df34b6",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { PassThrough } from 'node:stream'"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": "import type { IncomingMessage, ServerResponse } from 'node:http'"
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { afterEach, describe, expect, it, vi } from 'vitest'"
+      },
+      {
+        "changed": true,
+        "line": 4,
+        "text": "import { canvasProxyMiddleware } from './canvas-proxy'"
+      },
+      {
+        "changed": true,
+        "line": 5,
+        "text": ""
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 54,
+      "endColumn": 60,
+      "endLine": 3,
+      "line": 3,
+      "path": "vite.config.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "school-checklist",
+    "sourceSha256": "11b2edebff242884333a02da1750d7feb38d40741cf3a387c778c758997deb19",
+    "target": "vitest"
+  }
+]

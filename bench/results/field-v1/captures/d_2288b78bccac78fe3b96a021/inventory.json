@@ -1,0 +1,143 @@
+[
+  {
+    "caseId": "c_5c274160247f2bb6a2735a22",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": false,
+        "line": 20,
+        "text": "// both on your own runs."
+      },
+      {
+        "changed": false,
+        "line": 21,
+        "text": "const EFFORT = process.env.AGENT_EFFORT || \"high\";"
+      },
+      {
+        "changed": true,
+        "line": 22,
+        "text": "const MAX_TURNS = readIntegerEnv(\"AGENT_MAX_TURNS\", process.env.AGENT_MAX_TURNS, 40);"
+      },
+      {
+        "changed": false,
+        "line": 23,
+        "text": ""
+      },
+      {
+        "changed": false,
+        "line": 24,
+        "text": "// Opus 5's safety classifiers can decline a request outright; this re-serves it"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 53,
+      "endColumn": 80,
+      "endLine": 22,
+      "line": 22,
+      "path": "agent/run.mjs"
+    },
+    "raw": "process.env.AGENT_MAX_TURNS",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "850021aac1a0266f86439581be7fed21af2d203aed1526d417a724223091e2bc",
+    "target": "AGENT_MAX_TURNS"
+  },
+  {
+    "caseId": "c_76f8dbc5196839bf7c4e6745",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": true,
+        "line": 15,
+        "text": "import { readIntegerEnv } from \"./env.mjs\";"
+      },
+      {
+        "changed": false,
+        "line": 16,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 17,
+        "text": "const PORT = readIntegerEnv(\"MOD_PORT\", process.env.MOD_PORT, 3006, { max: 65_535 });"
+      },
+      {
+        "changed": false,
+        "line": 18,
+        "text": "const ROOT = join(dirname(fileURLToPath(import.meta.url)), \"..\");"
+      },
+      {
+        "changed": false,
+        "line": 19,
+        "text": "const MOD_DIR = join(ROOT, \"mod\");"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 41,
+      "endColumn": 61,
+      "endLine": 17,
+      "line": 17,
+      "path": "server/serve-mod.mjs"
+    },
+    "raw": "process.env.MOD_PORT",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "f63a6592d3a32d5cd82b05d872f4c9c59d4a7385250b9f5c6c1fe598e5e4dc3a",
+    "target": "MOD_PORT"
+  },
+  {
+    "caseId": "c_a78efe3a9f582c27a63ef203",
+    "changeId": "d_2288b78bccac78fe3b96a021",
+    "context": [
+      {
+        "changed": true,
+        "line": 8,
+        "text": "import { readIntegerEnv } from \"./env.mjs\";"
+      },
+      {
+        "changed": false,
+        "line": 9,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 10,
+        "text": "const PORT = readIntegerEnv(\"BRIDGE_PORT\", process.env.BRIDGE_PORT, 8765, { max: 65_535 });"
+      },
+      {
+        "changed": false,
+        "line": 11,
+        "text": "const DEFAULT_TIMEOUT_MS = 30_000;"
+      },
+      {
+        "changed": false,
+        "line": 12,
+        "text": "export const MAX_RUN_SECONDS = 300;"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 44,
+      "endColumn": 67,
+      "endLine": 10,
+      "line": 10,
+      "path": "server/bridge-server.mjs"
+    },
+    "raw": "process.env.BRIDGE_PORT",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "4576bbc1de8250518d3cce85df90b2644b6fb90978c7f4501db36791e7c61c77",
+    "target": "BRIDGE_PORT"
+  }
+]

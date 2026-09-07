@@ -1,0 +1,30 @@
+[
+  {
+    "command": "npm test",
+    "durationMs": 553.1660000000002,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "node",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T19:50:12.004Z",
+    "stderr": "",
+    "stdout": "\n> test\n> node --test\n\n✔ loads and validates a campus FeatureCollection (20.9866ms)\n✔ treats only a 404 as definitively missing campus data (0.324ms)\n✔ throws on transient HTTP failures so the caller can retry (0.473ms)\n✔ throws on malformed successful responses instead of caching a false miss (0.4848ms)\n✔ parses force and explicit campus targets (1.4277ms)\n✔ uses every available campus when no slug is specified (0.2004ms)\n✔ rejects unknown options before enrichment starts (0.2939ms)\n✔ rejects missing campus files instead of reporting success (57.9569ms)\n✔ uses all campuses by default (1.1796ms)\n✔ parses the supported options in either order (0.1998ms)\n✔ rejects missing, non-numeric, zero, and negative limits (0.322ms)\n✔ rejects unsafe, repeated, and unknown options (0.1467ms)\n✔ closes a valid open polygon ring (1.3045ms)\n✔ does not close an already closed ring twice (0.1854ms)\n✔ rejects missing and non-finite coordinates (0.2136ms)\n✔ rejects rings without three distinct positions (0.1049ms)\n✔ accepts a normal Overpass payload, including an empty result (0.6829ms)\n✔ rejects HTTP-200 error remarks so the caller retries (0.371ms)\n✔ rejects malformed payloads instead of treating them as empty data (0.1229ms)\n✔ returns parsed JSON and sends the project user agent (1.0547ms)\n✔ treats a 404 as a definitive missing resource (0.0967ms)\n✔ throws on transient HTTP failures so callers can retry (0.2719ms)\n✔ throws on malformed JSON so callers do not cache a false miss (0.6082ms)\n✔ accepts a specific campus building with college evidence (1.4758ms)\n✔ rejects an unrelated building with the same name (0.2721ms)\n✔ rejects a person whose name contains the building name (0.5821ms)\n✔ rejects a generic building name matched to a different campus landmark (0.1122ms)\n✔ matches short college names as words instead of substrings (0.0728ms)\n✔ accepts a college acronym derived from its full name (0.0727ms)\n✔ does not infer the college from a shared word in the building name (0.0704ms)\n✔ still accepts an explicit single-token college phrase (0.0619ms)\nℹ tests 31\nℹ suites 0\nℹ pass 31\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 153.1555\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run check",
+    "durationMs": 678.5520999999999,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "syntax",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T19:50:12.557Z",
+    "stderr": "",
+    "stdout": "\n> check\n> node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs\n\n",
+    "timedOut": false
+  }
+]

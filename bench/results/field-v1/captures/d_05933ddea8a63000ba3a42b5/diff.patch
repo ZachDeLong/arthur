@@ -1,0 +1,220 @@
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 9039f695cc1081f251ca148958385e3749be27dd..fdbe5aed019047906334697bcacc65dd68c84d62 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect, useMemo, useRef, type FC } from 'react';
++import { useState, useEffect, useMemo, useRef, useCallback, type FC } from 'react';
+ import { marked } from 'marked';
+ import DOMPurify from 'dompurify';
+ import type { Paper, Filters } from '@/types';
+@@ -15,6 +15,7 @@ import {
+   readJsonStorage,
+   readStorageValue,
+   writeJsonStorage,
++  writeClipboardText,
+   writeStorageValue,
+ } from '@/utils';
+ import { useBookmarks, useReadingLists } from '@/hooks';
+@@ -52,6 +53,7 @@ interface PaperGridCardProps {
+   isFocused: boolean;
+   onSelect: () => void;
+   onToggleExpand: () => void;
++  onCopyCitation: (paper: Paper) => void;
+ }
+ 
+ const PaperGridCard: FC<PaperGridCardProps> = ({
+@@ -64,6 +66,7 @@ const PaperGridCard: FC<PaperGridCardProps> = ({
+   isFocused,
+   onSelect,
+   onToggleExpand,
++  onCopyCitation,
+ }) => {
+   const score = paper.excitement_score || 0;
+   const cardRef = useRef<HTMLElement>(null);
+@@ -74,15 +77,6 @@ const PaperGridCard: FC<PaperGridCardProps> = ({
+     }
+   }, [isFocused]);
+ 
+-  const handleCite = async () => {
+-    try {
+-      const bibtex = await fetchBibtex(paper.arxiv_id);
+-      await navigator.clipboard.writeText(bibtex);
+-    } catch (e) {
+-      console.error('Failed to copy BibTeX:', e);
+-    }
+-  };
+-
+   return (
+     <article
+       ref={cardRef}
+@@ -151,7 +145,7 @@ const PaperGridCard: FC<PaperGridCardProps> = ({
+             </a>
+             {paper.arxiv_id && (
+               <button
+-                onClick={(e) => { e.stopPropagation(); handleCite(); }}
++                onClick={(e) => { e.stopPropagation(); onCopyCitation(paper); }}
+                 className="px-2 py-1.5 text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+               >
+                 Cite
+@@ -238,6 +232,44 @@ function App() {
+   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+   const [expandedPaper, setExpandedPaper] = useState<Paper | null>(null);
++  const [copyNotice, setCopyNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
++  const copyNoticeTimeout = useRef<number | null>(null);
++
++  const showCopyNotice = useCallback((kind: 'success' | 'error', message: string) => {
++    if (copyNoticeTimeout.current !== null) {
++      window.clearTimeout(copyNoticeTimeout.current);
++    }
++    setCopyNotice({ kind, message });
++    copyNoticeTimeout.current = window.setTimeout(() => {
++      setCopyNotice(null);
++      copyNoticeTimeout.current = null;
++    }, 2500);
++  }, []);
++
++  useEffect(() => () => {
++    if (copyNoticeTimeout.current !== null) {
++      window.clearTimeout(copyNoticeTimeout.current);
++    }
++  }, []);
++
++  const copyWithFeedback = useCallback(async (
++    getText: () => string | Promise<string>,
++    successMessage: string,
++    failureMessage: string,
++  ) => {
++    try {
++      await writeClipboardText(await getText());
++      showCopyNotice('success', successMessage);
++    } catch {
++      showCopyNotice('error', failureMessage);
++    }
++  }, [showCopyNotice]);
++
++  const copyCitation = useCallback((paper: Paper) => copyWithFeedback(
++    () => fetchBibtex(paper.arxiv_id),
++    'BibTeX copied.',
++    'Could not copy BibTeX.',
++  ), [copyWithFeedback]);
+ 
+   const { bookmarks, toggleBookmark, isBookmarked, clearBookmarks } = useBookmarks();
+   const { readingLists, addToList, removeFromList, getListForPaper, getListNames, getListCount, clearLists } = useReadingLists();
+@@ -477,6 +509,7 @@ function App() {
+                     isFocused={index === focusedIndex}
+                     onSelect={() => setFocusedIndex(index)}
+                     onToggleExpand={() => setExpandedPaper(paper)}
++                    onCopyCitation={copyCitation}
+                   />
+                 </div>
+               ))}
+@@ -685,7 +718,11 @@ function App() {
+                     Export CSV
+                   </button>
+                   <button
+-                    onClick={() => navigator.clipboard.writeText(window.location.href)}
++                    onClick={() => void copyWithFeedback(
++                      () => window.location.href,
++                      'Link copied.',
++                      'Could not copy link.',
++                    )}
+                     className="w-full px-2.5 py-1.5 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-md transition-colors"
+                   >
+                     Share Link
+@@ -838,6 +875,21 @@ function App() {
+ 
+       <div className="md:hidden h-16" />
+ 
++      {copyNotice && (
++        <div
++          role={copyNotice.kind === 'error' ? 'alert' : 'status'}
++          aria-live={copyNotice.kind === 'error' ? 'assertive' : 'polite'}
++          aria-atomic="true"
++          className={`fixed bottom-20 left-1/2 z-[60] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-medium shadow-lg md:bottom-6 ${
++            copyNotice.kind === 'error'
++              ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200'
++              : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
++          }`}
++        >
++          {copyNotice.message}
++        </div>
++      )}
++
+       {/* Global Paper Detail Modal */}
+       {expandedPaper && (
+           <div className="fixed inset-0 z-50 overflow-y-auto">
+@@ -927,10 +979,7 @@ function App() {
+                         View on arXiv →
+                       </a>
+                       <button
+-                        onClick={async () => {
+-                          const bibtex = await fetchBibtex(expandedPaper.arxiv_id);
+-                          await navigator.clipboard.writeText(bibtex);
+-                        }}
++                        onClick={() => void copyCitation(expandedPaper)}
+                         className="px-3 py-1.5 text-sm text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+                       >
+                         Copy BibTeX
+diff --git a/frontend/src/utils/clipboard.test.ts b/frontend/src/utils/clipboard.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e896b5cad5cf253a42c2d37bd505d59620c38dc
+--- /dev/null
++++ b/frontend/src/utils/clipboard.test.ts
+@@ -0,0 +1,26 @@
++import { describe, expect, it, vi } from 'vitest';
++
++import { writeClipboardText } from './clipboard';
++
++describe('writeClipboardText', () => {
++  it('writes the exact requested text', async () => {
++    const writeText = vi.fn().mockResolvedValue(undefined);
++
++    await expect(writeClipboardText('citation text', { writeText })).resolves.toBeUndefined();
++    expect(writeText).toHaveBeenCalledWith('citation text');
++  });
++
++  it('rejects when the Clipboard API is unavailable', async () => {
++    await expect(writeClipboardText('citation text', undefined)).rejects.toThrow(
++      'Clipboard API unavailable',
++    );
++  });
++
++  it('propagates permission failures for the UI to report', async () => {
++    const writeText = vi.fn().mockRejectedValue(new Error('Permission denied'));
++
++    await expect(writeClipboardText('citation text', { writeText })).rejects.toThrow(
++      'Permission denied',
++    );
++  });
++});
+diff --git a/frontend/src/utils/clipboard.ts b/frontend/src/utils/clipboard.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..40f40dff6498af803f59ffbed29ed74096726318
+--- /dev/null
++++ b/frontend/src/utils/clipboard.ts
+@@ -0,0 +1,14 @@
++export interface ClipboardWriter {
++  writeText: (text: string) => Promise<void>;
++}
++
++export const writeClipboardText = async (
++  text: string,
++  clipboard: ClipboardWriter | undefined = globalThis.navigator?.clipboard,
++): Promise<void> => {
++  if (!clipboard || typeof clipboard.writeText !== 'function') {
++    throw new Error('Clipboard API unavailable');
++  }
++
++  await clipboard.writeText(text);
++};
+diff --git a/frontend/src/utils/index.ts b/frontend/src/utils/index.ts
+index 8754ce56e872900dc6b3cc6d8cdfe46f275c4499..0817464d935d88e77b8b97d076128697d15339c1 100644
+--- a/frontend/src/utils/index.ts
++++ b/frontend/src/utils/index.ts
+@@ -2,3 +2,4 @@ export * from './scoreUtils';
+ export * from './queryUtils';
+ export * from './api';
+ export * from './storage';
++export * from './clipboard';

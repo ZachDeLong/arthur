@@ -1,0 +1,44 @@
+[
+  {
+    "command": "npm run test:run",
+    "durationMs": 2168.755,
+    "exitCode": 0,
+    "kind": "test",
+    "name": "vitest",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:15:00.721Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 test:run\n> vitest run\n\n\n RUN  v4.0.18 C:/Users/zachd/.arthur-field-worktrees/school-checklist-canvas-host\n\n ✓ api/canvas.test.js (12 tests) 13ms\n ✓ src/utils/dateUtils.test.ts (15 tests) 22ms\n ✓ src/store/taskStore.test.ts (10 tests) 6ms\n ✓ src/lib/canvas.test.ts (13 tests) 35ms\n\n Test Files  4 passed (4)\n      Tests  50 passed (50)\n   Start at  02:15:01\n   Duration  1.37s (transform 248ms, setup 1.31s, import 298ms, tests 77ms, environment 2.88s)\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run lint",
+    "durationMs": 3046.7853,
+    "exitCode": 0,
+    "kind": "lint",
+    "name": "eslint",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:15:02.890Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 lint\n> eslint .\n\n",
+    "timedOut": false
+  },
+  {
+    "command": "npm run build",
+    "durationMs": 2894.1263,
+    "exitCode": 0,
+    "kind": "compiler",
+    "name": "vite",
+    "outputTruncated": false,
+    "redactionCount": 0,
+    "signal": null,
+    "startedAt": "2026-09-07T09:15:05.937Z",
+    "stderr": "",
+    "stdout": "\n> school-checklist@0.0.0 build\n> vite build\n\nvite v7.3.1 building client environment for production...\ntransforming...\n✓ 539 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   1.00 kB │ gzip:   0.55 kB\ndist/assets/index-LsVGMwH1.css   35.74 kB │ gzip:   6.16 kB\ndist/assets/index-CKYZtj62.js   480.64 kB │ gzip: 150.94 kB\n✓ built in 2.02s\n",
+    "timedOut": false
+  }
+]

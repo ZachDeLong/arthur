@@ -1,0 +1,111 @@
+{
+  "activationCommit": "2d914e5e41637726dbb440dda4aed47ea148febb",
+  "analysisDurationMs": 30.695500000000038,
+  "checkerBuildSha256": "ebd920ecee65504abe59a4c188e1820dba128f23a58100b64c24a48b8f76ecd1",
+  "compiledBuildSha256": "b1cc37cb84452fca75a44f190d685707bf3706fba05a04eec34c4f07e995045f",
+  "durationMs": 403.5310999999999,
+  "predictions": [
+    {
+      "caseId": "c_84404ca18f825a00998f3753",
+      "outcome": "clean"
+    },
+    {
+      "caseId": "c_c1c8eaf8d2c7b56cce115b31",
+      "findingId": "c56204cb",
+      "outcome": "error"
+    }
+  ],
+  "report": {
+    "findings": [
+      {
+        "category": "package-not-found",
+        "checker": "imports",
+        "findingId": "c56204cb",
+        "location": {
+          "column": 56,
+          "endColumn": 61,
+          "endLine": 1,
+          "line": 1,
+          "path": "frontend/src/pages/ReadingListsPage.tsx"
+        },
+        "message": "Package not installed: react",
+        "severity": "error",
+        "target": "react"
+      }
+    ],
+    "projectDir": "ai-reasoning-hub-storage-capture",
+    "schemaVersion": "1.1",
+    "summary": {
+      "checkerResults": [
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "paths",
+          "displayName": "File Paths",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "schema",
+          "displayName": "Prisma Schema",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "sqlSchema",
+          "displayName": "SQL/Drizzle Schema",
+          "findings": 0
+        },
+        {
+          "applicable": true,
+          "checked": 1,
+          "checker": "imports",
+          "displayName": "Imports",
+          "findings": 1
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "env",
+          "displayName": "Env Variables",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "routes",
+          "displayName": "API Routes",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "supabaseSchema",
+          "displayName": "Supabase Schema",
+          "findings": 0
+        },
+        {
+          "applicable": false,
+          "checked": 0,
+          "checker": "expressRoutes",
+          "displayName": "Express/Fastify Routes",
+          "findings": 0
+        }
+      ],
+      "totalChecked": 1,
+      "totalErrors": 1,
+      "totalFindings": 1,
+      "totalWarnings": 0
+    },
+    "timestamp": "2026-09-07T20:38:47.081Z"
+  },
+  "runtime": {
+    "arch": "x64",
+    "node": "v24.14.0",
+    "platform": "win32"
+  },
+  "system": "arthur",
+  "unmatchedFindings": []
+}

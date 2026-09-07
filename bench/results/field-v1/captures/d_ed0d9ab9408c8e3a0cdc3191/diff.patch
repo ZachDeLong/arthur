@@ -1,0 +1,132 @@
+diff --git a/package.json b/package.json
+index c4af1dce0ae0172d00ef2ab4ca173fa9c25c3047..05ceababba2608a7d7d0a21ceb77c6c8693a05e0 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/enrich-campuses.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/fetch-all-campuses.mjs b/scripts/fetch-all-campuses.mjs
+index dfc80376caac2711ca3efbc0f0bed9b3a84120dd..2811f96f1a34955be2f906462ecb7b2e487343fe 100644
+--- a/scripts/fetch-all-campuses.mjs
++++ b/scripts/fetch-all-campuses.mjs
+@@ -7,7 +7,8 @@
+ //
+ // Re-run whenever you want fresh data or add/remove colleges.
+ 
+-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
++import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
++import { parseFetchOptions } from './fetch-options.mjs';
+ 
+ const OVERPASS_ENDPOINTS = [
+   'https://overpass.kumi.systems/api/interpreter',
+@@ -247,11 +248,8 @@ const COLLEGES = [
+ ];
+ 
+ async function main() {
++  const { skipExisting, limit } = parseFetchOptions(process.argv.slice(2), COLLEGES.length);
+   mkdirSync('data/buildings', { recursive: true });
+-  const skipExisting = process.argv.includes('--skip-existing');
+-  const limit = process.argv.includes('--limit')
+-    ? Number(process.argv[process.argv.indexOf('--limit') + 1])
+-    : COLLEGES.length;
+ 
+   const todo = COLLEGES.slice(0, limit).filter((c) => {
+     if (skipExisting && existsSync(`data/buildings/${c.slug}.geojson`)) {
+diff --git a/scripts/fetch-options.mjs b/scripts/fetch-options.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..05a9c42b926477b8d45e4fd6319a9094c2ebe509
+--- /dev/null
++++ b/scripts/fetch-options.mjs
+@@ -0,0 +1,34 @@
++export function parseFetchOptions(args, defaultLimit) {
++  let skipExisting = false;
++  let limit = defaultLimit;
++  let sawLimit = false;
++
++  for (let index = 0; index < args.length; index++) {
++    const arg = args[index];
++
++    if (arg === '--skip-existing') {
++      skipExisting = true;
++      continue;
++    }
++
++    if (arg === '--limit') {
++      if (sawLimit) throw new Error('--limit may only be provided once');
++      sawLimit = true;
++
++      const rawLimit = args[++index];
++      if (rawLimit === undefined || !/^[1-9]\d*$/.test(rawLimit)) {
++        throw new Error('--limit must be followed by a positive integer');
++      }
++
++      limit = Number(rawLimit);
++      if (!Number.isSafeInteger(limit)) {
++        throw new Error('--limit is too large');
++      }
++      continue;
++    }
++
++    throw new Error(`Unknown option: ${arg}`);
++  }
++
++  return { skipExisting, limit };
++}
+diff --git a/tests/fetch-options.test.mjs b/tests/fetch-options.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..704374d5a80721372549916eff01cd399b83f343
+--- /dev/null
++++ b/tests/fetch-options.test.mjs
+@@ -0,0 +1,46 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++
++import { parseFetchOptions } from '../scripts/fetch-options.mjs';
++
++test('uses all campuses by default', () => {
++  assert.deepEqual(parseFetchOptions([], 58), {
++    skipExisting: false,
++    limit: 58,
++  });
++});
++
++test('parses the supported options in either order', () => {
++  assert.deepEqual(parseFetchOptions(['--limit', '5', '--skip-existing'], 58), {
++    skipExisting: true,
++    limit: 5,
++  });
++  assert.deepEqual(parseFetchOptions(['--skip-existing', '--limit', '3'], 58), {
++    skipExisting: true,
++    limit: 3,
++  });
++});
++
++test('rejects missing, non-numeric, zero, and negative limits', () => {
++  for (const args of [
++    ['--limit'],
++    ['--limit', 'nope'],
++    ['--limit', '0'],
++    ['--limit', '-1'],
++    ['--limit', '1.5'],
++  ]) {
++    assert.throws(() => parseFetchOptions(args, 58), /positive integer/);
++  }
++});
++
++test('rejects unsafe, repeated, and unknown options', () => {
++  assert.throws(
++    () => parseFetchOptions(['--limit', '9007199254740992'], 58),
++    /too large/
++  );
++  assert.throws(
++    () => parseFetchOptions(['--limit', '2', '--limit', '3'], 58),
++    /only be provided once/
++  );
++  assert.throws(() => parseFetchOptions(['--limt', '2'], 58), /Unknown option/);
++});

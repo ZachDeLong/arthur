@@ -1,0 +1,34 @@
+{
+  "agentEvidence": "User-directed Codex task; change committed as 581c0726520274aa4a10110ae7615b0e01b9b931",
+  "agentTool": "Codex",
+  "baseCommit": "3e43bd74afdd6b4d18b100c8fd4e21b56f99ff92",
+  "caseCount": 0,
+  "caseInventorySha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "changeId": "d_fe3defdb807b9fa9811054fe",
+  "developerId": "zachd",
+  "includedBeforeArthurPrediction": true,
+  "publicRepositoryUrl": "https://github.com/ZachDeLong/benchbro",
+  "rawDiffSha256": "336c6c8b3861a4813006ffd9e6bd798680399ee7e51c9579d886b98203853728",
+  "relevantSourcePaths": [
+    "frontend/src/api/client.ts",
+    "frontend/src/pages/Results.tsx",
+    "src/benchbro/static/assets/index-DneIeDvx.js"
+  ],
+  "repositoryId": "benchbro",
+  "resultCommit": "581c0726520274aa4a10110ae7615b0e01b9b931",
+  "schemaVersion": 1,
+  "selectedAt": "2026-09-07T07:01:05.210Z",
+  "standardTools": [
+    {
+      "command": "npm --prefix frontend run build",
+      "kind": "compiler",
+      "name": "frontend-build"
+    },
+    {
+      "command": "python -m pytest -q",
+      "kind": "test",
+      "name": "pytest"
+    }
+  ],
+  "studyId": "field-v1"
+}

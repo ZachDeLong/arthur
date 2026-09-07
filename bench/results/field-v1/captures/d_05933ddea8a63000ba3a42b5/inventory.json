@@ -1,0 +1,76 @@
+[
+  {
+    "caseId": "c_2072a3929f4c718d83b473de",
+    "changeId": "d_05933ddea8a63000ba3a42b5",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { describe, expect, it, vi } from 'vitest';"
+      },
+      {
+        "changed": true,
+        "line": 2,
+        "text": ""
+      },
+      {
+        "changed": true,
+        "line": 3,
+        "text": "import { writeClipboardText } from './clipboard';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 43,
+      "endColumn": 49,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/utils/clipboard.test.ts"
+    },
+    "raw": "vitest",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "ab452699687731571a837deb1cfb8bba98727a07cfb389fa78d756f3bba82ce5",
+    "target": "vitest"
+  },
+  {
+    "caseId": "c_732f8ec0b39a895f2f2e5ba1",
+    "changeId": "d_05933ddea8a63000ba3a42b5",
+    "context": [
+      {
+        "changed": true,
+        "line": 1,
+        "text": "import { useState, useEffect, useMemo, useRef, useCallback, type FC } from 'react';"
+      },
+      {
+        "changed": false,
+        "line": 2,
+        "text": "import { marked } from 'marked';"
+      },
+      {
+        "changed": false,
+        "line": 3,
+        "text": "import DOMPurify from 'dompurify';"
+      }
+    ],
+    "domain": "imports",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 77,
+      "endColumn": 82,
+      "endLine": 1,
+      "line": 1,
+      "path": "frontend/src/App.tsx"
+    },
+    "raw": "react",
+    "repositoryId": "ai-reasoning-hub",
+    "sourceSha256": "5bb21c635510332a36f56a73d2c0c3c6fcd34d8cdc248b386b2cecd37146ca70",
+    "target": "react"
+  }
+]

@@ -1,0 +1,49 @@
+[
+  {
+    "caseId": "c_ca844fa0c54fa565ea518ea0",
+    "changeId": "d_07f8065749c09e3dd07d47a0",
+    "context": [
+      {
+        "changed": true,
+        "line": 84,
+        "text": "            fallbacks: FALLBACKS,"
+      },
+      {
+        "changed": true,
+        "line": 85,
+        "text": "            tools,"
+      },
+      {
+        "changed": true,
+        "line": 86,
+        "text": "            messages: [{ role: \"user\", content: initialTask(process.env.AGENT_GOAL || \"\") }],"
+      },
+      {
+        "changed": true,
+        "line": 87,
+        "text": "            max_iterations: MAX_TURNS,"
+      },
+      {
+        "changed": true,
+        "line": 88,
+        "text": "        });"
+      }
+    ],
+    "domain": "env",
+    "inventoryMethods": [
+      "independent-ast",
+      "independent-lexical"
+    ],
+    "location": {
+      "column": 61,
+      "endColumn": 83,
+      "endLine": 86,
+      "line": 86,
+      "path": "agent/run.mjs"
+    },
+    "raw": "process.env.AGENT_GOAL",
+    "repositoryId": "shapez-agent",
+    "sourceSha256": "0495fe3d655de34d7b98cf39ef4a08f27c04d0485c7ffa78854e5acaeb43cac9",
+    "target": "AGENT_GOAL"
+  }
+]

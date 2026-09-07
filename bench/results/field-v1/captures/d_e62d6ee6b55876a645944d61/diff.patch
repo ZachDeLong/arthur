@@ -1,0 +1,145 @@
+diff --git a/package.json b/package.json
+index 225824436636fcee8e9696e3c48b7d5854f71c4a..4ad9c8df5ca56096e7259901c1e2102d1bfcb498 100644
+--- a/package.json
++++ b/package.json
+@@ -3,7 +3,7 @@
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "check": "node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/fetch-timeout.js && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
++    "check": "node --check scripts/atomic-json-write.mjs && node --check scripts/campus-fetch.js && node --check scripts/enrich-campuses.mjs && node --check scripts/enrich-options.mjs && node --check scripts/fetch-all-campuses.mjs && node --check scripts/fetch-options.mjs && node --check scripts/fetch-timeout.js && node --check scripts/geojson-ring.mjs && node --check scripts/overpass-response.mjs && node --check scripts/wikipedia-match.mjs && node --check scripts/wiki-fetch.mjs",
+     "test": "node --test"
+   }
+ }
+diff --git a/scripts/atomic-json-write.mjs b/scripts/atomic-json-write.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a30e725701a4fe6c5a1ac503e75b995b41d26630
+--- /dev/null
++++ b/scripts/atomic-json-write.mjs
+@@ -0,0 +1,25 @@
++import { randomUUID } from 'node:crypto';
++import { rename, rm, writeFile } from 'node:fs/promises';
++import { basename, dirname, join } from 'node:path';
++
++const DEFAULT_FILE_OPERATIONS = { rename, rm, writeFile };
++
++export async function writeJsonAtomic(target, value, fileOperations = DEFAULT_FILE_OPERATIONS) {
++  const temporary = join(
++    dirname(target),
++    `.${basename(target)}.${process.pid}.${randomUUID()}.tmp`,
++  );
++  const contents = JSON.stringify(value);
++
++  try {
++    await fileOperations.writeFile(temporary, contents, 'utf8');
++    await fileOperations.rename(temporary, target);
++  } catch (error) {
++    try {
++      await fileOperations.rm(temporary, { force: true });
++    } catch {
++      // Preserve the write or rename error that made the operation fail.
++    }
++    throw error;
++  }
++}
+diff --git a/scripts/enrich-campuses.mjs b/scripts/enrich-campuses.mjs
+index 1d2d63cacc9719b5a7725d3a0c33352017b8ee56..94ba3a4197d4a9efdab3bbbdbb9cad4cac8f8a7b 100644
+--- a/scripts/enrich-campuses.mjs
++++ b/scripts/enrich-campuses.mjs
+@@ -7,8 +7,9 @@
+ //   node scripts/enrich-campuses.mjs stanford-university  # one slug
+ //   node scripts/enrich-campuses.mjs --force         # re-enrich even buildings we've tried before
+ 
+-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
++import { readFileSync, readdirSync } from 'node:fs';
+ import path from 'node:path';
++import { writeJsonAtomic } from './atomic-json-write.mjs';
+ import { parseEnrichOptions } from './enrich-options.mjs';
+ import { isRelevantMatch } from './wikipedia-match.mjs';
+ import { fetchJSON } from './wiki-fetch.mjs';
+@@ -216,7 +217,7 @@ async function enrichCampus(slug, force) {
+   })());
+   await Promise.all(workers);
+ 
+-  writeFileSync(file, JSON.stringify(data));
++  await writeJsonAtomic(file, data);
+   console.log(`  ✓ ${slug}: ${succeeded}/${toEnrich.length} buildings matched a Wikipedia article`);
+   if (retryableFailures) {
+     console.warn(`  ! ${slug}: ${retryableFailures} transient failure(s) left unmarked for retry`);
+diff --git a/scripts/fetch-all-campuses.mjs b/scripts/fetch-all-campuses.mjs
+index a4ca9622750ac7ca9b47527be07fa9782449a3dd..32881fa6b7bd5e79e919cea961a4f52ec935a392 100644
+--- a/scripts/fetch-all-campuses.mjs
++++ b/scripts/fetch-all-campuses.mjs
+@@ -7,7 +7,8 @@
+ //
+ // Re-run whenever you want fresh data or add/remove colleges.
+ 
+-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
++import { mkdirSync, existsSync } from 'node:fs';
++import { writeJsonAtomic } from './atomic-json-write.mjs';
+ import { parseFetchOptions } from './fetch-options.mjs';
+ import { fetchWithTimeout } from './fetch-timeout.js';
+ import { geometryToLinearRing } from './geojson-ring.mjs';
+@@ -179,7 +180,7 @@ out geom tags;`;
+ 
+   const fc = { type: 'FeatureCollection', features };
+   mkdirSync('data/buildings', { recursive: true });
+-  writeFileSync(out, JSON.stringify(fc));
++  await writeJsonAtomic(out, fc);
+ 
+   const named = features.filter((f) => f.properties.name).length;
+   console.log(`  ✓ ${name}: ${features.length} buildings (${named} named) in ${dt}ms`);
+diff --git a/tests/atomic-json-write.test.mjs b/tests/atomic-json-write.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..25e46481d5fa35ffb5fbd94ddb4bc588706cd7a0
+--- /dev/null
++++ b/tests/atomic-json-write.test.mjs
+@@ -0,0 +1,48 @@
++import assert from 'node:assert/strict';
++import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import test from 'node:test';
++
++import { writeJsonAtomic } from '../scripts/atomic-json-write.mjs';
++
++test('replaces an existing JSON file only after the new contents are complete', async () => {
++  const directory = await mkdtemp(join(tmpdir(), 'college-map-json-'));
++  const target = join(directory, 'campus.geojson');
++  try {
++    await writeFile(target, '{"old":true}', 'utf8');
++    await writeJsonAtomic(target, { type: 'FeatureCollection', features: [] });
++
++    assert.deepEqual(JSON.parse(await readFile(target, 'utf8')), {
++      type: 'FeatureCollection',
++      features: [],
++    });
++    assert.deepEqual(await readdir(directory), ['campus.geojson']);
++  } finally {
++    await rm(directory, { recursive: true, force: true });
++  }
++});
++
++test('preserves the cached file and removes the temporary file when replacement fails', async () => {
++  const directory = await mkdtemp(join(tmpdir(), 'college-map-json-'));
++  const target = join(directory, 'campus.geojson');
++  try {
++    await writeFile(target, '{"cached":true}', 'utf8');
++    const fileOperations = {
++      writeFile,
++      async rename() {
++        throw new Error('simulated replacement failure');
++      },
++      rm,
++    };
++
++    await assert.rejects(
++      writeJsonAtomic(target, { cached: false }, fileOperations),
++      /simulated replacement failure/,
++    );
++    assert.equal(await readFile(target, 'utf8'), '{"cached":true}');
++    assert.deepEqual(await readdir(directory), ['campus.geojson']);
++  } finally {
++    await rm(directory, { recursive: true, force: true });
++  }
++});
