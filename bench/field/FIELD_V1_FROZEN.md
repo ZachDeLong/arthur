@@ -15,6 +15,17 @@ estimated $0.044532 at the published $2/$10 per-million-token rates recorded at
 collection close, and produced 20 predictions. Prediction contents were frozen
 before any human labels existed.
 
+## Known decision-rule limitation
+
+All 50 captures record the same represented developer ID, `zachd`. The frozen
+release rule requires at least three represented external developers to record
+that they would keep the gate enabled, while the study CLI accepts at most one
+retention record per represented developer ID. Field v1 therefore cannot pass
+the all-conditions release decision regardless of its eventual detector
+metrics. This cohort will not be reopened or relabelled to hide that limitation;
+its precision, recall, latency, and paired-comparator results remain worth
+completing and publishing.
+
 ## Integrity receipt
 
 - Activation commit: `2d914e5e41637726dbb440dda4aed47ea148febb`
