@@ -157,10 +157,7 @@ export function freezeStudy(studyDir: string): StudyLock {
   if (collectionEvent?.type !== "collection_closed") {
     throw new Error("Collection lock is missing its append-only audit event.");
   }
-  const activation = assertFrozenArthurBuild();
-  if (activation.checkerBuildSha256 !== manifest.activation.checkerBuildSha256) {
-    throw new Error("Arthur build does not match the initialized study.");
-  }
+  const activation = assertFrozenArthurBuild(manifest.activation);
   validateCohort(manifest);
   if (!manifest.comparator) {
     throw new Error("Run the fixed LLM comparator before freezing the study.");

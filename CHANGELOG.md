@@ -31,6 +31,13 @@
 
 ### Fixed
 
+- Diff import checks now resolve dependencies from each importing file's
+  workspace instead of assuming every project has a root `package.json` and
+  root `node_modules`.
+- Import validation caches are isolated by resolution directory, so the same
+  package name can correctly pass in one workspace and fail in another.
+- Future field-study package contracts are tied to each blinded occurrence's
+  workspace rather than reusing root-only dependency facts.
 - SQL plan extraction no longer treats arbitrary TypeScript code blocks as SQL.
 - Route method findings now use the correct HTTP-method category.
 - Route handler indexing ignores commented exports and handles aliased exports.

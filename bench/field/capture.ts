@@ -215,8 +215,8 @@ function currentActivation(): ActivationRecord {
   return readJson<ActivationRecord>(activationPath);
 }
 
-export function assertFrozenArthurBuild(): ActivationRecord {
-  const activation = currentActivation();
+export function assertFrozenArthurBuild(expectedActivation?: ActivationRecord): ActivationRecord {
+  const activation = expectedActivation ?? currentActivation();
   const actual = fingerprintArthurBuild(arthurRepoRoot);
   if (actual !== activation.checkerBuildSha256) {
     throw new Error(
@@ -524,10 +524,7 @@ export function captureChange(options: CaptureOptions): string {
   if (manifest.comparator) {
     throw new Error("Collection is closed because comparator predictions are already frozen.");
   }
-  const activation = assertFrozenArthurBuild();
-  if (manifest.activation.checkerBuildSha256 !== activation.checkerBuildSha256) {
-    throw new Error("Study manifest was initialized for a different Arthur build.");
-  }
+  const activation = assertFrozenArthurBuild(manifest.activation);
 
   const projectDir = assertRepositoryRoot(options.projectDir);
   const dirtyBefore = worktreeStatus(projectDir);

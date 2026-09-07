@@ -20,7 +20,8 @@ function contractFor(
   if (item.domain === "env") return contracts.env;
   if (item.domain === "routes") return contracts.routes;
   const packageName = packageNameForSpecifier(item.target);
-  return contracts.packages.find((contract) => contract.packageName === packageName) ?? {
+  return contracts.packages.find((contract) => contract.caseId === item.caseId) ??
+    contracts.packages.find((contract) => contract.packageName === packageName) ?? {
     packageName,
     installed: false,
   } satisfies PackageContract;

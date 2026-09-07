@@ -130,8 +130,12 @@ export interface ReferenceCase {
 }
 
 export interface PackageContract {
+  /** Ties workspace-scoped package facts to one blinded occurrence. */
+  caseId?: string;
   packageName: string;
+  sourcePath?: string;
   declaredVersion?: string;
+  declarationManifestPath?: string;
   installed: boolean;
   installedManifest?: {
     name?: string;

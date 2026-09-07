@@ -417,12 +417,6 @@ export function buildReferenceInventory(
   return [...byId.values()].sort((left, right) => left.caseId.localeCompare(right.caseId));
 }
 
-function readProjectManifest(projectDir: string): Record<string, unknown> {
-  const manifestPath = path.join(projectDir, "package.json");
-  if (!fs.existsSync(manifestPath)) return {};
-  return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
-}
-
 function stringMap(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
@@ -529,16 +523,80 @@ function independentRoutes(projectDir: string): GroundTruthContracts["routes"] {
   }).sort((left, right) => left.urlPath.localeCompare(right.urlPath));
 }
 
+function projectAncestors(sourcePath: string, projectDir: string): string[] {
+  const projectRoot = path.resolve(projectDir);
+  const sourceAbsolute = path.resolve(projectRoot, sourcePath);
+  const relative = path.relative(projectRoot, sourceAbsolute);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return [projectRoot];
+
+  const result: string[] = [];
+  let current = path.dirname(sourceAbsolute);
+  while (true) {
+    result.push(current);
+    if (current === projectRoot) return result;
+    const parent = path.dirname(current);
+    if (parent === current) return result;
+    current = parent;
+  }
+}
+
+function relativeProjectPath(projectDir: string, filePath: string): string | undefined {
+  const relative = path.relative(path.resolve(projectDir), path.resolve(filePath));
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
+  return relative.replace(/\\/g, "/");
+}
+
+function declaredPackage(
+  projectDir: string,
+  sourcePath: string,
+  packageName: string,
+): { version?: string; manifestPath?: string } {
+  for (const directory of projectAncestors(sourcePath, projectDir)) {
+    const manifestPath = path.join(directory, "package.json");
+    if (!fs.existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+      const declared = {
+        ...stringMap(manifest.dependencies),
+        ...stringMap(manifest.devDependencies),
+        ...stringMap(manifest.optionalDependencies),
+        ...stringMap(manifest.peerDependencies),
+      };
+      if (declared[packageName] !== undefined) {
+        return {
+          version: declared[packageName],
+          manifestPath: relativeProjectPath(projectDir, manifestPath),
+        };
+      }
+    } catch {
+      // Invalid package metadata provides no frozen dependency fact.
+    }
+  }
+  return {};
+}
+
+function installedPackagePath(projectDir: string, sourcePath: string, packageName: string): string | undefined {
+  for (const directory of projectAncestors(sourcePath, projectDir)) {
+    const candidate = path.join(directory, "node_modules", ...packageName.split("/"), "package.json");
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 function packageContract(
   projectDir: string,
-  packageName: string,
-  declared: Record<string, string>,
+  item: ReferenceCase,
 ): PackageContract {
-  const packagePath = path.join(projectDir, "node_modules", ...packageName.split("/"), "package.json");
-  if (!fs.existsSync(packagePath)) {
+  const packageName = packageNameForSpecifier(item.target);
+  const declared = declaredPackage(projectDir, item.location.path, packageName);
+  const packagePath = installedPackagePath(projectDir, item.location.path, packageName);
+  if (!packagePath) {
     return {
+      caseId: item.caseId,
       packageName,
-      declaredVersion: declared[packageName],
+      sourcePath: item.location.path,
+      declaredVersion: declared.version,
+      declarationManifestPath: declared.manifestPath,
       installed: false,
     };
   }
@@ -546,8 +604,11 @@ function packageContract(
   const manifest = JSON.parse(fs.readFileSync(packagePath, "utf-8")) as Record<string, unknown>;
   const text = (key: string) => typeof manifest[key] === "string" ? manifest[key] as string : undefined;
   return {
+    caseId: item.caseId,
     packageName,
-    declaredVersion: declared[packageName],
+    sourcePath: item.location.path,
+    declaredVersion: declared.version,
+    declarationManifestPath: declared.manifestPath,
     installed: true,
     installedManifest: {
       name: text("name"),
@@ -566,25 +627,14 @@ export function buildGroundTruthContracts(
   files: DiffFile[],
   cases: ReferenceCase[],
 ): GroundTruthContracts {
-  const manifest = readProjectManifest(projectDir);
-  const declared = {
-    ...stringMap(manifest.dependencies),
-    ...stringMap(manifest.devDependencies),
-    ...stringMap(manifest.optionalDependencies),
-    ...stringMap(manifest.peerDependencies),
-  };
-  const packageNames = new Set(
-    cases
-      .filter((item) => item.domain === "imports")
-      .map((item) => packageNameForSpecifier(item.target)),
-  );
   const env = independentEnvContract(projectDir);
   const routes = independentRoutes(projectDir);
 
   return {
-    packages: [...packageNames]
-      .sort()
-      .map((packageName) => packageContract(projectDir, packageName, declared)),
+    packages: cases
+      .filter((item) => item.domain === "imports")
+      .sort((left, right) => left.caseId.localeCompare(right.caseId))
+      .map((item) => packageContract(projectDir, item)),
     env: {
       filesFound: [...env.filesFound].sort(),
       definedNames: [...env.definedNames].sort(),

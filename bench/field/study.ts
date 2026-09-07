@@ -19,7 +19,7 @@ import {
   manifestPath,
   saveManifest,
 } from "./study-store.js";
-import type { CohortRules, DecisionRules, StudyManifest } from "./types.js";
+import type { ActivationRecord, CohortRules, DecisionRules, StudyManifest } from "./types.js";
 import { FIELD_SCHEMA_VERSION } from "./types.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -56,12 +56,19 @@ function cohortFromPlan(plan: StudyPlanFile): CohortRules {
   };
 }
 
-export function initializeStudy(studyDir: string, requestedStudyId?: string): StudyManifest {
+export function initializeStudy(
+  studyDir: string,
+  requestedStudyId?: string,
+  options?: { activationOverrideForTests?: ActivationRecord },
+): StudyManifest {
   const root = path.resolve(studyDir);
   if (fs.existsSync(manifestPath(root))) {
     throw new Error(`Study is already initialized: ${root}`);
   }
-  const activation = assertFrozenArthurBuild();
+  if (options?.activationOverrideForTests && process.env.NODE_ENV !== "test") {
+    throw new Error("A field-study activation override is permitted only under the test runner.");
+  }
+  const activation = assertFrozenArthurBuild(options?.activationOverrideForTests);
   const protocol = normalizeText(fs.readFileSync(protocolPath, "utf-8"));
   const protocolSha256 = sha256(protocol);
   if (protocolSha256 !== activation.protocolSha256) {
@@ -97,7 +104,9 @@ export function initializeStudy(studyDir: string, requestedStudyId?: string): St
   );
   writeTextExclusive(
     path.join(root, "protocol", "activation.json"),
-    normalizeText(fs.readFileSync(activationPath, "utf-8")),
+    options?.activationOverrideForTests
+      ? `${JSON.stringify(activation, null, 2)}\n`
+      : normalizeText(fs.readFileSync(activationPath, "utf-8")),
   );
 
   const manifest: StudyManifest = {

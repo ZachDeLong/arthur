@@ -98,7 +98,9 @@ source, that checker is skipped.
 Arthur reports the exact selected, supported, applicable, and skipped checker
 sets. A partial diff scan never claims that all project references were
 verified. Packages declared in `package.json` but absent from installed ground
-truth are warnings rather than silently passing as verified.
+truth are warnings rather than silently passing as verified. Import resolution
+starts beside each changed source file, so nested npm workspaces and monorepo
+packages use their own `package.json` and `node_modules` state.
 
 ## Example
 

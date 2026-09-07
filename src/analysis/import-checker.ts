@@ -259,7 +259,7 @@ function suggestPackage(packageName: string, nodeModulesDir: string): string | u
 
 // --- Package.json Dependency Check ---
 
-/** Cache for parsed package.json deps (per projectDir). Cleared per run via clearImportCaches(). */
+/** Cache for parsed on-disk package.json deps. Cleared per run via clearImportCaches(). */
 const depsCache = new Map<string, Set<string>>();
 
 /** Clear module-level caches. Call before each MCP tool invocation to avoid stale results. */
@@ -306,43 +306,87 @@ function isPlannedDependency(packageName: string, planText: string): boolean {
     .some((line) => installCommand.test(line) && new RegExp(`(?:^|[\\s'"\`])${escaped}(?:$|[\\s'"\`])`, "i").test(line));
 }
 
-function isListedDependency(
-  packageName: string,
-  projectDir: string,
-  cache?: Map<string, unknown>,
-  override?: Set<string>,
-): boolean {
-  if (override) return override.has(packageName);
-  const cacheKey = `deps:${projectDir}`;
-  let allDeps = (cache?.get(cacheKey) as Set<string> | undefined) ?? depsCache.get(projectDir);
-  if (!allDeps) {
-    allDeps = new Set<string>();
-    const pkgPath = path.join(projectDir, "package.json");
-    try {
-      const content = fs.readFileSync(pkgPath, "utf-8");
-      allDeps = parseDeclaredDependencies(content);
-    } catch {
-      // No package.json or parse error — can't validate
-    }
-    depsCache.set(projectDir, allDeps);
-    if (cache) cache.set(cacheKey, allDeps);
-  }
-  return allDeps.has(packageName);
+function fileSystemKey(filePath: string): string {
+  const resolved = path.resolve(filePath);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
-/** Locate an installed package in the project or a hoisted workspace ancestor. */
-function findInstalledPackageJson(packageName: string, projectDir: string): string | null {
-  let current = path.resolve(projectDir);
+function ancestorDirectories(startDir: string): string[] {
+  const directories: string[] = [];
+  let current = path.resolve(startDir);
   const root = path.parse(current).root;
-
   while (true) {
-    const candidate = path.join(current, "node_modules", packageName, "package.json");
-    if (fs.existsSync(candidate)) return candidate;
-    if (current === root) return null;
+    directories.push(current);
+    if (current === root) return directories;
     const parent = path.dirname(current);
-    if (parent === current) return null;
+    if (parent === current) return directories;
     current = parent;
   }
+}
+
+function packageJsonOverlays(files: DiffFile[], projectDir: string): Map<string, DiffFile> {
+  const overlays = new Map<string, DiffFile>();
+  for (const file of files) {
+    if (path.posix.basename(file.path.replace(/\\/g, "/")) !== "package.json") continue;
+    overlays.set(fileSystemKey(path.resolve(projectDir, file.path)), file);
+  }
+  return overlays;
+}
+
+function dependenciesAt(
+  manifestPath: string,
+  cache?: Map<string, unknown>,
+  overlays?: Map<string, DiffFile>,
+): Set<string> {
+  const manifestKey = fileSystemKey(manifestPath);
+  const overlay = overlays?.get(manifestKey);
+  if (overlay) {
+    return overlay.status === "deleted"
+      ? new Set<string>()
+      : parseDeclaredDependencies(overlay.content);
+  }
+
+  const cacheKey = `deps:${manifestKey}`;
+  let allDeps = (cache?.get(cacheKey) as Set<string> | undefined) ?? depsCache.get(manifestKey);
+  if (!allDeps) {
+    allDeps = new Set<string>();
+    try {
+      allDeps = parseDeclaredDependencies(fs.readFileSync(manifestPath, "utf-8"));
+    } catch {
+      // A missing or invalid manifest contributes no dependency declarations.
+    }
+    depsCache.set(manifestKey, allDeps);
+    if (cache) cache.set(cacheKey, allDeps);
+  }
+  return allDeps;
+}
+
+/** Follow Node's upward lookup from the importing file and inspect every package.json. */
+function isListedDependency(
+  packageName: string,
+  resolutionDir: string,
+  cache?: Map<string, unknown>,
+  overlays?: Map<string, DiffFile>,
+): boolean {
+  return ancestorDirectories(resolutionDir).some((directory) =>
+    dependenciesAt(path.join(directory, "package.json"), cache, overlays).has(packageName));
+}
+
+/** Locate an installed package exactly as Node would from the importing file. */
+function findInstalledPackageJson(packageName: string, resolutionDir: string): string | null {
+  for (const current of ancestorDirectories(resolutionDir)) {
+    const candidate = path.join(current, "node_modules", packageName, "package.json");
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function suggestPackageFromAncestors(packageName: string, resolutionDir: string): string | undefined {
+  for (const current of ancestorDirectories(resolutionDir)) {
+    const suggestion = suggestPackage(packageName, path.join(current, "node_modules"));
+    if (suggestion) return suggestion;
+  }
+  return undefined;
 }
 
 // --- Main Analysis ---
@@ -353,11 +397,10 @@ function findInstalledPackageJson(packageName: string, projectDir: string): stri
  */
 function validateImportSource(
   source: string,
-  projectDir: string,
-  nodeModulesDir: string,
+  resolutionDir: string,
   filePath?: string,
   cache?: Map<string, unknown>,
-  declaredDependencies?: Set<string>,
+  overlays?: Map<string, DiffFile>,
 ): { ref: ImportRef | null; skipped: boolean; unverified?: ImportRef } {
   if (shouldSkip(source)) {
     return { ref: null, skipped: true };
@@ -366,11 +409,11 @@ function validateImportSource(
   const { packageName, subpath } = parsePackageName(source);
 
   // Check if package exists in node_modules
-  const pkgJsonPath = findInstalledPackageJson(packageName, projectDir);
+  const pkgJsonPath = findInstalledPackageJson(packageName, resolutionDir);
   if (!pkgJsonPath) {
     // A declaration is intent, not installed ground truth. Surface it as an
     // unverified warning instead of silently calling it valid.
-    if (isListedDependency(packageName, projectDir, cache, declaredDependencies)) {
+    if (isListedDependency(packageName, resolutionDir, cache, overlays)) {
       return {
         ref: null,
         skipped: false,
@@ -384,7 +427,7 @@ function validateImportSource(
         },
       };
     }
-    const suggestion = suggestPackage(packageName, nodeModulesDir);
+    const suggestion = suggestPackageFromAncestors(packageName, resolutionDir);
     return {
       ref: {
         raw: source,
@@ -441,19 +484,13 @@ function validateImportSource(
 
 /** Analyze imports from DiffFile[] (source mode) — per-file attribution. */
 function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: Map<string, unknown>): ImportAnalysis {
-  const nodeModulesDir = path.join(projectDir, "node_modules");
   const hallucinations: ImportRef[] = [];
   const unverifiedImports: ImportRef[] = [];
   let totalImports = 0;
   let skippedImports = 0;
   let checkedImports = 0;
   let validImports = 0;
-  const packageJsonOverlay = files.find((file) => file.path === "package.json");
-  const declaredDependencies = packageJsonOverlay
-    ? packageJsonOverlay.status === "deleted"
-      ? new Set<string>()
-      : parseDeclaredDependencies(packageJsonOverlay.content)
-    : undefined;
+  const overlays = packageJsonOverlays(files, projectDir);
 
   // Cache validation results by package source to avoid redundant fs lookups
   const validatedPackages = new Map<string, ReturnType<typeof validateImportSource>>();
@@ -466,18 +503,19 @@ function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: 
 
     for (const occurrence of occurrences) {
       const source = occurrence.source;
+      const resolutionDir = path.dirname(path.resolve(projectDir, diffFile.path));
       // Check cache first
-      let result = validatedPackages.get(source);
+      const validationKey = `${fileSystemKey(resolutionDir)}\0${source}`;
+      let result = validatedPackages.get(validationKey);
       if (!result) {
         result = validateImportSource(
           source,
-          projectDir,
-          nodeModulesDir,
-          undefined,
+          resolutionDir,
+          diffFile.path,
           cache,
-          declaredDependencies,
+          overlays,
         );
-        validatedPackages.set(source, result);
+        validatedPackages.set(validationKey, result);
       }
 
       if (result.skipped) {
@@ -537,8 +575,6 @@ export function analyzeImports(
   // Plan mode (default): extract from plan text string
   const planText = input as string;
   const allSources = extractImports(planText);
-  const nodeModulesDir = path.join(projectDir, "node_modules");
-
   const hallucinations: ImportRef[] = [];
   const unverifiedImports: ImportRef[] = [];
   let skippedImports = 0;
@@ -546,7 +582,7 @@ export function analyzeImports(
   let validImports = 0;
 
   for (const source of allSources) {
-    const result = validateImportSource(source, projectDir, nodeModulesDir, undefined, options?.cache);
+    const result = validateImportSource(source, projectDir, undefined, options?.cache);
 
     if (result.skipped) {
       skippedImports++;

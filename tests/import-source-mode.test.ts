@@ -141,6 +141,105 @@ describe("analyzeImports — source mode", () => {
     }
   });
 
+  it("resolves installed packages from the importing workspace", () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-import-workspace-"));
+    const frontendDir = path.join(projectDir, "frontend");
+    const packageDir = path.join(frontendDir, "node_modules", "react");
+    fs.mkdirSync(path.join(frontendDir, "src"), { recursive: true });
+    fs.mkdirSync(packageDir, { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, "package.json"), JSON.stringify({
+      dependencies: { react: "^19.0.0" },
+    }));
+    fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({
+      name: "react",
+      version: "19.0.0",
+    }));
+
+    try {
+      const result = analyzeImports([{
+        path: "frontend/src/App.tsx",
+        content: 'import React from "react";\n',
+        changedLines: [1],
+      }], projectDir, { mode: "source" });
+
+      expect(result.checkedImports).toBe(1);
+      expect(result.validImports).toBe(1);
+      expect(result.hallucinations).toEqual([]);
+      expect(result.unverifiedImports).toEqual([]);
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses a changed nested package.json as the staged workspace view", () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-import-workspace-overlay-"));
+    fs.mkdirSync(path.join(projectDir, "frontend", "src"), { recursive: true });
+
+    try {
+      const result = analyzeImports([
+        {
+          path: "frontend/package.json",
+          content: JSON.stringify({ dependencies: { "future-workspace-package": "^1.0.0" } }),
+          changedLines: [1],
+          status: "added",
+        },
+        {
+          path: "frontend/src/App.tsx",
+          content: 'import value from "future-workspace-package";\n',
+          changedLines: [1],
+          status: "added",
+        },
+      ], projectDir, { mode: "source" });
+
+      expect(result.hallucinations).toEqual([]);
+      expect(result.unverifiedImports).toHaveLength(1);
+      expect(result.unverifiedImports[0]).toMatchObject({
+        raw: "future-workspace-package",
+        file: "frontend/src/App.tsx",
+        reason: "declared-not-installed",
+      });
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not share package validation across sibling workspaces", () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-import-workspace-cache-"));
+    const installedDir = path.join(projectDir, "apps", "installed", "node_modules", "workspace-only");
+    fs.mkdirSync(installedDir, { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "apps", "missing", "src"), { recursive: true });
+    fs.writeFileSync(path.join(installedDir, "package.json"), JSON.stringify({
+      name: "workspace-only",
+      version: "1.0.0",
+    }));
+
+    try {
+      const result = analyzeImports([
+        {
+          path: "apps/installed/src/index.ts",
+          content: 'import value from "workspace-only";\n',
+          changedLines: [1],
+        },
+        {
+          path: "apps/missing/src/index.ts",
+          content: 'import value from "workspace-only";\n',
+          changedLines: [1],
+        },
+      ], projectDir, { mode: "source" });
+
+      expect(result.checkedImports).toBe(2);
+      expect(result.validImports).toBe(1);
+      expect(result.hallucinations).toHaveLength(1);
+      expect(result.hallucinations[0]).toMatchObject({
+        raw: "workspace-only",
+        file: "apps/missing/src/index.ts",
+        reason: "package-not-found",
+      });
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   it("escapes regex characters in package export patterns", () => {
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-import-pattern-"));
     const packageDir = path.join(projectDir, "node_modules", "pattern-package");

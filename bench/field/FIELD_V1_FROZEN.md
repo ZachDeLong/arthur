@@ -39,11 +39,23 @@ completing and publishing.
 - Standard-tool evidence: `9487e08f9611b31506cb1bf3025143c0c722004577b8262365f2714a90da5362`
 - Freeze audit head: `6f73a690773471ce687190c396189853a16fc70a958ffd5f73d71709d7d5a6e2`
 
+## Post-freeze evidence erratum
+
+A non-independent operator inspection found that import contracts in the review
+packets checked only the repository-root `package.json` and `node_modules`.
+That evidence is invalid for nested npm projects. The original frozen artifacts
+above were not rewritten. A detector-blind correction instructing reviewers to
+verify every import from its source workspace was appended as audit event 107:
+
+- Erratum: `corrections/0001-workspace-package-resolution.md`
+- Erratum SHA-256: `ff91735af822069a4e54193c57cccbb49128d6c7296e36c71e90b6acb62a2069`
+- Post-erratum audit head: `48dff97d5cd2c2b55d001cbcfbf5af883f4a0394a0ca2a9e626bd12678ea175d`
+
 The publication snapshot is under `bench/results/field-v1/`. Reviewers must
 receive only `frozen/review-packets.jsonl`,
-`frozen/standard-tool-evidence.json`, and their blank submission template. They
-must not open either detector-prediction file until their submissions are
-locked.
+`frozen/standard-tool-evidence.json`, the audited evidence erratum above, and
+their blank submission template. They must not open either detector-prediction
+file until their submissions are locked.
 
 The preregistered decision cannot be scored until two eligible independent
 reviewers submit labels, a different reviewer adjudicates every disagreement or

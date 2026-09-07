@@ -10,7 +10,8 @@ import {
   parseComparatorPredictions,
 } from "../bench/field/comparator.js";
 import { freezeStudy } from "../bench/field/freeze.js";
-import { buildReferenceInventory } from "../bench/field/inventory.js";
+import { fingerprintArthurBuild } from "../bench/field/fingerprint.js";
+import { buildGroundTruthContracts, buildReferenceInventory } from "../bench/field/inventory.js";
 import {
   createAdjudicationTemplate,
   createBaselineTemplate,
@@ -34,6 +35,7 @@ import { captureDir, loadManifest, saveManifest } from "../bench/field/study-sto
 import { initializeStudy, recordExclusion } from "../bench/field/study.js";
 import type {
   ArtifactIndex,
+  ActivationRecord,
   ArthurCapture,
   CaptureMetadata,
   ComparatorRun,
@@ -115,6 +117,14 @@ function sourceLocation(pathName: string, line: number) {
   return { path: pathName, line, column: 1, endLine: line, endColumn: 10 };
 }
 
+function currentTestActivation(): ActivationRecord {
+  const activation = readJson<ActivationRecord>(path.resolve("bench/field/activation.json"));
+  return {
+    ...activation,
+    checkerBuildSha256: fingerprintArthurBuild(process.cwd()),
+  };
+}
+
 function makeCase(
   caseId: string,
   changeId: string,
@@ -137,7 +147,11 @@ function makeCase(
   };
 }
 
-function minimalReport(cases: ReferenceCase[], predictions: ArthurCapture["predictions"]): ArthurCapture {
+function minimalReport(
+  cases: ReferenceCase[],
+  predictions: ArthurCapture["predictions"],
+  activation: ActivationRecord,
+): ArthurCapture {
   const findings = predictions.flatMap((prediction) => {
     if (prediction.outcome !== "error") return [];
     const item = cases.find((candidate) => candidate.caseId === prediction.caseId)!;
@@ -153,8 +167,8 @@ function minimalReport(cases: ReferenceCase[], predictions: ArthurCapture["predi
   });
   return {
     system: "arthur",
-    activationCommit: assertFrozenArthurBuild().activationCommit,
-    checkerBuildSha256: assertFrozenArthurBuild().checkerBuildSha256,
+    activationCommit: activation.activationCommit,
+    checkerBuildSha256: activation.checkerBuildSha256,
     runtime: {
       node: process.version,
       platform: process.platform,
@@ -253,7 +267,7 @@ function writeSyntheticCapture(
   const selectionPath = path.join(studyDir, "selections", `${changeId}.json`);
   writeJson(selectionPath, selection);
   recordAuditEvent(studyDir, "candidate_selected_before_prediction", selectionPath);
-  const arthur = minimalReport(cases, predictions);
+  const arthur = minimalReport(cases, predictions, loadManifest(studyDir).activation);
   writeJson(path.join(directory, "metadata.json"), metadata);
   fs.writeFileSync(path.join(directory, "diff.patch"), `${changeId}\n`, "utf-8");
   writeJson(path.join(directory, "sources.json"), []);
@@ -307,7 +321,12 @@ function fillReview(
 
 describe("field benchmark", () => {
   it("locks the activated build and inventories only live supported references", () => {
-    expect(assertFrozenArthurBuild().activationCommit).toBe(
+    const testActivation = currentTestActivation();
+    expect(() => assertFrozenArthurBuild({
+      ...testActivation,
+      checkerBuildSha256: "0".repeat(64),
+    })).toThrow(/differs from the activated field-study build/);
+    expect(assertFrozenArthurBuild(testActivation).activationCommit).toBe(
       "2d914e5e41637726dbb440dda4aed47ea148febb",
     );
     const source = [
@@ -339,9 +358,46 @@ describe("field benchmark", () => {
     );
   });
 
+  it("builds package contracts from each importing workspace", () => {
+    const directory = temporaryDirectory("arthur-field-workspace-contract-");
+    git(directory, ["init"]);
+    git(directory, ["config", "user.name", "Field Test"]);
+    git(directory, ["config", "user.email", "field@example.test"]);
+    writeProjectFile(directory, "frontend/package.json", JSON.stringify({
+      dependencies: { react: "^19.0.0" },
+    }));
+    writeProjectFile(directory, "frontend/src/App.tsx", 'import React from "react";\n');
+    git(directory, ["add", "-A"]);
+    git(directory, ["commit", "-m", "workspace fixture"]);
+    writeProjectFile(directory, "frontend/node_modules/react/package.json", JSON.stringify({
+      name: "react",
+      version: "19.0.0",
+    }));
+
+    const files: DiffFile[] = [{
+      path: "frontend/src/App.tsx",
+      content: 'import React from "react";\n',
+      changedLines: [1],
+      status: "added",
+    }];
+    const cases = buildReferenceInventory(files, "d_workspace", "repo-workspace");
+    const contracts = buildGroundTruthContracts(directory, files, cases);
+
+    expect(cases).toHaveLength(1);
+    expect(contracts.packages).toEqual([expect.objectContaining({
+      caseId: cases[0].caseId,
+      packageName: "react",
+      sourcePath: "frontend/src/App.tsx",
+      declarationManifestPath: "frontend/package.json",
+      declaredVersion: "^19.0.0",
+      installed: true,
+      installedManifest: expect.objectContaining({ name: "react", version: "19.0.0" }),
+    })]);
+  });
+
   it("captures a clean committed Git change, redacts secrets, and hashes every artifact", () => {
     const studyDir = temporaryDirectory("arthur-field-study-");
-    initializeStudy(studyDir, "capture-smoke");
+    initializeStudy(studyDir, "capture-smoke", { activationOverrideForTests: currentTestActivation() });
     const fixture = createGitFixture();
     const compiledCliAvailable = fs.existsSync(
       path.join(process.cwd(), "dist", "bin", "arthur.js"),
@@ -443,7 +499,7 @@ describe("field benchmark", () => {
 
   it("rejects attempts to move preregistered decision rules", () => {
     const studyDir = temporaryDirectory("arthur-field-tamper-");
-    const manifest = initializeStudy(studyDir, "tamper-test");
+    const manifest = initializeStudy(studyDir, "tamper-test", { activationOverrideForTests: currentTestActivation() });
     manifest.decisionRules.minimumBlockingPrecision = 0;
     saveManifest(studyDir, manifest);
     expect(() => recordExclusion({
@@ -456,7 +512,7 @@ describe("field benchmark", () => {
 
   it("runs the full frozen, blinded, adjudicated scoring workflow and preserves a negative decision", () => {
     const studyDir = temporaryDirectory("arthur-field-lifecycle-");
-    const manifest = initializeStudy(studyDir, "lifecycle-test");
+    const manifest = initializeStudy(studyDir, "lifecycle-test", { activationOverrideForTests: currentTestActivation() });
     const actionableId = "c_actionable_case_000001";
     const validId = "c_valid_case_00000000002";
     const ignoredId = "c_ignored_case_000000003";
@@ -594,7 +650,7 @@ describe("field benchmark", () => {
     );
 
     const lock = freezeStudy(studyDir);
-    expect(lock.activationCommit).toBe(assertFrozenArthurBuild().activationCommit);
+    expect(lock.activationCommit).toBe(manifest.activation.activationCommit);
     const packets = readJsonLines<ReviewPacket>(
       path.join(studyDir, "frozen", "review-packets.jsonl"),
     );
