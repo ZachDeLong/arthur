@@ -1,122 +1,244 @@
 # Arthur
 
-Inspired by Quantum Merlin-Arthur (QMA) verification, Arthur is a deterministic ground truth verification method for AI-generated code. It catches hallucinated file paths, schema references, imports, env vars, routes, and package API usage before code gets written.
+Arthur is a reference-integrity gate for AI-written code.
+
+AI coding agents cite things that may not exist: file paths, imports, database
+columns, API routes, env vars, package exports, and schema fields. Arthur checks
+those references against ground truth before they become bugs.
+
+The first Arthur vertical is code. The broader idea is simple: when an AI output
+cites a source, Arthur verifies that the cited thing is real.
 
 ## The Problem
 
-AI coding assistants hallucinate. They reference files that don't exist, query database columns that aren't real, import packages that aren't installed, and build plans on assumptions that don't match the actual codebase.
+AI coding assistants are good at plausible implementation, but they still invent
+references:
 
-The model can't reliably catch its own mistakes. Self-review is limited by the same context constraints and attention budget that caused the hallucinations in the first place.
+- files that are not in the repo
+- Prisma models or fields that are not in `schema.prisma`
+- Supabase or SQL columns that are not in the generated schema
+- packages or import subpaths that are not installed or exported
+- env vars that are not defined
+- routes that are not registered
 
-Arthur runs deterministic checks against ground truth (your actual files, schemas, packages, env vars) and returns the results, including what actually exists, so the model can self-correct.
+LLM self-review can catch these errors. In Arthur's first locked paired
+benchmark, Claude Sonnet 5 and Arthur both classified every blocking case
+correctly. Arthur's narrower advantage was operational: the local run took
+63 ms with no network call, credential, token cost, or run-to-run variance,
+while Claude took 30–42 seconds per run. See
+[`bench/paired/RESULTS.md`](bench/paired/RESULTS.md).
+
+Arthur uses deterministic checks against local ground truth and returns nearby
+real values, so the same narrow checks can run automatically on every change.
 
 ## Install
 
 ```bash
+# CLI and pre-commit hook
+npm install --save-dev arthur-mcp
+
+# MCP adapter for Claude Code
 claude mcp add arthur -- npx arthur-mcp
 ```
 
-Arthur is now available as an MCP server in Claude Code. All tools run locally. No API key, no credits, no config.
+Arthur runs locally as an MCP server. The deterministic checks need no API key,
+account, or remote service; import verification uses the dependencies already
+installed in the target checkout.
 
-## How It Works
+## Use It As A Gate
 
-1. Claude Code generates a plan
-2. Claude Code calls Arthur's `check_all` tool
-3. Arthur validates every reference against ground truth (file tree, schemas, node_modules, .env files, routes)
-4. Arthur returns findings **with the correct values**: not just "this is wrong" but "this is wrong, here's what actually exists"
-5. Claude Code reads the findings and corrects its plan
+Arthur has two useful entry points:
 
+```bash
+# Check an implementation plan before code is written
+arthur check --plan plan.md --project ./my-app
+
+# Check changed code before commit or in CI
+arthur check --diff HEAD --project ./my-app
+arthur check --diff origin/main --project ./my-app
+
+# Install a quiet staged-change gate
+arthur hooks install --project ./my-app
 ```
-# When Arthur finds a hallucinated Prisma model:
-✗ prisma.engagement - hallucinated-model -> prisma.participantEngagement
-  Available models: participant (Participant), contentItem (ContentItem),
-                    participantEngagement (ParticipantEngagement)
 
-# When Arthur finds a hallucinated file path:
-✗ src/models/User.ts - NOT FOUND
-  Closest: src/lib/db.ts, src/app/api/participants/route.ts
+In MCP hosts, use:
 
-# When Arthur finds a wrong Supabase column:
-✗ .select('...early_decision_deadline...') - hallucinated-column
-  Available columns on college_tiers: id, name, tier, acceptance_rate, ...
+```text
+check_all(planText, projectDir)
+check_diff(projectDir, diffRef)
 ```
+
+Those are the only tools exposed by default. Existing individual checker tools
+can be restored with `ARTHUR_MCP_LEGACY_TOOLS=1`. The networked `verify_plan`
+and session helpers require the separate `ARTHUR_MCP_ENABLE_LLM_TOOL=1` and
+`ARTHUR_MCP_ENABLE_SESSION_TOOLS=1` opt-ins.
+
+`check_all` is useful while planning. `check_diff` is the primary gate. Diff
+mode currently targets JavaScript and TypeScript, reads staged content from
+Git's index, includes untracked files by default, checks only changed lines,
+and returns source locations for every finding.
+
+## What Arthur Checks
+
+| Checker | Plan | Diff | Ground truth |
+|---|---:|---:|---|
+| Paths | Yes | Not yet | Project tree |
+| Prisma schema | Yes | Not yet | `schema.prisma` |
+| SQL/Drizzle schema | Yes | Not yet | `pgTable()` / `CREATE TABLE` |
+| Supabase schema | Yes | Not yet | `database.types.ts` |
+| Imports | Yes | Yes | Installed package metadata |
+| Env vars | Yes | Yes | `.env*` files |
+| Next.js routes | Yes | Yes | App Router `route.ts` files |
+| Express/Fastify routes | Yes | Not yet | Route registrations |
+| Package API *(experimental)* | Opt-in | Not yet | Package `.d.ts` files |
+
+All checkers auto-detect. If a project does not use a supported ground-truth
+source, that checker is skipped.
+
+Arthur reports the exact selected, supported, applicable, and skipped checker
+sets. A partial diff scan never claims that all project references were
+verified. Packages declared in `package.json` but absent from installed ground
+truth are warnings rather than silently passing as verified.
+
+## Example
+
+```text
+Invalid reference:
+  prisma.engagement
+
+Ground truth:
+  Available models:
+    participant -> Participant
+    contentItem -> ContentItem
+    participantEngagement -> ParticipantEngagement
+
+Suggested correction:
+  prisma.participantEngagement
+```
+
+```text
+Invalid reference:
+  src/models/User.ts
+
+Ground truth:
+  Closest files:
+    src/lib/db.ts
+    src/app/api/participants/route.ts
+```
+
+Arthur does not decide whether the design is good. It checks whether the AI
+cited real things.
 
 ## Recommended Setup
 
-Add this to your project's `CLAUDE.md` so Claude Code uses Arthur automatically:
+Add this to your project's agent instructions:
 
 ```markdown
-## Verification
+## Reference Integrity
 
-Before implementing any plan, call the `check_all` MCP tool with the plan text and project directory.
-Fix all hallucinated references using the ground truth provided in the response before writing code.
+Before implementing a plan, run Arthur's `check_all` against the plan and
+project directory. After writing code, run `check_diff` against the changed
+files. Fix any invented references using Arthur's ground-truth suggestions.
 ```
 
-## Tools
+Or install the managed pre-commit hook:
 
-### `check_all` (recommended)
-
-Runs all stable checkers in a single call. Returns a comprehensive report with ground truth context for every finding.
-
-```
-check_all(planText, projectDir)
+```bash
+arthur hooks install
+arthur hooks uninstall
 ```
 
-### `check_diff`
-
-Validates actual code changes from a git diff against project ground truth. Use after writing code.
-
-```
-check_diff(diffRef, projectDir)
-```
-
-### Individual Checkers
-
-| Tool | What it catches | Ground truth source |
-|---|---|---|
-| `check_paths` | Hallucinated file paths | Project directory tree |
-| `check_schema` | Wrong Prisma models, fields, methods, relations | `schema.prisma` |
-| `check_sql_schema` | Wrong Drizzle/SQL tables, columns | `pgTable()` / `CREATE TABLE` |
-| `check_supabase_schema` | Wrong Supabase tables, columns, functions | `database.types.ts` |
-| `check_imports` | Non-existent packages, invalid subpaths | `node_modules` + `package.json` |
-| `check_env` | Undefined environment variables | `.env*` files |
-| `check_routes` | Non-existent API routes, wrong methods | Next.js App Router `route.ts` files |
-| `check_express_routes` | Wrong Express/Fastify routes | Express/Fastify route registrations |
-| `check_package_api` *(experimental)* | Wrong named imports/member access | Package `.d.ts` exports in `node_modules` |
-
-All checkers auto-detect. If a project has no Prisma schema, that checker silently returns nothing.
-
-### `verify_plan` (optional, requires API key)
-
-Full pipeline: all static checks + LLM review by a separate Claude instance. Requires `ANTHROPIC_API_KEY`.
+Arthur will not overwrite an existing hook it does not own. In that case it
+prints the one command to add manually.
 
 ## CLI
 
 ```bash
 npm install -g arthur-mcp
 
-# Static analysis only (no API key needed)
+# Plan mode
 arthur check --plan plan.md --project ./my-app
-arthur check --plan plan.md --project ./my-app --strict
+cat plan.md | arthur check --project ./my-app
 
-# Verify code changes
+# Diff mode
 arthur check --diff HEAD --project ./my-app
+arthur check --diff HEAD --staged --project ./my-app
 arthur check --diff origin/main --project ./my-app
 
-# Full verification (static + LLM review)
+# Machine-readable output
+arthur check --diff origin/main --format json
+arthur check --diff origin/main --format sarif > arthur.sarif
+
+# Fail closed on low coverage without enabling experimental rules
+arthur check --diff HEAD --staged --strict
+
+# Optional LLM review wrapper
+export ANTHROPIC_API_KEY=your-key
 codeverifier verify --plan plan.md --project ./my-app
 ```
+
+The deterministic CLI and MCP checks are local. `codeverifier` is a separate,
+optional wrapper that sends the assembled plan and referenced source context to
+Anthropic using your API credentials.
+
+## CI
+
+Arthur emits SARIF 2.1.0 for GitHub code scanning and other compatible tools.
+A minimal pull-request gate is:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    fetch-depth: 0
+- run: npm ci
+- run: npx arthur check --diff origin/${{ github.base_ref }} --format sarif > arthur.sarif
+```
+
+Arthur exits non-zero for error findings. Warning-only results remain visible
+without blocking the build.
 
 ## Development
 
 ```bash
 git clone https://github.com/ZachDeLong/arthur.git
 cd arthur
-npm install
-npm run build
+npm ci
+npm run check
 npm test
+npm run validate
+npm run build
+
+# Locked, label-separated Arthur vs LLM comparison
+npm run bench:paired -- arthur
 ```
+
+`npm run validate` evaluates the blocking diff rules against a manually labelled
+fixture corpus. It is a regression gate, not an independently audited claim of
+real-world precision;
+a historical sweep of 37 diffs from `ZachDeLong/school-checklist` found no
+confirmed false positives, but broader agent-authored and external-user
+validation remains required. See
+[`bench/validation/FIELD_RESULTS.md`](bench/validation/FIELD_RESULTS.md).
+The paired benchmark design, frozen corpus, and non-winning first result are in
+[`bench/paired/`](bench/paired/README.md).
+The preregistered release-decision study is in
+[`bench/field/PROTOCOL.md`](bench/field/PROTOCOL.md); its rules must be committed
+before any field data is collected.
+
+## Direction
+
+Arthur is not trying to be a general AI reviewer. It is a precise, boring,
+deterministic layer for checking references that AI agents cite.
+
+Near-term focus:
+
+1. Validate diff-mode precision on real agent-authored changes.
+2. Expand source mode only where a deterministic contract exists.
+3. Keep hook latency below the agent workflow's interruption threshold.
+4. Keep noisy checkers experimental until precision is proven.
+
+See [docs/DIRECTION.md](docs/DIRECTION.md) for the product direction.
 
 ## License
 
-MIT
+[MIT](LICENSE)

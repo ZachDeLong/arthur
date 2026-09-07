@@ -1,39 +1,44 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
-import { analyzeApiRoutes, buildRouteIndex, type ApiRouteAnalysis } from "../api-route-checker.js";
+import {
+  analyzeApiRoutes,
+  analyzeApiRouteSourceFiles,
+  buildRouteIndex,
+  type ApiRouteAnalysis,
+} from "../api-route-checker.js";
 import { printApiRouteAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "routes",
   displayName: "API Routes",
   catchKey: "routes",
+  supportsSourceMode: true,
 
   run(input: CheckerInput, projectDir): CheckerResult {
-    if (input.mode === "source") {
-      return {
-        checkerId: "routes",
-        checked: 0,
-        hallucinated: 0,
-        hallucinations: [],
-        catchItems: [],
-        applicable: false,
-        notApplicableReason: "source mode not implemented for this checker",
-        rawAnalysis: null,
-      };
-    }
-
-    const analysis = analyzeApiRoutes(input.text, projectDir);
+    const analysis = input.mode === "source" && input.files
+      ? analyzeApiRouteSourceFiles(input.files, projectDir)
+      : analyzeApiRoutes(input.text, projectDir);
+    const applicable = analysis.routesIndexed > 0 && analysis.checkedRefs > 0;
     return {
       checkerId: "routes",
       checked: analysis.checkedRefs,
       hallucinated: analysis.hallucinations.length,
       hallucinations: analysis.hallucinations.map(h => ({
         raw: `${h.method ?? ""} ${h.urlPath}`.trim(),
-        category: h.hallucinationCategory ?? "unknown",
+        category: h.hallucinationCategory === "hallucinated-method"
+          ? "wrong-method"
+          : h.hallucinationCategory ?? "unknown",
         suggestion: h.suggestion,
+        location: h.location,
       })),
       catchItems: analysis.hallucinations.map(h => `${h.method ?? ""} ${h.urlPath}`.trim()),
-      applicable: analysis.routesIndexed > 0,
-      notApplicableReason: analysis.routesIndexed > 0 ? undefined : "No Next.js App Router route files found",
+      applicable,
+      notApplicableReason: applicable
+        ? undefined
+        : analysis.routesIndexed === 0
+          ? "No Next.js App Router route files found"
+          : input.mode === "source"
+            ? "No changed static API route refs found"
+            : "No API route refs found in plan",
       rawAnalysis: analysis,
     };
   },

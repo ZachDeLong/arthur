@@ -1,6 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import * as ts from "typescript";
 import { getAllFiles } from "../context/tree.js";
+import { isJavaScriptSourceFile, type DiffFile } from "../diff/resolver.js";
+import type { SourceLocation } from "./registry.js";
+import {
+  occurrenceLocation,
+  occurrenceTouchesChangedLines,
+} from "./source-locations.js";
+import { extractTypeScriptRouteRefs } from "./typescript-source.js";
 
 // --- Types ---
 
@@ -17,6 +25,8 @@ export interface ApiRouteRef {
   valid: boolean;
   hallucinationCategory?: "hallucinated-route" | "hallucinated-method";
   suggestion?: string;
+  file?: string;
+  location?: SourceLocation;
 }
 
 export interface ApiRouteAnalysis {
@@ -39,60 +49,95 @@ const VALID_HTTP_METHODS = new Set([
 
 /** Convert a filesystem path like 'src/app/api/participants/route.ts' to URL path '/api/participants'. */
 export function filePathToUrlPath(filePath: string): string | null {
-  // Find the app/ prefix
-  const appIndex = filePath.indexOf("app/");
+  const segments = filePath.replace(/\\/g, "/").split("/").filter(Boolean);
+  const appIndex = segments.findIndex((segment, index) => {
+    if (segment !== "app") return false;
+    const firstUrlSegment = segments
+      .slice(index + 1, -1)
+      .find((candidate) => !/^\([^)]+\)$/.test(candidate) && !candidate.startsWith("@"));
+    return firstUrlSegment === "api";
+  });
   if (appIndex === -1) return null;
+  if (!/^route\.(?:ts|js|tsx|jsx)$/.test(segments.at(-1) ?? "")) return null;
 
-  // Strip everything before and including app/, and the route.{ext} suffix
-  let urlPath = filePath.slice(appIndex + 4); // after 'app/'
-  urlPath = urlPath.replace(/\/route\.(ts|js|tsx|jsx)$/, "");
-
-  // Remove route group segments: (auth), (marketing), etc.
-  urlPath = urlPath.replace(/\([^)]+\)\/?/g, "");
-
-  // Remove trailing slash
-  urlPath = urlPath.replace(/\/$/, "");
-
-  // Prepend /
-  return "/" + urlPath;
+  const routeSegments = segments
+    .slice(appIndex + 1, -1)
+    .filter((segment) => !/^\([^)]+\)$/.test(segment) && !segment.startsWith("@"));
+  return `/${routeSegments.join("/")}`;
 }
 
 /** Parse exported HTTP method handlers from a route file's content. */
 export function parseRouteMethods(content: string): Set<string> {
   const methods = new Set<string>();
+  const sourceFile = ts.createSourceFile(
+    "route.ts",
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const isExported = (node: ts.Node): boolean => (
+    ts.canHaveModifiers(node)
+    && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+  );
 
-  // Match: export async function GET / export function POST / etc.
-  const exportRegex = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g;
-  for (const match of content.matchAll(exportRegex)) {
-    methods.add(match[1]);
-  }
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement)
+      && isExported(statement)
+      && statement.name
+      && VALID_HTTP_METHODS.has(statement.name.text)) {
+      methods.add(statement.name.text);
+      continue;
+    }
 
-  // Match: export const GET = ... / export const POST = ...
-  const constRegex = /export\s+const\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s*=/g;
-  for (const match of content.matchAll(constRegex)) {
-    methods.add(match[1]);
+    if (ts.isVariableStatement(statement) && isExported(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name) && VALID_HTTP_METHODS.has(declaration.name.text)) {
+          methods.add(declaration.name.text);
+        }
+      }
+      continue;
+    }
+
+    if (ts.isExportDeclaration(statement)
+      && statement.exportClause
+      && ts.isNamedExports(statement.exportClause)) {
+      for (const element of statement.exportClause.elements) {
+        if (VALID_HTTP_METHODS.has(element.name.text)) methods.add(element.name.text);
+      }
+    }
   }
 
   return methods;
 }
 
 /** Scan project for Next.js App Router route files and build a URL → route index. */
-export function buildRouteIndex(projectDir: string): Map<string, ApiRoute> {
+export function buildRouteIndex(
+  projectDir: string,
+  diffFiles?: DiffFile[],
+): Map<string, ApiRoute> {
   const allFiles = getAllFiles(projectDir);
   const index = new Map<string, ApiRoute>();
+  const overlays = new Map((diffFiles ?? []).map((file) => [file.path, file]));
+
+  for (const file of diffFiles ?? []) {
+    if (file.previousPath) allFiles.delete(file.previousPath);
+    if (file.status === "deleted") allFiles.delete(file.path);
+    else allFiles.add(file.path);
+  }
 
   for (const filePath of allFiles) {
     // Only match route.{ts,js,tsx,jsx} files inside an app/ directory
-    if (!/app\/.*\/route\.(ts|js|tsx|jsx)$/.test(filePath)) continue;
+    if (!/(?:^|\/)app\//.test(filePath) || !/\/route\.(ts|js|tsx|jsx)$/.test(filePath)) continue;
 
     const urlPath = filePathToUrlPath(filePath);
-    if (!urlPath) continue;
+    if (!urlPath || !urlPath.startsWith("/api/")) continue;
 
     // Parse methods from file content
     const fullPath = path.join(projectDir, filePath);
     let methods = new Set<string>();
     try {
-      const content = fs.readFileSync(fullPath, "utf-8");
+      const content = overlays.get(filePath)?.content ?? fs.readFileSync(fullPath, "utf-8");
       methods = parseRouteMethods(content);
     } catch {
       // Can't read file — index with empty methods
@@ -110,63 +155,106 @@ interface RawApiRef {
   raw: string;
   urlPath: string;
   method?: string;
+  index: number;
+  length: number;
 }
 
-/** Extract API route references from plan text. */
-export function extractApiRouteRefs(planText: string): RawApiRef[] {
+function extractApiRouteOccurrences(
+  sourceText: string,
+  sourceMode: boolean,
+): RawApiRef[] {
   const refs: RawApiRef[] = [];
   const seen = new Set<string>();
+  const methodAwareFetches = new Set<number>();
 
-  const add = (raw: string, urlPath: string, method?: string) => {
+  const add = (
+    raw: string,
+    urlPath: string,
+    method: string | undefined,
+    index: number,
+  ) => {
     // Normalize: strip query string, trailing slash
     urlPath = urlPath.split("?")[0].replace(/\/$/, "");
     if (!urlPath.startsWith("/api/")) return;
+    // Dynamic templates are not deterministic references. Concrete values
+    // still match dynamic route segments through matchRoute().
+    if (sourceMode && urlPath.includes("${")) return;
 
-    const key = `${method ?? ""}|${urlPath}`;
+    const key = sourceMode
+      ? `${index}|${method ?? ""}|${urlPath}`
+      : `${method ?? ""}|${urlPath}`;
     if (seen.has(key)) return;
     seen.add(key);
 
-    refs.push({ raw, urlPath, method });
+    refs.push({ raw, urlPath, method, index, length: raw.length });
   };
-
-  // fetch('/api/...') or fetch("/api/...")
-  const fetchRegex = /fetch\s*\(\s*['"`](\/api\/[^'"`\s)]+)['"`]/g;
-  for (const match of planText.matchAll(fetchRegex)) {
-    add(match[0], match[1]);
-  }
 
   // fetch('/api/...', { method: 'POST' }) — extract method from nearby options
   const fetchWithMethodRegex = /fetch\s*\(\s*['"`](\/api\/[^'"`\s)]+)['"`]\s*,\s*\{[^}]*method\s*:\s*['"`](GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)['"`]/gi;
-  for (const match of planText.matchAll(fetchWithMethodRegex)) {
-    add(match[0], match[1], match[2].toUpperCase());
+  for (const match of sourceText.matchAll(fetchWithMethodRegex)) {
+    if (match.index === undefined) continue;
+    methodAwareFetches.add(match.index);
+    add(match[0], match[1], match[2].toUpperCase(), match.index);
+  }
+
+  // fetch('/api/...') or fetch("/api/...")
+  const fetchRegex = /fetch\s*\(\s*['"`](\/api\/[^'"`\s)]+)['"`]/g;
+  for (const match of sourceText.matchAll(fetchRegex)) {
+    if (match.index === undefined || methodAwareFetches.has(match.index)) continue;
+    add(match[0], match[1], "GET", match.index);
   }
 
   // axios.get('/api/...'), axios.post('/api/...'), etc.
   const axiosRegex = /axios\.(get|post|put|delete|patch)\s*\(\s*['"`](\/api\/[^'"`\s)]+)['"`]/gi;
-  for (const match of planText.matchAll(axiosRegex)) {
-    add(match[0], match[2], match[1].toUpperCase());
+  for (const match of sourceText.matchAll(axiosRegex)) {
+    if (match.index === undefined) continue;
+    add(match[0], match[2], match[1].toUpperCase(), match.index);
   }
 
-  // GET /api/..., POST /api/..., etc. (REST notation in prose)
-  const restRegex = /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(\/api\/\S+)/g;
-  for (const match of planText.matchAll(restRegex)) {
-    const urlPath = match[2].replace(/[`'")\],;.]+$/, ""); // strip trailing punctuation
-    add(match[0], urlPath, match[1]);
-  }
+  if (!sourceMode) {
+    // REST notation and bare backticks are useful in plans but too noisy in
+    // source files, where they frequently occur in comments and examples.
+    const restRegex = /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(\/api\/\S+)/g;
+    for (const match of sourceText.matchAll(restRegex)) {
+      if (match.index === undefined) continue;
+      const urlPath = match[2].replace(/[`'")\],;.]+$/, "");
+      add(match[0], urlPath, match[1], match.index);
+    }
 
-  // Bare `/api/...` in backticks
-  const backtickRegex = /`(\/api\/[^`\s]+)`/g;
-  for (const match of planText.matchAll(backtickRegex)) {
-    add(match[0], match[1]);
+    const backtickRegex = /`(\/api\/[^`\s]+)`/g;
+    for (const match of sourceText.matchAll(backtickRegex)) {
+      if (match.index === undefined) continue;
+      add(match[0], match[1], undefined, match.index);
+    }
   }
 
   // new URL('/api/...')
   const urlRegex = /new\s+URL\s*\(\s*['"`](\/api\/[^'"`\s)]+)['"`]/g;
-  for (const match of planText.matchAll(urlRegex)) {
-    add(match[0], match[1]);
+  for (const match of sourceText.matchAll(urlRegex)) {
+    if (match.index === undefined) continue;
+    add(match[0], match[1], undefined, match.index);
   }
 
-  return refs;
+  return refs.sort((a, b) => a.index - b.index);
+}
+
+/** Extract API route references from plan text. */
+export function extractApiRouteRefs(planText: string): RawApiRef[] {
+  return extractApiRouteOccurrences(planText, false);
+}
+
+/** Ignore illustrative routes that the plan explicitly defers to the future. */
+function isDeferredPlanRoute(ref: RawApiRef, planText: string): boolean {
+  const lineStart = planText.lastIndexOf("\n", ref.index) + 1;
+  const nextLine = planText.indexOf("\n", ref.index + ref.length);
+  const lineEnd = nextLine === -1 ? planText.length : nextLine;
+  const line = planText.slice(lineStart, lineEnd).toLowerCase();
+
+  return (
+    /\bif\b[^\n]{0,120}\b(?:later|future)\b/.test(line) ||
+    /\b(?:later|future)\b[^\n]{0,80}\b(?:needed|required|desired)\b/.test(line) ||
+    /\b(?:hypothetical|future endpoint|deferred endpoint)\b/.test(line)
+  );
 }
 
 // --- Route Matching ---
@@ -184,10 +272,13 @@ export function matchRoute(urlPath: string, index: Map<string, ApiRoute>): ApiRo
     // Check catch-all first: [...slug] or [[...slug]]
     if (routeSegments.length > 0) {
       const lastSeg = routeSegments[routeSegments.length - 1];
-      if (/^\[\.\.\./.test(lastSeg) || /^\[\[\.\.\./.test(lastSeg)) {
+      const requiredCatchAll = /^\[\.\.\.[^\]]+\]$/.test(lastSeg);
+      const optionalCatchAll = /^\[\[\.\.\.[^\]]+\]\]$/.test(lastSeg);
+      if (requiredCatchAll || optionalCatchAll) {
         // Catch-all: match if URL starts with the same prefix
         const prefixSegments = routeSegments.slice(0, -1);
-        if (segments.length >= prefixSegments.length) {
+        const minimumLength = prefixSegments.length + (requiredCatchAll ? 1 : 0);
+        if (segments.length >= minimumLength) {
           const prefixMatch = prefixSegments.every((seg, i) => {
             if (seg.startsWith("[") && seg.endsWith("]")) return true;
             return seg === segments[i];
@@ -276,6 +367,11 @@ export function analyzeApiRoutes(planText: string, projectDir: string): ApiRoute
   let skippedRefs = 0;
 
   for (const ref of rawRefs) {
+    if (isDeferredPlanRoute(ref, planText)) {
+      skippedRefs++;
+      continue;
+    }
+
     const route = matchRoute(ref.urlPath, index);
 
     if (!route) {
@@ -309,7 +405,7 @@ export function analyzeApiRoutes(planText: string, projectDir: string): ApiRoute
     validRefs++;
   }
 
-  const checkedRefs = rawRefs.length;
+  const checkedRefs = rawRefs.length - skippedRefs;
   const hallucinationRate = checkedRefs > 0 ? hallucinations.length / checkedRefs : 0;
 
   return {
@@ -319,6 +415,85 @@ export function analyzeApiRoutes(planText: string, projectDir: string): ApiRoute
     hallucinations,
     hallucinationRate,
     skippedRefs,
+    routesIndexed: index.size,
+  };
+}
+
+/** Analyze only static route references that intersect changed source lines. */
+export function analyzeApiRouteSourceFiles(
+  files: DiffFile[],
+  projectDir: string,
+): ApiRouteAnalysis {
+  const index = buildRouteIndex(projectDir, files);
+  if (index.size === 0) {
+    return {
+      totalRefs: 0,
+      checkedRefs: 0,
+      validRefs: 0,
+      hallucinations: [],
+      hallucinationRate: 0,
+      skippedRefs: 0,
+      routesIndexed: 0,
+    };
+  }
+
+  const hallucinations: ApiRouteRef[] = [];
+  let checkedRefs = 0;
+  let validRefs = 0;
+
+  for (const file of files) {
+    if (file.status === "deleted" || !isJavaScriptSourceFile(file.path)) continue;
+    const refs = extractTypeScriptRouteRefs(file.path, file.content)
+      .filter((ref) => occurrenceTouchesChangedLines(file, {
+        index: ref.changeIndex,
+        length: ref.changeLength,
+      }));
+
+    for (const ref of refs) {
+      checkedRefs++;
+      const route = matchRoute(ref.urlPath, index);
+      const location = occurrenceLocation(file, ref);
+
+      if (!route) {
+        const suggestion = suggestRoute(ref.urlPath, index);
+        hallucinations.push({
+          raw: ref.raw,
+          urlPath: ref.urlPath,
+          method: ref.method,
+          valid: false,
+          hallucinationCategory: "hallucinated-route",
+          suggestion: suggestion ? `did you mean ${suggestion}?` : undefined,
+          file: file.path,
+          location,
+        });
+        continue;
+      }
+
+      if (ref.method && route.methods.size > 0 && !route.methods.has(ref.method)) {
+        hallucinations.push({
+          raw: ref.raw,
+          urlPath: ref.urlPath,
+          method: ref.method,
+          valid: false,
+          hallucinationCategory: "hallucinated-method",
+          suggestion: `valid methods: ${[...route.methods].join(", ")}`,
+          file: file.path,
+          location,
+        });
+        continue;
+      }
+
+      validRefs++;
+    }
+  }
+
+  return {
+    totalRefs: checkedRefs,
+    checkedRefs,
+    validRefs,
+    hallucinations,
+    hallucinationRate: checkedRefs > 0 ? hallucinations.length / checkedRefs : 0,
+    skippedRefs: 0,
     routesIndexed: index.size,
   };
 }

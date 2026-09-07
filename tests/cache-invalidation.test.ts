@@ -80,7 +80,7 @@ describe("Cache invalidation", () => {
   it("request-scoped cache is populated by analyzeImports", () => {
     const cache = new Map<string, unknown>();
     analyzeImports(
-      "```ts\nimport express from 'express';\n```",
+      "```ts\nimport value from 'fixture-only-not-installed';\n```",
       path.resolve(import.meta.dirname, "../bench/fixtures/fixture-e"),
       { cache },
     );

@@ -21,12 +21,27 @@ import { logCatch, buildCatchFindings } from "../logging/catches.js";
 import { evaluateCoverageGate, runAllCheckers } from "../analysis/run-all.js";
 
 import { buildJsonReport } from "../analysis/finding-schema.js";
+import { buildSarifReport } from "../analysis/sarif.js";
 import "../analysis/checkers/index.js";
 
 import { resolveDiffFiles } from "../diff/resolver.js";
 import { getChecker, type CheckerInput } from "../analysis/registry.js";
 
-export function registerToolHandlers(server: McpServer): void {
+export interface ToolRegistrationOptions {
+  legacyTools?: boolean;
+  llmTool?: boolean;
+  sessionTools?: boolean;
+}
+
+export function registerToolHandlers(
+  server: McpServer,
+  options: ToolRegistrationOptions = {},
+): void {
+  const legacyTools = options.legacyTools ?? process.env.ARTHUR_MCP_LEGACY_TOOLS === "1";
+  const llmTool = options.llmTool ?? process.env.ARTHUR_MCP_ENABLE_LLM_TOOL === "1";
+  const sessionTools = options.sessionTools ?? process.env.ARTHUR_MCP_ENABLE_SESSION_TOOLS === "1";
+
+  if (legacyTools) {
   // --- check_paths ---
 
   server.tool(
@@ -330,18 +345,20 @@ export function registerToolHandlers(server: McpServer): void {
     },
   );
 
+  }
+
   // --- check_all (registry-driven) ---
 
   server.tool(
     "check_all",
-    "Run Arthur's full static verification pass in one call. By default this runs stable deterministic checkers (paths, schema, SQL/Drizzle, Supabase, imports, env vars, routes). Optional strict mode enables experimental checkers and enforces coverage thresholds. Returns ground truth context for every finding. No API key required.",
+    "Run Arthur's full static verification pass in one call. By default this runs stable deterministic checkers (paths, schema, SQL/Drizzle, Supabase, imports, env vars, routes). Strict mode enforces coverage thresholds; experimental checkers remain opt-in. Returns ground truth context for every finding. No API key required.",
     {
       planText: z.string().describe("The plan text to verify against the project"),
       projectDir: z.string().describe("Absolute path to the project directory"),
       schemaPath: z.string().optional().describe("Absolute path to schema.prisma (auto-detected if omitted)"),
-      format: z.enum(["text", "json"]).optional().default("text").describe("Output format: 'text' for markdown (default), 'json' for machine-readable ArthurReport"),
-      includeExperimental: z.boolean().optional().describe("Include experimental checkers (TypeScript Types + Package API). Defaults to project config or false."),
-      strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate if checked refs are below threshold."),
+      format: z.enum(["text", "json", "sarif"]).optional().default("text").describe("Output format: markdown text (default), Arthur JSON, or SARIF 2.1.0"),
+      includeExperimental: z.boolean().optional().describe("Include experimental checkers (Package API). Defaults to project config or false."),
+      strict: z.boolean().optional().default(false).describe("Strict mode: fails the coverage gate if checked refs are below threshold. Experimental checkers remain opt-in."),
       minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold: minimum refs that must be checked."),
       coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode. Defaults to project config or warn."),
     },
@@ -395,12 +412,17 @@ export function registerToolHandlers(server: McpServer): void {
         });
 
         // JSON output
-        if (format === "json") {
+        if (format === "json" || format === "sarif") {
           const report = buildJsonReport(summary.checkerResults, projectDir);
+          if (format === "sarif") {
+            return { content: [{ type: "text", text: JSON.stringify(buildSarifReport(report), null, 2) }] };
+          }
           const payload = {
             ...report,
             meta: {
+              scope: { mode: "plan" },
               includeExperimental: policy.includeExperimental,
+              checkerCoverage: summary.coverage,
               coverageGate,
               skippedCheckers: summary.skippedCheckers.map((s) => ({
                 checker: s.checker.id,
@@ -476,22 +498,24 @@ export function registerToolHandlers(server: McpServer): void {
 
   server.tool(
     "check_diff",
-    "Validate actual code changes from a git diff against project ground truth. Catches hallucinated imports in source files that were added or modified. Only checkers with source-mode support are run (currently: imports). No API key required.",
+    "Validate changed lines from a git diff against project ground truth. Checks package imports, env variables, and Next.js API route references with file/line locations. Reads staged content from the Git index and includes untracked files in working-tree mode. No API key required.",
     {
       projectDir: z.string().describe("Absolute path to the project directory (must be a git repo)"),
       diffRef: z.string().optional().default("HEAD").describe("Git ref to diff against: HEAD (default), origin/main, HEAD~3, etc."),
       staged: z.boolean().optional().default(false).describe("Check only staged changes (for pre-commit hooks)"),
-      format: z.enum(["text", "json"]).optional().default("text").describe("Output format: 'text' for markdown (default), 'json' for machine-readable ArthurReport"),
+      includeUntracked: z.boolean().optional().default(true).describe("Include untracked source files in working-tree mode (default: true)"),
+      format: z.enum(["text", "json", "sarif"]).optional().default("text").describe("Output format: markdown text (default), Arthur JSON, or SARIF 2.1.0"),
       includeExperimental: z.boolean().optional().describe("Include experimental checkers (if they support source mode)."),
-      strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate."),
+      strict: z.boolean().optional().default(false).describe("Strict mode: fails the coverage gate. Experimental checkers remain opt-in."),
       minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold."),
       coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode."),
     },
-    async ({ projectDir, diffRef, staged, format, includeExperimental, strict, minCheckedRefs, coverageMode }) => {
+    async ({ projectDir, diffRef, staged, includeUntracked, format, includeExperimental, strict, minCheckedRefs, coverageMode }) => {
       try {
-        const files = resolveDiffFiles(projectDir, diffRef, { staged });
+        const files = resolveDiffFiles(projectDir, diffRef, { staged, includeUntracked });
+        const emptyDiff = files.length === 0;
 
-        if (files.length === 0) {
+        if (emptyDiff && format === "text") {
           return { content: [{ type: "text" as const, text: "No changed source files found in diff." }] };
         }
 
@@ -508,11 +532,18 @@ export function registerToolHandlers(server: McpServer): void {
         const summary = runAllCheckers(input, projectDir, {
           includeExperimental: policy.includeExperimental,
         });
-        const coverageGate = evaluateCoverageGate(
-          summary.totalChecked,
-          policy.minCheckedRefs,
-          policy.coverageMode,
-        );
+        const coverageGate = emptyDiff
+          ? {
+              mode: policy.coverageMode,
+              minCheckedRefs: policy.minCheckedRefs,
+              triggered: false,
+              message: "No changed source files; coverage gate is not applicable.",
+            }
+          : evaluateCoverageGate(
+              summary.totalChecked,
+              policy.minCheckedRefs,
+              policy.coverageMode,
+            );
 
         // Log catches
         const catchFindings: Record<string, { checked: number; hallucinated: number; items: string[] } | null> = {};
@@ -531,16 +562,21 @@ export function registerToolHandlers(server: McpServer): void {
         });
 
         // JSON output
-        if (format === "json") {
+        if (format === "json" || format === "sarif") {
           const report = buildJsonReport(summary.checkerResults, projectDir);
+          if (format === "sarif") {
+            return { content: [{ type: "text" as const, text: JSON.stringify(buildSarifReport(report), null, 2) }] };
+          }
           const payload = {
             ...report,
             meta: {
               mode: "diff",
               diffRef,
               staged,
+              includeUntracked,
               filesChecked: files.length,
               includeExperimental: policy.includeExperimental,
+              checkerCoverage: summary.coverage,
               coverageGate,
               skippedCheckers: summary.skippedCheckers.map((s) => ({
                 checker: s.checker.id,
@@ -559,6 +595,7 @@ export function registerToolHandlers(server: McpServer): void {
         lines.push(`**Mode:** diff (${staged ? "staged" : diffRef})`);
         lines.push(`**Files checked:** ${files.length}`);
         lines.push(`**Experimental checkers:** ${policy.includeExperimental ? "enabled" : "disabled"}`);
+        lines.push(`**Diff checker support:** ${summary.coverage.sourceModeSupported.length}/${summary.coverage.selectedCheckers.length} selected checker(s)`);
         lines.push(``);
 
         for (const { checker, result } of summary.checkerResults) {
@@ -591,10 +628,12 @@ export function registerToolHandlers(server: McpServer): void {
         lines.push(``);
 
         lines.push(`---`);
-        if (summary.totalFindings === 0) {
-          lines.push(`**All checks passed.** No issues found in changed files.`);
+        if (summary.totalErrors === 0 && summary.totalWarnings === 0) {
+          lines.push(`**No findings in the references Arthur checked.** See checker coverage above for the exact scope.`);
+        } else if (summary.totalErrors === 0) {
+          lines.push(`**0 errors and ${summary.totalWarnings} warning(s).** Review the unverified references above.`);
         } else {
-          lines.push(`**${summary.totalFindings} issue(s) found.** Fix the references above.`);
+          lines.push(`**${summary.totalErrors} error(s) and ${summary.totalWarnings} warning(s).** Fix the invalid references above.`);
         }
 
         const coverageFailed = coverageGate.mode === "fail" && coverageGate.triggered;
@@ -610,19 +649,20 @@ export function registerToolHandlers(server: McpServer): void {
     },
   );
 
+  if (llmTool) {
   // --- verify_plan ---
 
   server.tool(
     "verify_plan",
-    "Full plan verification: static analysis (paths, imports, env vars, types, API routes, SQL schemas + optional Prisma schema) followed by LLM review. Requires ANTHROPIC_API_KEY environment variable.",
+    "Optional full plan verification: static analysis (paths, imports, env vars, API routes, SQL schemas + optional Prisma schema) followed by LLM review. Requires ANTHROPIC_API_KEY environment variable.",
     {
       planText: z.string().describe("The plan text to verify"),
       projectDir: z.string().describe("Absolute path to the project directory"),
       prompt: z.string().optional().describe("Original user request (for intent alignment checking)"),
       schemaPath: z.string().optional().describe("Absolute path to schema.prisma for Prisma schema validation"),
-      model: z.string().optional().describe("Claude model to use (default: from config or claude-sonnet-4-5-20250929)"),
-      includeExperimental: z.boolean().optional().describe("Include experimental checkers (TypeScript Types + Package API). Defaults to project config or false."),
-      strict: z.boolean().optional().default(false).describe("Strict mode: includes experimental checkers and fails coverage gate if checked refs are below threshold."),
+      model: z.string().optional().describe("Claude model to use (default: from config or claude-sonnet-5)"),
+      includeExperimental: z.boolean().optional().describe("Include experimental checkers (Package API). Defaults to project config or false."),
+      strict: z.boolean().optional().default(false).describe("Strict mode: fails the coverage gate if checked refs are below threshold. Experimental checkers remain opt-in."),
       minCheckedRefs: z.number().int().positive().optional().describe("Coverage gate threshold: minimum refs that must be checked."),
       coverageMode: z.enum(["off", "warn", "fail"]).optional().describe("Coverage gate mode. Defaults to project config or warn."),
     },
@@ -646,7 +686,7 @@ export function registerToolHandlers(server: McpServer): void {
           return {
             content: [{
               type: "text",
-              text: "Error: No API key found. Set the ANTHROPIC_API_KEY environment variable to use verify_plan. The check_paths and check_schema tools work without an API key.",
+              text: "Error: No API key found. Set the ANTHROPIC_API_KEY environment variable to use verify_plan. The deterministic check_all and check_diff tools work without an API key.",
             }],
             isError: true,
           };
@@ -738,6 +778,9 @@ export function registerToolHandlers(server: McpServer): void {
     },
   );
 
+  }
+
+  if (sessionTools) {
   // --- update_session_context ---
 
   server.tool(
@@ -819,4 +862,5 @@ export function registerToolHandlers(server: McpServer): void {
       }
     },
   );
+  }
 }

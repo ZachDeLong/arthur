@@ -1,23 +1,24 @@
 /**
- * Big Benchmark Runner: All 7 Static Checkers vs Self-Review
+ * Big Benchmark Runner: Static Checker Findings vs Self-Review
  *
- * Proves the core thesis: breadth of automatic coverage beats
- * any single prompt. Self-review must spread attention across
- * 7 categories. Arthur's 7 static checkers each run independently
- * at 100%. The gap is permanent.
- *
- * Arthur arm = static checkers only. No LLM call. 100% by definition.
- * Self-review arm = LLM only. Comprehensive adversarial prompt.
+ * This is an agreement study: Arthur generates candidate findings, then an
+ * LLM independently reviews the same plan with full project context. Arthur's
+ * findings are not independently adjudicated ground truth.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
-import Anthropic from "@anthropic-ai/sdk";
 import { loadConfig } from "../../src/config/manager.js";
 import { buildContext } from "../../src/context/builder.js";
 import { generatePlan } from "./plan-generator.js";
+import {
+  formatBenchmarkModel,
+  resolveBenchmarkLlm,
+  runBenchmarkLlm,
+  type BenchmarkLlmOptions,
+} from "./llm-provider.js";
 import { analyzePaths } from "./path-checker.js";
 import { parseSchema, analyzeSchema } from "./schema-checker.js";
 import { analyzeSqlSchema } from "../../src/analysis/sql-schema-checker.js";
@@ -27,6 +28,7 @@ import { analyzeApiRoutes } from "../../src/analysis/api-route-checker.js";
 import { getAllFiles } from "../../src/context/tree.js";
 import { extractGroundTruth, type AllCheckerResults } from "./ground-truth.js";
 import { parseErrorDetections } from "./unified-detection-parser.js";
+import { generateBigReport } from "./big-benchmark-report.js";
 import {
   getBigBenchmarkSystemPrompt,
   buildBigBenchmarkUserMessage,
@@ -44,18 +46,18 @@ const FIXTURES_DIR = path.join(BENCH_ROOT, "fixtures");
 const PROMPTS_PATH = path.join(BENCH_ROOT, "prompts", "prompts.json");
 const RESULTS_DIR = path.join(BENCH_ROOT, "results");
 
-const ALL_CATEGORIES: CheckerCategory[] = [
+export const ALL_CATEGORIES: CheckerCategory[] = [
   "path", "schema", "sql_schema", "import", "env", "route",
 ];
 
 // --- Helpers ---
 
-function loadPrompts(): PromptDefinition[] {
+export function loadPrompts(): PromptDefinition[] {
   const raw = fs.readFileSync(PROMPTS_PATH, "utf-8");
   return JSON.parse(raw) as PromptDefinition[];
 }
 
-function getFixtureDir(fixture: string): string {
+export function getFixtureDir(fixture: string): string {
   return path.join(FIXTURES_DIR, fixture);
 }
 
@@ -68,34 +70,22 @@ function createRunDir(): string {
 
 /** Run a single LLM call. */
 async function runLlmReview(
-  apiKey: string,
-  model: string,
+  llm: BenchmarkLlmOptions,
   systemPrompt: string,
   userMessage: string,
 ): Promise<{ output: string; inputTokens: number; outputTokens: number }> {
-  const client = new Anthropic({ apiKey });
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 8192,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+  return runBenchmarkLlm({
+    ...llm,
+    systemPrompt,
+    userMessage,
+    maxOutputTokens: 16_000,
+    anthropicThinking: "adaptive",
+    anthropicEffort: "medium",
   });
-
-  const output = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
-
-  return {
-    output,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
 }
 
 /** Run all applicable static checkers for a prompt. */
-function runStaticCheckers(
+export function runStaticCheckers(
   planText: string,
   fixtureDir: string,
   prompt: PromptDefinition,
@@ -128,7 +118,7 @@ function runStaticCheckers(
 }
 
 /** Compute per-category stats from detections. */
-function computePerCategory(
+export function computePerCategory(
   detections: ReturnType<typeof parseErrorDetections>,
 ): Record<CheckerCategory, { errors: number; detected: number; rate: number }> {
   const result = {} as Record<CheckerCategory, { errors: number; detected: number; rate: number }>;
@@ -150,21 +140,31 @@ function computePerCategory(
 /** Run the big benchmark for a single prompt. */
 async function runPrompt(
   prompt: PromptDefinition,
-  apiKey: string,
-  model: string,
+  llm: BenchmarkLlmOptions,
 ): Promise<BigBenchmarkRun | null> {
   const fixtureDir = getFixtureDir(prompt.fixture);
 
   // Step 1: Generate plan (README-only context)
   console.log(chalk.blue(`  [${prompt.id}] Generating plan...`));
-  const planResult = await generatePlan(prompt, fixtureDir, apiKey, model);
+  const planResult = await generatePlan(
+    prompt,
+    fixtureDir,
+    llm.apiKey,
+    llm.model,
+    {
+      provider: llm.provider,
+      maxOutputTokens: 16_000,
+      anthropicThinking: "adaptive",
+      anthropicEffort: "medium",
+    },
+  );
   console.log(
     chalk.dim(
       `  [${prompt.id}] Plan: ${planResult.inputTokens} in / ${planResult.outputTokens} out`,
     ),
   );
 
-  // Step 2: Run all static checkers → ground truth
+  // Step 2: Run all static checkers → candidate findings
   console.log(chalk.blue(`  [${prompt.id}] Running static checkers...`));
   const checkerResults = runStaticCheckers(planResult.plan, fixtureDir, prompt);
   const groundTruth = extractGroundTruth(checkerResults);
@@ -179,7 +179,7 @@ async function runPrompt(
     .join(", ");
   console.log(
     chalk.dim(
-      `  [${prompt.id}] Ground truth: ${groundTruth.length} errors (${countStr || "none"})`,
+      `  [${prompt.id}] Checker findings: ${groundTruth.length} (${countStr || "none"})`,
     ),
   );
 
@@ -202,8 +202,7 @@ async function runPrompt(
   // Step 5: Run self-review LLM
   console.log(chalk.blue(`  [${prompt.id}] Running self-review...`));
   const selfReviewResult = await runLlmReview(
-    apiKey,
-    model,
+    llm,
     getBigBenchmarkSystemPrompt(),
     buildBigBenchmarkUserMessage(context),
   );
@@ -246,7 +245,7 @@ async function runPrompt(
     promptId: prompt.id,
     fixture: prompt.fixture,
     task: prompt.task,
-    model,
+    model: formatBenchmarkModel(llm),
     generatedPlan: planResult.plan,
     groundTruth,
     selfReviewOutput: selfReviewResult.output,
@@ -260,7 +259,7 @@ async function runPrompt(
 }
 
 /** Generate summary across all runs. */
-function generateSummary(
+export function generateSummary(
   runs: BigBenchmarkRun[],
   model: string,
 ): BigBenchmarkSummary {
@@ -325,17 +324,23 @@ export async function runBigBenchmark(
   promptIds?: string[],
 ): Promise<void> {
   const config = loadConfig(path.resolve("."));
-  const apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  let llm: BenchmarkLlmOptions;
+  try {
+    llm = resolveBenchmarkLlm({
+      anthropicApiKey: config.apiKey ?? process.env.ANTHROPIC_API_KEY,
+      anthropicModel: config.model,
+    });
+  } catch (error) {
     console.error(
       chalk.red(
-        "No API key found. Set ANTHROPIC_API_KEY or run codeverifier init.",
+        error instanceof Error ? error.message : "Unable to configure benchmark provider.",
       ),
     );
     process.exit(1);
+    return;
   }
 
-  const model = config.model;
+  const model = formatBenchmarkModel(llm);
   const allPrompts = loadPrompts();
   const prompts = promptIds
     ? allPrompts.filter((p) => promptIds.includes(p.id))
@@ -348,7 +353,7 @@ export async function runBigBenchmark(
 
   console.log(
     chalk.bold.cyan(
-      `\nBig Benchmark: All 7 Checkers vs Self-Review\n` +
+      `\nBig Benchmark: Static Checker Findings vs Self-Review\n` +
         `Running ${prompts.length} prompts with model: ${model}\n`,
     ),
   );
@@ -363,7 +368,7 @@ export async function runBigBenchmark(
       chalk.bold(`\nPrompt ${prompt.id}: ${prompt.task.slice(0, 60)}...`),
     );
 
-    const run = await runPrompt(prompt, apiKey, model);
+    const run = await runPrompt(prompt, llm);
 
     if (run) {
       runs.push(run);
@@ -385,7 +390,7 @@ export async function runBigBenchmark(
   fs.writeFileSync(summaryFile, JSON.stringify(summary, null, 2) + "\n", "utf-8");
 
   // Generate report
-  const report = generateBigBenchmarkReport(runs, summary);
+  const report = generateBigReport(runs, summary);
   const reportFile = path.join(runDir, "REPORT.md");
   fs.writeFileSync(reportFile, report, "utf-8");
 
@@ -396,132 +401,30 @@ export async function runBigBenchmark(
 
   console.log(`  Model: ${model}`);
   console.log(`  Prompts with errors: ${runs.length}`);
-  console.log(`  Total errors: ${summary.totalErrors}\n`);
+  console.log(`  Checker findings: ${summary.totalErrors}\n`);
 
   // Category table
-  console.log("  Category          Errors  Static  Self-Review  Gap");
-  console.log("  ────────────────  ──────  ──────  ───────────  ──────");
+  console.log("  Category          Findings  Review mentioned  Unmatched");
+  console.log("  ────────────────  ────────  ────────────────  ─────────");
 
   for (const cat of ALL_CATEGORIES) {
     const stats = summary.perCategory[cat];
     if (stats.errors === 0) continue;
     const pad = (s: string, n: number) => s.padEnd(n);
-    const staticRate = "100%";
     const selfRate = `${(stats.rate * 100).toFixed(0)}%`;
-    const gap = `${((1 - stats.rate) * 100).toFixed(0)}pp`;
+    const unmatched = String(stats.errors - stats.detected);
     console.log(
-      `  ${pad(cat, 18)}${String(stats.errors).padStart(4)}    ${staticRate.padStart(4)}    ${selfRate.padStart(9)}  ${gap.padStart(5)}`,
+      `  ${pad(cat, 18)}${String(stats.errors).padStart(6)}    ${selfRate.padStart(14)}  ${unmatched.padStart(9)}`,
     );
   }
 
-  console.log("  ────────────────  ──────  ──────  ───────────  ──────");
+  console.log("  ────────────────  ────────  ────────────────  ─────────");
   console.log(
-    `  ${"OVERALL".padEnd(18)}${String(summary.totalErrors).padStart(4)}    ${"100%".padStart(4)}    ${`${(summary.overallDetectionRate * 100).toFixed(0)}%`.padStart(9)}  ${`${((1 - summary.overallDetectionRate) * 100).toFixed(0)}pp`.padStart(5)}`,
+    `  ${"OVERALL".padEnd(18)}${String(summary.totalErrors).padStart(6)}    ${`${(summary.overallDetectionRate * 100).toFixed(0)}%`.padStart(14)}  ${String(summary.totalErrors - summary.totalDetected).padStart(9)}`,
   );
 
   console.log(chalk.dim(`\n  Results: ${runDir}`));
   console.log(chalk.dim(`  Report: ${reportFile}`));
-}
-
-/** Generate markdown report inline (also available as separate module). */
-function generateBigBenchmarkReport(
-  runs: BigBenchmarkRun[],
-  summary: BigBenchmarkSummary,
-): string {
-  // Import and delegate to the report generator
-  return generateReportMarkdown(runs, summary);
-}
-
-/** Inline report generation — mirrors big-benchmark-report.ts. */
-function generateReportMarkdown(
-  runs: BigBenchmarkRun[],
-  summary: BigBenchmarkSummary,
-): string {
-  const lines: string[] = [];
-
-  lines.push("# Big Benchmark: All 7 Checkers vs Self-Review\n");
-  lines.push(
-    `> ${summary.totalRuns} prompts, ${summary.totalErrors} ground-truth errors. Model: ${summary.model}. Generated ${new Date().toISOString().slice(0, 10)}.\n`,
-  );
-  lines.push(
-    "Arthur's static checkers catch errors deterministically at 100%. Self-review must spread attention across 7 categories with a single prompt. The question: **what percentage of real errors does self-review independently catch?**\n",
-  );
-
-  // Main comparison table
-  lines.push("## Results by Category\n");
-  lines.push("| Category | Errors | Static (Arthur) | Self-Review | Gap |");
-  lines.push("|----------|--------|-----------------|-------------|-----|");
-
-  for (const cat of ALL_CATEGORIES) {
-    const stats = summary.perCategory[cat];
-    if (stats.errors === 0) continue;
-    const selfRate = `${(stats.rate * 100).toFixed(1)}%`;
-    const gap = `${((1 - stats.rate) * 100).toFixed(1)}pp`;
-    lines.push(
-      `| ${cat} | ${stats.errors} | 100% | ${selfRate} | ${gap} |`,
-    );
-  }
-
-  lines.push(
-    `| **Overall** | **${summary.totalErrors}** | **100%** | **${(summary.overallDetectionRate * 100).toFixed(1)}%** | **${((1 - summary.overallDetectionRate) * 100).toFixed(1)}pp** |`,
-  );
-  lines.push("");
-
-  // Per-fixture breakdown
-  lines.push("## Results by Fixture\n");
-  lines.push("| Fixture | Errors | Self-Review Rate |");
-  lines.push("|---------|--------|-----------------|");
-
-  for (const [fixture, stats] of Object.entries(summary.perFixture)) {
-    lines.push(
-      `| ${fixture} | ${stats.errors} | ${(stats.rate * 100).toFixed(1)}% |`,
-    );
-  }
-  lines.push("");
-
-  // Per-run detail
-  lines.push("## Per-Run Detail\n");
-  lines.push("| Prompt | Fixture | Errors | Detected | Rate |");
-  lines.push("|--------|---------|--------|----------|------|");
-
-  for (const run of runs) {
-    const detected = run.detections.filter((d) => d.detected).length;
-    lines.push(
-      `| ${run.promptId} | ${run.fixture} | ${run.groundTruth.length} | ${detected} | ${(run.overallDetectionRate * 100).toFixed(1)}% |`,
-    );
-  }
-  lines.push("");
-
-  // Missed errors detail
-  lines.push("## Missed Errors (Self-Review Failed to Detect)\n");
-
-  for (const run of runs) {
-    const missed = run.detections.filter((d) => !d.detected);
-    if (missed.length === 0) continue;
-
-    lines.push(`### Prompt ${run.promptId} (${run.fixture})\n`);
-    for (const det of missed) {
-      const suggestion = det.error.suggestion ? ` (suggestion: ${det.error.suggestion})` : "";
-      lines.push(`- **[${det.error.category}]** \`${det.error.raw}\` — ${det.error.description}${suggestion}`);
-    }
-    lines.push("");
-  }
-
-  // Methodology
-  lines.push("## Methodology\n");
-  lines.push("1. **Plan generation:** LLM generates a plan with README-only context (no file tree, no source code)");
-  lines.push("2. **Ground truth:** All 7 static checkers run against the plan to identify errors deterministically");
-  lines.push("3. **Self-review:** Same model reviews its own plan with adversarial prompt + full project context");
-  lines.push("4. **Scoring:** Self-review output parsed for detection of each ground-truth error\n");
-  lines.push("**Key insight:** Arthur's static checkers are the ground truth. They run independently, each at 100% detection, with zero attention budget competition. Self-review must allocate finite LLM attention across all 7 categories simultaneously.\n");
-
-  // API usage
-  lines.push("## API Usage\n");
-  lines.push(`- Total input tokens: ${summary.apiUsage.totalInputTokens.toLocaleString()}`);
-  lines.push(`- Total output tokens: ${summary.apiUsage.totalOutputTokens.toLocaleString()}`);
-  lines.push("");
-
-  return lines.join("\n");
 }
 
 // CLI entry point

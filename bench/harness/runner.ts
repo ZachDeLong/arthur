@@ -24,6 +24,7 @@ import { runReport } from "./report-generator.js";
 import { runSelfReviewBenchmark } from "./self-review-runner.js";
 import { runBigBenchmark } from "./big-benchmark-runner.js";
 import { runBigReport } from "./big-benchmark-report.js";
+import { runBigRescore } from "./big-benchmark-rescore.js";
 import { runTier4 } from "../tier4/tier4-runner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -687,11 +688,13 @@ if (subcommand === "tier1" || args.length === 0) {
 } else if (subcommand === "big-report") {
   const reportArgs = args.slice(1);
   runBigReport(reportArgs);
+} else if (subcommand === "big-rescore") {
+  runBigRescore(args.slice(1));
 } else if (subcommand === "tier4") {
   const mode = args[1]; // generate | score | report | undefined (full)
   const taskIds = args.slice(2);
   runTier4(mode, taskIds.length > 0 ? taskIds : undefined);
 } else {
-  console.error("Usage: bench [tier1|tier2|tier3|tier4|all|report|self-review|big|big-report] [prompt-ids...]");
+  console.error("Usage: bench [tier1|tier2|tier3|tier4|all|report|self-review|big|big-report|big-rescore] [args...]");
   process.exit(1);
 }

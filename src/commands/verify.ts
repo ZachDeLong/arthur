@@ -35,7 +35,7 @@ export async function runVerify(options: VerifyOptions): Promise<void> {
   const apiKey = config.apiKey;
   if (!apiKey) {
     log.error(
-      "No API key found. Set ANTHROPIC_API_KEY env var or run `codeverifier init`.",
+      "No API key found. Set the ANTHROPIC_API_KEY environment variable.",
     );
     process.exit(1);
   }

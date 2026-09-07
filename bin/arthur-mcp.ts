@@ -3,24 +3,15 @@
 /**
  * Arthur MCP Server
  *
- * Exposes Arthur's static analysis and plan verification as MCP tools
- * for direct integration with Claude Code.
+ * Exposes Arthur's reference-integrity checks as MCP tools for direct
+ * integration with AI coding hosts.
  *
- * Tools:
- *   check_paths            — deterministic path validation (no API key)
- *   check_schema           — deterministic Prisma schema validation (no API key)
- *   check_imports          — deterministic package import validation (no API key)
- *   check_env              — deterministic env variable validation (no API key)
- *   check_routes           — deterministic Next.js API route validation (no API key)
- *   check_sql_schema       — deterministic Drizzle/SQL schema validation (no API key)
- *   check_supabase_schema  — deterministic Supabase schema validation (no API key)
- *   check_express_routes   — deterministic Express/Fastify route validation (no API key)
- *   check_package_api      — deterministic package API validation (no API key)
+ * Default tools:
  *   check_all              — runs all deterministic checkers in one call (no API key)
- *   check_diff             — validates actual code changes from a git diff (no API key)
- *   verify_plan            — full pipeline: static analysis + LLM review (requires ANTHROPIC_API_KEY)
- *   update_session_context — record decisions/insights to survive context compression
- *   get_session_context    — read back session context after compression
+ *   check_diff             — validates changed lines from a git diff (no API key)
+ *
+ * Legacy individual tools, networked LLM review, and session tools are
+ * available through explicit ARTHUR_MCP_* environment opt-ins.
  *
  * Prisma schema auto-detected at prisma/schema.prisma (or schemaPath override).
  *
@@ -32,11 +23,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { registerToolHandlers } from "../src/mcp/tool-handlers.js";
-import { initTsParser } from "../src/analysis/dts-parser.js";
+import { ARTHUR_VERSION } from "../src/version.js";
 
 const server = new McpServer({
   name: "arthur",
-  version: "0.1.0",
+  version: ARTHUR_VERSION,
 });
 
 registerToolHandlers(server);
@@ -44,9 +35,6 @@ registerToolHandlers(server);
 // --- Start server ---
 
 async function main() {
-  const tsAvailable = await initTsParser();
-  console.error(`[arthur-mcp] TypeScript parser: ${tsAvailable ? "available" : "unavailable (regex fallback)"}`);
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[arthur-mcp] Server started on stdio");

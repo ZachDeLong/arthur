@@ -2,18 +2,19 @@
 
 import { Command } from "commander";
 import { runInit } from "../src/commands/init.js";
+import { ARTHUR_VERSION } from "../src/version.js";
 import { runVerify, type VerifyOptions } from "../src/commands/verify.js";
 
 const program = new Command();
 
 program
   .name("codeverifier")
-  .description("Independent verification layer for Claude Code plans")
-  .version("0.1.0");
+  .description("Optional LLM review wrapper for Arthur plan checks")
+  .version(ARTHUR_VERSION);
 
 program
   .command("init")
-  .description("Set up API key and default configuration")
+  .description("Set up default model and token-budget configuration")
   .action(async () => {
     await runInit();
   });

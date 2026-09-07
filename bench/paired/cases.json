@@ -1,0 +1,562 @@
+[
+  {
+    "id": "case-01542edaa48e",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-01542edaa48e.ts",
+    "source": "export const docs = \"process.env.LOH_LEVEL\";"
+  },
+  {
+    "id": "case-04af28a0f53e",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-04af28a0f53e.ts",
+    "source": "export const docs = \"process.env.UPSTREAM_SERWICES_URL\";"
+  },
+  {
+    "id": "case-05db8ac4df91",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-05db8ac4df91.ts",
+    "source": "export const value = process.env.CACHE_TTM_SECONDS;"
+  },
+  {
+    "id": "case-061c0ac07906",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-061c0ac07906.ts",
+    "source": "export const docs = \"import \\\"@aothropic-ai/sdk\\\";\";"
+  },
+  {
+    "id": "case-0ad5a8035c01",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-0ad5a8035c01.ts",
+    "source": "// import \"typescriqt\";"
+  },
+  {
+    "id": "case-0b3fd8e3a418",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-0b3fd8e3a418.ts",
+    "source": "export const docs = \"process.env.UPTTREAM_USERS_URL\";"
+  },
+  {
+    "id": "case-0b83b0549591",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-0b83b0549591.ts",
+    "source": "import \"ihnore\";"
+  },
+  {
+    "id": "case-0c9309e6ce7d",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-0c9309e6ce7d.ts",
+    "source": "export const docs = \"import \\\"ihnore\\\";\";"
+  },
+  {
+    "id": "case-165e88f4ddc3",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-165e88f4ddc3.ts",
+    "source": "export const docs = \"import \\\"cialk\\\";\";"
+  },
+  {
+    "id": "case-1794ed8b88d8",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-1794ed8b88d8.ts",
+    "source": "export const docs = \"fetch(\\\"/api/conteot\\\", { method: \\\"POST\\\" })\";"
+  },
+  {
+    "id": "case-1ac0a9e613fb",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-1ac0a9e613fb.ts",
+    "source": "import \"@aothropic-ai/sdk\";"
+  },
+  {
+    "id": "case-1b9ed2ec7fac",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-1b9ed2ec7fac.ts",
+    "source": "export const value = process.env.JWT_SEDRET;"
+  },
+  {
+    "id": "case-1fd081980c1b",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-1fd081980c1b.ts",
+    "source": "import \"cialk\";"
+  },
+  {
+    "id": "case-29d6e8fd7589",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-29d6e8fd7589.ts",
+    "source": "export const response = fetch(\"/api/paruicipants\");"
+  },
+  {
+    "id": "case-36199972f270",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-36199972f270.ts",
+    "source": "export const response = fetch(\"/api/conteot\");"
+  },
+  {
+    "id": "case-36e8a7c878a3",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-36e8a7c878a3.ts",
+    "source": "export const docs = \"process.env.APP_TECRET_KEY\";"
+  },
+  {
+    "id": "case-398d3b38e82a",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-398d3b38e82a.ts",
+    "source": "// export const value = process.env.LOH_LEVEL;"
+  },
+  {
+    "id": "case-3b907a58ac90",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-3b907a58ac90.ts",
+    "source": "// import \"@modelcontfxtprotocol/sdk\";"
+  },
+  {
+    "id": "case-420d4747f549",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-420d4747f549.ts",
+    "source": "export const value = process.env.UPSTREAM_SERWICES_URL;"
+  },
+  {
+    "id": "case-437b524239af",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-437b524239af.ts",
+    "source": "import \"cpmmander\";"
+  },
+  {
+    "id": "case-44ee2f2e1960",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-44ee2f2e1960.ts",
+    "source": "export const docs = \"fetch(\\\"/api/conteot\\\")\";"
+  },
+  {
+    "id": "case-457f67aa108c",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-457f67aa108c.ts",
+    "source": "export const docs = \"import \\\"cpmmander\\\";\";"
+  },
+  {
+    "id": "case-4777cc90d731",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-4777cc90d731.ts",
+    "source": "export const docs = \"import \\\"typescriqt\\\";\";"
+  },
+  {
+    "id": "case-48d0d08ba7d2",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-48d0d08ba7d2.ts",
+    "source": "import \"zoe\";"
+  },
+  {
+    "id": "case-4ada8c15cd5d",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-4ada8c15cd5d.ts",
+    "source": "export const value = process.env.APP_TECRET_KEY;"
+  },
+  {
+    "id": "case-4b002fb15d43",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-4b002fb15d43.ts",
+    "source": "export const value = process.env.LOG_LEVEL;"
+  },
+  {
+    "id": "case-4d6b29eceb6a",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-4d6b29eceb6a.ts",
+    "source": "export const response = fetch(\"/api/participants\");"
+  },
+  {
+    "id": "case-531c7b8e915c",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-531c7b8e915c.ts",
+    "source": "// export const response = fetch(\"/api/paruicipants\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-534cdd5eecc3",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-534cdd5eecc3.ts",
+    "source": "// export const value = process.env.POSTGRES_CONNECUION_STRING;"
+  },
+  {
+    "id": "case-55f202367ef1",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-55f202367ef1.ts",
+    "source": "// export const response = fetch(\"/api/paruicipants\");"
+  },
+  {
+    "id": "case-5a37e3c92647",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-5a37e3c92647.ts",
+    "source": "// export const value = process.env.APP_TECRET_KEY;"
+  },
+  {
+    "id": "case-5b5dddab3e35",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-5b5dddab3e35.ts",
+    "source": "export const response = fetch(\"/api/conteot\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-5ce136911eb0",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-5ce136911eb0.ts",
+    "source": "import \"typescriqt\";"
+  },
+  {
+    "id": "case-5dff3ead9121",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-5dff3ead9121.ts",
+    "source": "export const value = process.env.UPTTREAM_USERS_URL;"
+  },
+  {
+    "id": "case-5eba5b62cdb3",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-5eba5b62cdb3.ts",
+    "source": "import \"typescript\";"
+  },
+  {
+    "id": "case-606405924a28",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-606405924a28.ts",
+    "source": "export const docs = \"process.env.CACHE_TTM_SECONDS\";"
+  },
+  {
+    "id": "case-611beb5e0d50",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-611beb5e0d50.ts",
+    "source": "// export const response = fetch(\"/api/conteot\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-672670171d52",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-672670171d52.ts",
+    "source": "import \"@modelcontextprotocol/sdk\";"
+  },
+  {
+    "id": "case-69cdacd4fb5b",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-69cdacd4fb5b.ts",
+    "source": "export const value = process.env.JWT_SECRET;"
+  },
+  {
+    "id": "case-6c4d592c81fb",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-6c4d592c81fb.ts",
+    "source": "export const value = process.env.POSTGRES_CONNECTION_STRING;"
+  },
+  {
+    "id": "case-6d4dcb127fa3",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-6d4dcb127fa3.ts",
+    "source": "// export const value = process.env.CACHE_TTM_SECONDS;"
+  },
+  {
+    "id": "case-6f6b75393140",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-6f6b75393140.ts",
+    "source": "export const value = process.env.DATABASE_VRL;"
+  },
+  {
+    "id": "case-6f7c7e4a6069",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-6f7c7e4a6069.ts",
+    "source": "export const docs = \"fetch(\\\"/api/paruicipants\\\")\";"
+  },
+  {
+    "id": "case-7285dfceee4c",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-7285dfceee4c.ts",
+    "source": "export const value = process.env.APP_SECRET_KEY;"
+  },
+  {
+    "id": "case-765628af7be8",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-765628af7be8.ts",
+    "source": "export const value = process.env.CACHE_TTL_SECONDS;"
+  },
+  {
+    "id": "case-7a1df1616757",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-7a1df1616757.ts",
+    "source": "export const response = fetch(\"/api/paruicipants\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-8d913972c43a",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-8d913972c43a.ts",
+    "source": "import \"chalk\";"
+  },
+  {
+    "id": "case-8f41682927a8",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-8f41682927a8.ts",
+    "source": "export const docs = \"import \\\"@modelcontfxtprotocol/sdk\\\";\";"
+  },
+  {
+    "id": "case-92ad3c49c8d4",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-92ad3c49c8d4.ts",
+    "source": "import \"@anthropic-ai/sdk\";"
+  },
+  {
+    "id": "case-993b0b8050ad",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-993b0b8050ad.ts",
+    "source": "export const docs = \"process.env.DATABASE_VRL\";"
+  },
+  {
+    "id": "case-99f5cdb0214e",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-99f5cdb0214e.ts",
+    "source": "export const value = process.env.UPSTREAM_SERVICES_URL;"
+  },
+  {
+    "id": "case-a45e26a8777e",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-a45e26a8777e.ts",
+    "source": "import \"commander\";"
+  },
+  {
+    "id": "case-a87bddb1f200",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-a87bddb1f200.ts",
+    "source": "export const value = process.env.DATABASE_URL;"
+  },
+  {
+    "id": "case-a908030acec6",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-a908030acec6.ts",
+    "source": "// import \"zoe\";"
+  },
+  {
+    "id": "case-a9697442ed6d",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-a9697442ed6d.ts",
+    "source": "// import \"cialk\";"
+  },
+  {
+    "id": "case-acd0cc93211d",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-acd0cc93211d.ts",
+    "source": "// export const value = process.env.DATABASE_VRL;"
+  },
+  {
+    "id": "case-ad68ac18d6ad",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-ad68ac18d6ad.ts",
+    "source": "// export const value = process.env.JWT_SEDRET;"
+  },
+  {
+    "id": "case-aed93f5958c9",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-aed93f5958c9.ts",
+    "source": "// import \"ihnore\";"
+  },
+  {
+    "id": "case-b7f1380fd0b7",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-b7f1380fd0b7.ts",
+    "source": "export const docs = \"process.env.POST\";"
+  },
+  {
+    "id": "case-bcc8bc95b99e",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-bcc8bc95b99e.ts",
+    "source": "import \"ignore\";"
+  },
+  {
+    "id": "case-bef6cdbe5a02",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-bef6cdbe5a02.ts",
+    "source": "export const value = process.env.PORT;"
+  },
+  {
+    "id": "case-bf569b7e4ee7",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-bf569b7e4ee7.ts",
+    "source": "export const response = fetch(\"/api/content\");"
+  },
+  {
+    "id": "case-c651d1778f20",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-c651d1778f20.ts",
+    "source": "// import \"cpmmander\";"
+  },
+  {
+    "id": "case-cf4602f57794",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-cf4602f57794.ts",
+    "source": "export const docs = \"fetch(\\\"/api/paruicipants\\\", { method: \\\"POST\\\" })\";"
+  },
+  {
+    "id": "case-d15bc55381d3",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-d15bc55381d3.ts",
+    "source": "export const docs = \"process.env.POSTGRES_CONNECUION_STRING\";"
+  },
+  {
+    "id": "case-d443daa007e6",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-d443daa007e6.ts",
+    "source": "// export const response = fetch(\"/api/conteot\");"
+  },
+  {
+    "id": "case-d65c2a92d0eb",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-d65c2a92d0eb.ts",
+    "source": "import \"@modelcontfxtprotocol/sdk\";"
+  },
+  {
+    "id": "case-da2e04a76f2c",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-da2e04a76f2c.ts",
+    "source": "export const value = process.env.UPSTREAM_USERS_URL;"
+  },
+  {
+    "id": "case-dc7f292241c7",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-dc7f292241c7.ts",
+    "source": "export const response = fetch(\"/api/content\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-ded32219a78c",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-ded32219a78c.ts",
+    "source": "// export const value = process.env.UPSTREAM_SERWICES_URL;"
+  },
+  {
+    "id": "case-e7b3aad51891",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-e7b3aad51891.ts",
+    "source": "import \"zod\";"
+  },
+  {
+    "id": "case-e9e8ce2254ac",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-e9e8ce2254ac.ts",
+    "source": "// import \"@aothropic-ai/sdk\";"
+  },
+  {
+    "id": "case-eae2b0f8fa51",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-eae2b0f8fa51.ts",
+    "source": "export const value = process.env.LOH_LEVEL;"
+  },
+  {
+    "id": "case-eae3438e73f6",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-eae3438e73f6.ts",
+    "source": "export const docs = \"process.env.JWT_SEDRET\";"
+  },
+  {
+    "id": "case-eb92d74bc1fb",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-d",
+    "filePath": "src/paired-benchmark/case-eb92d74bc1fb.ts",
+    "source": "export const value = process.env.POSTGRES_CONNECUION_STRING;"
+  },
+  {
+    "id": "case-ed2415c553c3",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-ed2415c553c3.ts",
+    "source": "export const value = process.env.POST;"
+  },
+  {
+    "id": "case-edf0aafbaab1",
+    "category": "import",
+    "projectDir": ".",
+    "filePath": "src/paired-benchmark/case-edf0aafbaab1.ts",
+    "source": "export const docs = \"import \\\"zoe\\\";\";"
+  },
+  {
+    "id": "case-eece54d49e51",
+    "category": "route",
+    "projectDir": "bench/fixtures/fixture-c",
+    "filePath": "src/paired-benchmark/case-eece54d49e51.ts",
+    "source": "export const response = fetch(\"/api/participants\", { method: \"POST\" });"
+  },
+  {
+    "id": "case-f952bb2d43f7",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-f952bb2d43f7.ts",
+    "source": "// export const value = process.env.POST;"
+  },
+  {
+    "id": "case-fc73e79f7ff2",
+    "category": "env",
+    "projectDir": "bench/fixtures/fixture-b",
+    "filePath": "src/paired-benchmark/case-fc73e79f7ff2.ts",
+    "source": "// export const value = process.env.UPTTREAM_USERS_URL;"
+  }
+]

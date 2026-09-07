@@ -29,6 +29,12 @@ function createTestRepo(): string {
   }));
 
   fs.writeFileSync(path.join(dir, "index.ts"), 'export const x = 1;\n');
+  fs.writeFileSync(path.join(dir, ".env.example"), "SERVICE_URL=https://example.test\n");
+  fs.mkdirSync(path.join(dir, "src/app/api/health"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "src/app/api/health/route.ts"),
+    "export async function GET() { return new Response('ok'); }\n",
+  );
   execSync("git add -A", { cwd: dir, stdio: "pipe" });
   execSync('git commit -m "init"', { cwd: dir, stdio: "pipe" });
 
@@ -96,9 +102,40 @@ describe("check --diff end-to-end", () => {
     await runCheck({ diff: "HEAD", project: repoDir, format: "json" });
     const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const report = JSON.parse(output);
-    expect(report.schemaVersion).toBe("1.0");
+    expect(report.schemaVersion).toBe("1.1");
     expect(report.summary.totalFindings).toBeGreaterThan(0);
     expect(report.findings.length).toBeGreaterThan(0);
+    expect(report.findings[0].location).toMatchObject({
+      path: "src/app.ts",
+      line: 1,
+    });
+    expect(report.meta.checkerCoverage.sourceModeSupported).toEqual(
+      expect.arrayContaining(["imports", "env", "routes"]),
+    );
+    expect(report.meta.scope.files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: "src/app.ts" })]),
+    );
+  });
+
+  it("checks changed env and route references end to end", async () => {
+    fs.writeFileSync(
+      path.join(repoDir, "src/client.ts"),
+      [
+        "export const url = process.env.MISSING_SERVICE_URL;",
+        "export const response = fetch('/api/missing-health');",
+      ].join("\n"),
+    );
+
+    const code = await runCheck({ diff: "HEAD", project: repoDir, format: "json" });
+    expect(code).toBe(1);
+    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const report = JSON.parse(output);
+
+    expect(report.summary.totalErrors).toBe(2);
+    expect(report.findings.map((finding: { checker: string }) => finding.checker)).toEqual(
+      expect.arrayContaining(["env", "routes"]),
+    );
+    expect(report.findings.every((finding: { location?: unknown }) => finding.location)).toBe(true);
   });
 
   it("returns 0 for empty diff", async () => {

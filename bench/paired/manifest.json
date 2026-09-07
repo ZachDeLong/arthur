@@ -1,0 +1,21 @@
+{
+  "benchmarkVersion": 1,
+  "seed": "arthur-paired-v1-2026-09-07",
+  "selectionProcedure": "All direct runtime dependencies in package.json, all declared env names in fixtures b/c/d, and all exported HTTP methods in fixture-c App Router route files; four fixed variants per reference.",
+  "caseCount": 80,
+  "categoryCounts": {
+    "import": 28,
+    "env": 36,
+    "route": 16
+  },
+  "sourceHashes": {
+    "bench/fixtures/fixture-b/.env.example": "21144044dfdfe2da60b107bd137b12fe1f5b67b897e80e2734ec48f86b10e822",
+    "bench/fixtures/fixture-c/.env.example": "3ff1066e66ed9f4d170423881771d3535d0fa2425582ca2ccd4484f13dcd72e4",
+    "bench/fixtures/fixture-c/src/app/api/content/route.ts": "4d090bb0c6f3c8674d2b2dc448a27d6b6f286f8914c5ef73e15228a48a0685c8",
+    "bench/fixtures/fixture-c/src/app/api/participants/route.ts": "f5005f30ba32594179fac98733cf8bc55c28d28aeea76745ca06d959fb505958",
+    "bench/fixtures/fixture-d/.env.example": "46feb37d141566e3bcf63f4edd42cb309e0acdeb1003b63ffda398fb012aff8b",
+    "package.json": "be96579021c05cf6cf94972203ad0083c4ebef995dbba8f6402ce73ebb239738"
+  },
+  "casesSha256": "d43eefb03905aabfdf685e3af18484a5b1b484c4d1a1c59a56fd07de319e2a99",
+  "labelsSha256": "32fe12cef12aebece186c6f749c562fe8c17f079454b58bbf26effaefc2f0f99"
+}

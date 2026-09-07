@@ -47,6 +47,21 @@ describe("check_paths", () => {
     expect(result.hallucinations.some(h => h.raw.includes("auth"))).toBe(true);
   });
 
+  it("does not flag paths explicitly declared as new files", () => {
+    const result = checker.run(
+      planInput([
+        "**Create:** `src/services/new-service.ts`",
+        "### New File: `src/types/new-types.ts`",
+        "| `src/routes/new-route.ts` | Create |",
+        "Create migration `migrations/002_add_index.sql`.",
+        "Create a route test (`tests/a.test.ts` or `tests/b.test.ts`).",
+      ].join("\n")),
+      FIXTURE_A,
+    );
+
+    expect(result.hallucinated).toBe(0);
+  });
+
   it("finds closest matches for hallucinated paths", () => {
     const result = checker.run(
       planInput("We will modify `src/utils/resolvers.ts`"),
@@ -195,6 +210,27 @@ describe("check_imports", () => {
     expect(result.hallucinations.some(h => h.raw.includes("nonexistent-package-xyz"))).toBe(true);
   });
 
+  it("does not call an explicitly planned dependency a hallucination", () => {
+    const result = checker.run(
+      planInput([
+        "Modify `package.json`:",
+        "```json",
+        '{ "dependencies": { "new-planned-package": "^1.0.0" } }',
+        "```",
+        'Then `import planned from "new-planned-package"`.',
+      ].join("\n")),
+      FIXTURE_A,
+    );
+
+    expect(result.hallucinations).toEqual([
+      expect.objectContaining({
+        raw: "new-planned-package",
+        category: "planned-dependency",
+        severity: "warning",
+      }),
+    ]);
+  });
+
   it("detects hallucinated imports in fixture-e", () => {
     const result = checker.run(
       planInput('We will `import helmet from "helmet"` for security'),
@@ -317,6 +353,14 @@ describe("check_routes", () => {
     );
     expect(result.applicable).toBe(true);
     expect(result.hallucinated).toBeGreaterThanOrEqual(1);
+  });
+
+  it("skips routes explicitly deferred as future examples", () => {
+    const result = checker.run(
+      planInput("If an API endpoint is later needed (e.g. `GET /api/future-example`), add it then."),
+      FIXTURE_C,
+    );
+    expect(result.hallucinated).toBe(0);
   });
 
   it("not applicable for projects without Next.js routes", () => {

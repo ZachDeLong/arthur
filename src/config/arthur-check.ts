@@ -89,7 +89,6 @@ export function resolveArthurCheckPolicy(
     ?? DEFAULT_COVERAGE_MODE;
 
   if (overrides.strict) {
-    includeExperimental = true;
     if (overrideMin === undefined && fileMin === undefined) {
       minCheckedRefs = STRICT_DEFAULT_MIN_CHECKED_REFS;
     }

@@ -1,27 +1,22 @@
 import { registerChecker, type CheckerInput, type CheckerResult } from "../registry.js";
-import { analyzeEnv, parseEnvFiles, type EnvAnalysis } from "../env-checker.js";
+import {
+  analyzeEnv,
+  analyzeEnvSourceFiles,
+  parseEnvFiles,
+  type EnvAnalysis,
+} from "../env-checker.js";
 import { printEnvAnalysis } from "../formatter.js";
 
 registerChecker({
   id: "env",
   displayName: "Env Variables",
   catchKey: "env",
+  supportsSourceMode: true,
 
   run(input: CheckerInput, projectDir): CheckerResult {
-    if (input.mode === "source") {
-      return {
-        checkerId: "env",
-        checked: 0,
-        hallucinated: 0,
-        hallucinations: [],
-        catchItems: [],
-        applicable: false,
-        notApplicableReason: "source mode not implemented for this checker",
-        rawAnalysis: null,
-      };
-    }
-
-    const analysis = analyzeEnv(input.text, projectDir);
+    const analysis = input.mode === "source" && input.files
+      ? analyzeEnvSourceFiles(input.files, projectDir)
+      : analyzeEnv(input.text, projectDir);
     const applicable = analysis.envFilesFound.length > 0 && analysis.checkedRefs > 0;
     const notApplicableReason = analysis.envFilesFound.length === 0
       ? "No .env* files found in project"
@@ -34,6 +29,7 @@ registerChecker({
         raw: h.varName,
         category: "not-in-env-files",
         suggestion: h.suggestion,
+        location: h.location,
       })),
       catchItems: analysis.hallucinations.map(h => h.varName),
       applicable,

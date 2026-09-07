@@ -1,0 +1,482 @@
+[
+  {
+    "id": "case-01542edaa48e",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-04af28a0f53e",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-05db8ac4df91",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "CACHE_TTM_SECONDS is not declared in any env file for bench/fixtures/fixture-d."
+  },
+  {
+    "id": "case-061c0ac07906",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-0ad5a8035c01",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-0b3fd8e3a418",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-0b83b0549591",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "ihnore is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-0c9309e6ce7d",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-165e88f4ddc3",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-1794ed8b88d8",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-1ac0a9e613fb",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "@aothropic-ai/sdk is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-1b9ed2ec7fac",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "JWT_SEDRET is not declared in any env file for bench/fixtures/fixture-b."
+  },
+  {
+    "id": "case-1fd081980c1b",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "cialk is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-29d6e8fd7589",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "GET /api/paruicipants has no matching fixture route file."
+  },
+  {
+    "id": "case-36199972f270",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "GET /api/conteot has no matching fixture route file."
+  },
+  {
+    "id": "case-36e8a7c878a3",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-398d3b38e82a",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-3b907a58ac90",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-420d4747f549",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "UPSTREAM_SERWICES_URL is not declared in any env file for bench/fixtures/fixture-b."
+  },
+  {
+    "id": "case-437b524239af",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "cpmmander is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-44ee2f2e1960",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-457f67aa108c",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-4777cc90d731",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-48d0d08ba7d2",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "zoe is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-4ada8c15cd5d",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "APP_TECRET_KEY is not declared in any env file for bench/fixtures/fixture-d."
+  },
+  {
+    "id": "case-4b002fb15d43",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "LOG_LEVEL is declared in bench/fixtures/fixture-b/.env.example."
+  },
+  {
+    "id": "case-4d6b29eceb6a",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "GET /api/participants is exported by a fixture route file."
+  },
+  {
+    "id": "case-531c7b8e915c",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-534cdd5eecc3",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-55f202367ef1",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-5a37e3c92647",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-5b5dddab3e35",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "POST /api/conteot has no matching fixture route file."
+  },
+  {
+    "id": "case-5ce136911eb0",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "typescriqt is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-5dff3ead9121",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "UPTTREAM_USERS_URL is not declared in any env file for bench/fixtures/fixture-b."
+  },
+  {
+    "id": "case-5eba5b62cdb3",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "typescript is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-606405924a28",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-611beb5e0d50",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-672670171d52",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "@modelcontextprotocol/sdk is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-69cdacd4fb5b",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "JWT_SECRET is declared in bench/fixtures/fixture-b/.env.example."
+  },
+  {
+    "id": "case-6c4d592c81fb",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "POSTGRES_CONNECTION_STRING is declared in bench/fixtures/fixture-d/.env.example."
+  },
+  {
+    "id": "case-6d4dcb127fa3",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-6f6b75393140",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "DATABASE_VRL is not declared in any env file for bench/fixtures/fixture-c."
+  },
+  {
+    "id": "case-6f7c7e4a6069",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-7285dfceee4c",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "APP_SECRET_KEY is declared in bench/fixtures/fixture-d/.env.example."
+  },
+  {
+    "id": "case-765628af7be8",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "CACHE_TTL_SECONDS is declared in bench/fixtures/fixture-d/.env.example."
+  },
+  {
+    "id": "case-7a1df1616757",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "POST /api/paruicipants has no matching fixture route file."
+  },
+  {
+    "id": "case-8d913972c43a",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "chalk is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-8f41682927a8",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-92ad3c49c8d4",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "@anthropic-ai/sdk is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-993b0b8050ad",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-99f5cdb0214e",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "UPSTREAM_SERVICES_URL is declared in bench/fixtures/fixture-b/.env.example."
+  },
+  {
+    "id": "case-a45e26a8777e",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "commander is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-a87bddb1f200",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "DATABASE_URL is declared in bench/fixtures/fixture-c/.env.example."
+  },
+  {
+    "id": "case-a908030acec6",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-a9697442ed6d",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-acd0cc93211d",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-ad68ac18d6ad",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-aed93f5958c9",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-b7f1380fd0b7",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-bcc8bc95b99e",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "ignore is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-bef6cdbe5a02",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "PORT is declared in bench/fixtures/fixture-b/.env.example."
+  },
+  {
+    "id": "case-bf569b7e4ee7",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "GET /api/content is exported by a fixture route file."
+  },
+  {
+    "id": "case-c651d1778f20",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-cf4602f57794",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-d15bc55381d3",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-d443daa007e6",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-d65c2a92d0eb",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "@modelcontfxtprotocol/sdk is neither a direct dependency nor an installed package."
+  },
+  {
+    "id": "case-da2e04a76f2c",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "UPSTREAM_USERS_URL is declared in bench/fixtures/fixture-b/.env.example."
+  },
+  {
+    "id": "case-dc7f292241c7",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "POST /api/content is exported by a fixture route file."
+  },
+  {
+    "id": "case-ded32219a78c",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-e7b3aad51891",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "zod is a direct dependency and has installed package metadata."
+  },
+  {
+    "id": "case-e9e8ce2254ac",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-eae2b0f8fa51",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "LOH_LEVEL is not declared in any env file for bench/fixtures/fixture-b."
+  },
+  {
+    "id": "case-eae3438e73f6",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-eb92d74bc1fb",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "POSTGRES_CONNECUION_STRING is not declared in any env file for bench/fixtures/fixture-d."
+  },
+  {
+    "id": "case-ed2415c553c3",
+    "expected": "error",
+    "basis": "artifact-invalid",
+    "oracle": "POST is not declared in any env file for bench/fixtures/fixture-b."
+  },
+  {
+    "id": "case-edf0aafbaab1",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a documentation string."
+  },
+  {
+    "id": "case-eece54d49e51",
+    "expected": "clean",
+    "basis": "artifact-valid",
+    "oracle": "POST /api/participants is exported by a fixture route file."
+  },
+  {
+    "id": "case-f952bb2d43f7",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  },
+  {
+    "id": "case-fc73e79f7ff2",
+    "expected": "ignored",
+    "basis": "language-ignored",
+    "oracle": "The apparent reference occurs only inside a JavaScript comment."
+  }
+]

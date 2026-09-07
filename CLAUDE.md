@@ -1,205 +1,243 @@
 # Arthur
 
-Ground truth verification for AI-generated code. MCP server that catches hallucinated references before code gets written — deterministically, zero cost, no API key.
+Arthur is a reference-integrity gate for AI-written code.
 
-**npm package:** `arthur-mcp` | **Install:** `claude mcp add arthur -- npx arthur-mcp`
+The product is not a general AI reviewer. Arthur's job is narrower: when an AI
+cites a code reference, check whether that reference exists in local ground
+truth and return the closest real values when it does not.
+
+**npm package:** `arthur-mcp`
+**Install:** `claude mcp add arthur -- npx arthur-mcp`
+**Direction doc:** `docs/DIRECTION.md`
+
+## Product Frame
+
+Arthur stops AI from citing things that do not exist.
+
+For code, those citations are:
+
+- file paths
+- imports and package subpaths
+- Prisma models, fields, methods, and relations
+- SQL/Drizzle tables and columns
+- Supabase tables, columns, RPC functions, and enums
+- environment variables
+- Next.js, Express, and Fastify routes
+- package API exports and members
+
+Arthur should stay deterministic by default. LLM review exists as an optional
+wrapper, but the core value is local ground truth, zero API key, low cost, and
+high precision.
 
 ## Architecture
 
-```
+```text
 bin/
-  arthur.ts         Non-interactive CLI (arthur check — for CI pipelines)
-  codeverifier.ts   Interactive CLI (codeverifier verify — LLM review)
-  arthur-mcp.ts     MCP server (stdio transport, 13 tools)
+  arthur.ts         Non-interactive CLI: arthur check
+  codeverifier.ts   Optional LLM review wrapper
+  arthur-mcp.ts     MCP server over stdio
 
 src/
-  analysis/     Static analysis checkers + registry pattern
-    checkers/   Checker registration files (one per checker, auto-registered via barrel import)
-    registry.ts Checker registry (CheckerDefinition interface, registerChecker/getCheckers)
-  diff/         Git diff resolver (resolveDiffFiles, DiffFile type)
-  commands/     CLI commands (check, verify, init)
-  config/       Config management (global + project + env)
-  context/      Project context builder (tree, file reader, token budget)
-  plan/         Plan loading (file, stdin, interactive)
-  session/      Session feedback storage (iterative re-verification)
-  verifier/     Prompt construction, API streaming, output rendering
+  analysis/         Static analysis checkers and registry
+    checkers/       Checker registration files
+    registry.ts     CheckerDefinition, registerChecker, getCheckers
+    typescript-source.ts  AST-backed source reference extraction
+  diff/             Git diff resolver
+  commands/         CLI commands
+  config/           Global/project/env config
+  context/          Project context builder for optional LLM review
+  plan/             Plan loading
+  session/          Optional verification/session feedback
+  verifier/         Optional Anthropic review wrapper
 
 bench/
-  fixtures/     Test projects (fixture-a: TS, fixture-b: Go, fixture-c: Next.js+Prisma, fixture-d: Drizzle+SQL, fixture-e: Express)
-  harness/      Benchmark runner, scoring, detection parsing
-  prompts/      Benchmark prompts + drift specs
-  naive-prompt.ts   Frozen baseline prompt (DO NOT MODIFY)
-  tier3/        Real-world refactoring benchmark (hybrid: automated setup + manual sessions)
+  fixtures/         Small test projects
+  harness/          Benchmark runners and scoring
+  validation/       Manually labelled precision regression corpus
+  tier3/, tier4/    Research benchmarks, not product surface
 ```
 
-## MCP Server
+No tsconfig path aliases. Use relative imports.
 
-Thirteen tools (registry-driven — adding a new checker is a 2-file operation):
-- **`check_all`** — runs stable deterministic checkers against a plan in one call, returns comprehensive report with ground truth (no API key). Supports strict mode (experimental checkers + coverage fail gate). **This is the primary tool for plan verification.**
-- **`check_diff`** — validates actual code changes from a git diff against project ground truth (no API key). Runs source-mode checkers (currently: imports) on files added/modified since the given ref. **Use this after writing code.**
-- `check_paths` — path validation against project tree + closest matches (no API key)
-- `check_schema` — Prisma schema validation + full schema ground truth (no API key)
-- `check_sql_schema` — Drizzle/SQL schema validation + full table/column listing (no API key)
-- `check_supabase_schema` — Supabase `database.types.ts` validation: tables, columns, functions, enums (no API key)
-- `check_imports` — package import validation + installed packages listing (no API key)
-- `check_env` — env variable validation + all defined vars (no API key)
-- `check_routes` — Next.js App Router route validation + all routes listing (no API key)
-- `check_express_routes` — Express/Fastify route validation with mount prefix resolution (no API key)
-- `verify_plan` — full pipeline: all static checks + LLM review (requires ANTHROPIC_API_KEY). Accepts `includeExperimental` / `strict` / `minCheckedRefs` / `coverageMode` like `check_all`.
-- `update_session_context` / `get_session_context` — session persistence across context compression
+## Primary Workflows
 
-**Install:** `claude mcp add arthur -- npx arthur-mcp`
+### Diff Gate
 
-**Critical:** No `console.log()` in `arthur-mcp.ts` — stdout is JSON-RPC protocol. Use `console.error()` for debug output.
+This is the product direction.
 
-## CLI (`arthur check`)
-
-Non-interactive CLI for CI pipelines. Runs stable deterministic checkers by default without an MCP host.
-
+```bash
+arthur check --diff HEAD --project .
+arthur check --diff HEAD --staged --project .
+arthur check --diff origin/main --project .
 ```
-# Plan mode (verify a plan before implementation)
-arthur check --plan plan.md --project . --format text|json --schema schema.prisma --strict
+
+`check_diff` validates changed lines from a git diff. Imports, env vars, and
+Next.js routes use TypeScript AST extraction and return source locations. Staged
+mode reads index contents; working-tree mode includes untracked files by default.
+
+### Plan Support
+
+```bash
+arthur check --plan plan.md --project .
 cat plan.md | arthur check --project .
-
-# Diff mode (verify actual code changes)
-arthur check --diff HEAD --project .              # all uncommitted changes
-arthur check --diff HEAD --staged --project .     # staged only (pre-commit)
-arthur check --diff origin/main --project .       # CI: everything since branch point
 ```
 
-- **Plan input:** `--plan <file>`, `--stdin`, or auto-detect piped stdin. Never falls through to interactive mode.
-- **Diff input:** `--diff <ref>` resolves changed `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs` files from git diff. `--staged` checks staged files only. `--diff` and `--plan` are mutually exclusive.
-- **Output:** `text` (compact colored table, default) or `json` (full `ArthurReport` from `finding-schema.ts`).
-- **Experimental checkers:** `--include-experimental` enables `types` + `packageApi`.
-- **Coverage gate:** `--min-checked-refs <n>` + `--coverage-mode off|warn|fail` prevents false confidence from low-reference plans.
-- **Strict mode:** `--strict` enables experimental checkers and defaults coverage mode to `fail`.
-- **Exit codes:** 0 = clean, 1 = findings or error.
-- **Dev:** `npm run arthur -- check --plan plan.md --project .`
+`check_all` is useful before implementation, but it should not be the public
+center of gravity. Agents forget to call planning tools; hooks and CI do not.
 
-## Build & Run
+### Optional LLM Review
 
-- `npm run build` — compile TypeScript (also verifies types)
-- `npm run arthur` — run non-interactive CLI via tsx
-- `npm run dev` — run interactive CLI via tsx
-- `npm run mcp` — run MCP server via tsx (for development)
-- `npm run bench:big` — run big benchmark (static analysis vs self-review, all prompts)
-- `npm run bench:big -- 06 09` — run big benchmark on specific prompts
-- `npm run bench:big:report` — regenerate report from latest big benchmark results
-- `npm run bench:tier1` — run Tier 1 (hallucination detection)
-- `npm run bench:tier2` — run Tier 2 (intent drift detection)
-- `npm run bench:report` — generate markdown report from existing results
-- `npm run bench:self-review` — run self-review vs Arthur comparison
-- `npm run bench:tier4` — full Tier 4 run (generate plans + score + report, requires API key)
-- `npm run bench:tier4 -- generate` — generate plans only (saves to bench/tier4/plans/)
-- `npm run bench:tier4 -- score` — score cached plans (Arthur vs self-review)
-- `npm run bench:tier4 -- report` — regenerate report from latest results
-- `npm run bench -- tier3` — print the full T3 workflow instructions
-- No tsconfig path aliases — use relative imports
+```bash
+codeverifier verify --plan plan.md --project .
+```
 
-## Key Conventions
+`verify_plan` and `codeverifier` remain optional. Do not lead with them in the
+product story.
 
-- **Naive prompt is frozen** — `bench/naive-prompt.ts` must never be modified. It's the reproducible baseline.
-- **Results dir is gitignored** — benchmark results in `bench/results/` are local only.
-- **Config locations** — global: `~/.arthur/config.json`, project: `.arthur/config.json`, env: `ANTHROPIC_API_KEY` (legacy: `~/.codeverifier/config.json` still read with deprecation warning)
-- **Token budget** — default 80k. Priority order: prompt > plan > README > CLAUDE.md > session feedback > referenced files > tree.
-- **Model default** — `claude-sonnet-4-5-20250929` (Sonnet 4.5). Override via project config `.arthur/config.json`.
-- **Fixture src/ excluded from root tsconfig** — `bench/fixtures/*/src` is excluded because fixture source files have their own deps (Next.js, Prisma, etc.).
+## MCP Tools
 
-## Benchmark System
+Arthur exposes two MCP tools by default:
 
-### Tier 1: Hallucination Detection
-Generates plans with README-only context, then verifies against full project tree. Checks paths and schema references.
+- `check_diff` - changed-line reference gate; primary product
+- `check_all` - plan-mode combined static checks
 
-- Fixture-c uses non-obvious naming (Participant not User, displayIdentifier not username) to tempt hallucinations
-- Detection via 4-tier parsing: direct match → sentiment → section → directory correction
+Compatibility and optional surfaces are explicit environment opt-ins:
 
-### Tier 2: Intent Drift Detection
-Injects synthetic drift into generated plans. Measures whether the verifier catches it.
+- `ARTHUR_MCP_LEGACY_TOOLS=1` adds individual checker tools:
+  - `check_paths`
+  - `check_schema`
+  - `check_sql_schema`
+  - `check_supabase_schema`
+  - `check_imports`
+  - `check_env`
+  - `check_routes`
+  - `check_express_routes`
+  - `check_package_api` - experimental
+- `ARTHUR_MCP_ENABLE_LLM_TOOL=1` adds `verify_plan` and requires `ANTHROPIC_API_KEY`.
+- `ARTHUR_MCP_ENABLE_SESSION_TOOLS=1` adds the two session-context helpers.
 
-- **Drift specs**: `bench/prompts/drift-specs.json` — each spec applied independently
-- **Replace-based specs are fragile** — regex patterns must account for non-deterministic LLM output. `append` is always reliable.
+Critical MCP rule: never use `console.log()` in `arthur-mcp.ts`. Stdout is the
+JSON-RPC transport. Use `console.error()` for diagnostics.
 
-### Big Benchmark: Static Analysis vs Self-Review
-Measures what self-review misses across all checker categories. Self-review gets the same full context and an adversarial prompt.
+## CLI Behavior
 
-- **Runner**: `bench/harness/big-benchmark-runner.ts`
-- **Ground truth**: `bench/harness/ground-truth.ts`
-- **Prompt**: `bench/prompts/big-benchmark-prompt.ts`
-- **Report**: `bench/harness/big-benchmark-report.ts`
-- Run with: `npm run bench:big` or `npm run bench:big -- 06 07 08 09 10 11`
+- Plan input: `--plan <file>`, `--stdin`, or piped stdin.
+- Diff input: `--diff <ref>` resolves relevant changed files from git.
+- `--staged` checks staged index contents only; `--no-untracked` excludes untracked files.
+- `--diff` and `--plan` are mutually exclusive.
+- Output: `text`, versioned `json`, or SARIF 2.1.0.
+- Experimental checkers: `--include-experimental` enables `packageApi`.
+- Strict mode: `--strict` defaults coverage mode to `fail`; experimental rules
+  remain explicitly opt-in.
+- Exit code: `0` for clean or warning-only results, `1` for errors or a failed gate.
 
-### Tier 4: Arthur vs Self-Review on Real Projects
-Tests Arthur against self-review on real LLM-generated plans with limited context. Self-review gets the SAME context as plan generation (CLAUDE.md only, no file tree), which is realistic.
+## Build And Test
 
-- **Runner**: `bench/tier4/tier4-runner.ts`
-- **Tasks**: `bench/tier4/tasks.json` (8 tasks against counselor-sophie)
-- **Prompts**: `bench/tier4/tier4-prompt.ts`
-- **Report**: `bench/tier4/tier4-report.ts`
-- **Cached plans**: `bench/tier4/plans/counselor-sophie/` (git-tracked, generated once)
-- **External project**: counselor-sophie at `~/counselor-sophie` (not copied into fixtures)
-- **sql_schema excluded**: false positives on English phrases matching SQL patterns
-- **package_api included in strict/experimental modes**: validates named imports/member access against .d.ts files
-- Run with: `npm run bench:tier4` or individual modes (`generate`, `score`, `report`)
+```bash
+npm run check
+npm test
+npm run validate
+npm run build
+npm run publish:check
+```
 
-### Tier 3: Real-World Refactoring Verification
-Hybrid benchmark — automated setup + manual Claude Code sessions.
+Development shortcuts:
 
-- **Workspaces live at `~/.arthur-tier3-workspaces/`** — NOT inside `~/arthur/` (prevents CLAUDE.md contamination)
-- **Must commit workspace changes before eval** — `evaluate.ts` uses `git diff HEAD~1`
+```bash
+npm run arthur -- check --plan plan.md --project .
+npm run arthur -- check --diff HEAD --project .
+npm run mcp
+```
 
-## Roadmap
+## Current Roadmap
 
-Arthur's core pivot: from plan verifier to **automatic static analysis for AI-generated code**. Deterministic static checkers (zero cost, high recall on reference errors) are the product. LLM review is opt-in.
+Arthur's core pivot is from plan verifier to automatic reference-integrity gate
+for AI-written code.
 
-### Phase 1: `check --diff` (code input, not just plans)
-- [x] `CheckerInput` abstraction — checkers accept `{ mode: "plan" | "source", text, files? }` instead of raw planText
-- [x] `src/diff/resolver.ts` — git diff plumbing, returns `DiffFile[]` filtered to JS/TS extensions
-- [x] `arthur check --diff HEAD --strict .` — CLI support for diff mode
-- [x] `arthur check --diff --staged --strict .` — staged files for pre-commit
-- [x] `check_diff` MCP tool — source-mode counterpart to `check_all`
-- [x] Import checker source mode — validates imports from actual source files with per-file attribution
-- [ ] Expand source mode to other checkers (env, routes, schema) — each checker needs its own source adapter
+### Phase 1: Make Diff Mode Real
 
-### Phase 2: Hooks (make Arthur invisible)
-- `arthur hooks install` — writes pre-commit hook that runs `arthur check --diff --staged --strict .`
-- Optional post-edit hook for Claude Code integration (fires when Claude writes files)
-- Goal: Arthur runs automatically, no CLAUDE.md instructions needed, no hoping Claude cooperates
+- [x] `CheckerInput` abstraction supports `plan` and `source` modes.
+- [x] `src/diff/resolver.ts` resolves changed lines, staged index data, deletions, and untracked files.
+- [x] `arthur check --diff HEAD --project .`
+- [x] `arthur check --diff HEAD --staged --project .`
+- [x] `check_diff` MCP tool.
+- [x] Import checker source mode with per-file attribution and locations.
+- [x] Env var source mode.
+- [x] Route source mode.
+- [ ] Prisma/Supabase/SQL source mode for changed query code.
 
-### Phase 3: Precision gates
-- Per-checker `enabled` / `warn` / `fail` severity levels
-- Noisy checkers (`types` at 98% FP, `packageApi` React re-exports) stay disabled until precision improves
-- Small golden test corpus for regression detection — ensure precision doesn't silently degrade
+### Phase 2: Make Arthur Automatic
 
-### Phase 4: Standalone CI tool
-- One command in CI: `arthur check --diff origin/main --strict .`
-- Exit code 1 on findings or low coverage
-- JSON output for CI integrations
-- Arthur becomes useful beyond MCP/Claude Code — any AI coding tool, any CI pipeline
+- [x] `arthur hooks install` for pre-commit checks.
+- [ ] Optional Claude Code-specific hook adapter.
+- [x] GitHub Actions CI and SARIF output.
+- [x] `--quiet` output for clean diffs and managed hooks.
 
-### Demoted (still available, not the focus)
-- `verify_plan` — LLM review is opt-in only. Static is default. Benchmarks showed static checkers outperform self-review, though with methodological caveats (see bench/METHODOLOGY.md)
-- Session context tools — context compression is a Claude Code problem, not Arthur's
-- New language support (Python, etc.) — go deep on JS/TS before going wide
+### Phase 3: Precision Gates
 
-### Completed checkers
-- ~~Express/Fastify route checker~~ (v0.4.0)
-- ~~Package API checker~~ (v0.5.0) — known FP: React re-exports
+- [ ] Per-checker `enabled` / `warn` / `fail` policy.
+- [x] Keep noisy checkers experimental until precision improves.
+- [x] Maintain separate fixture and historical field-validation records.
+- [x] Track precision separately from unlabeled historical checks.
 
-## Adding a New Checker
+### Phase 4: Adapters, Not Scope Creep
 
-With the registry pattern, adding a checker is a 2-file operation:
+- MCP remains an adapter.
+- CLI remains the stable core.
+- Future citation verticals should be separate packages or plugins unless they
+  cleanly reuse the same reference-gate core.
 
-1. Create `src/analysis/my-checker.ts` — the analysis logic (exports `analyzeMyThing()`)
-2. Create `src/analysis/checkers/my-checker.ts` — imports `registerChecker()`, wraps the analysis in a `CheckerDefinition`
-3. Add `import "./my-checker.js"` to `src/analysis/checkers/index.ts`
+## Benchmarks
 
-Stable checkers are automatically included in `check_all`, `arthur check`, `verify_plan`, and catch logging.
-Experimental checkers are included when `includeExperimental`/`strict` is enabled (CLI flags or `.arthur/config.json`).
+The benchmark system is useful research, not a headline proof.
+
+Known limitation: Arthur's benchmarks often use Arthur's own checkers as ground
+truth, so they measure whether another reviewer agrees with Arthur's
+classification. They do not independently prove Arthur's precision.
+
+Known false-positive risks:
+
+- `packageApi`: React and package re-export patterns.
+- `sqlSchema`: English phrases that resemble SQL references.
+
+Keep benchmark claims humble and point readers to `bench/METHODOLOGY.md`.
+
+The controlled comparison is `bench/paired/`: case inputs and labels are
+SHA-256 locked separately before prediction, selection is exhaustive within the
+declared artifacts, and Claude runs repeatedly. The first 80-case result showed
+no blocking accuracy difference: Arthur and Claude Sonnet 5 were both perfect.
+Arthur's measured advantage was local latency and zero API use, not accuracy.
+Run it with `npm run bench:paired -- arthur` or, with an API key,
+`npm run bench:paired -- all 3`.
+
+## Config
+
+- Global config: `~/.arthur/config.json`
+- Project config: `.arthur/config.json`
+- API key env: `ANTHROPIC_API_KEY`
+- Legacy global config `~/.codeverifier/config.json` is still read with a
+  deprecation warning.
+- Default token budget for optional LLM review: 80k.
+
+## Adding A Checker
+
+The registry pattern makes a new checker a small, explicit addition:
+
+1. Create `src/analysis/my-checker.ts` with the analysis logic.
+2. Create `src/analysis/checkers/my-checker.ts` and call `registerChecker()`.
+3. Add `import "./my-checker.js"` to `src/analysis/checkers/index.ts`.
+
+Stable checkers are included in `check_all`, `arthur check`, `verify_plan`, and
+catch logging. Experimental checkers are included only when requested through
+`includeExperimental` or `--include-experimental`.
 
 ## Gotchas
 
-- `.*` in JS regex doesn't cross newlines — use `[^#]*` or `[\s\S]*?` for multi-line section matches
-- Plans are non-deterministic — `replace`-based drift injections may fail to match. Record as "skipped", not "missed".
-- **No `console.log()` in MCP server** — stdout is JSON-RPC. Use `console.error()`.
-- **Fixtures don't have node_modules** — import checker must fall back to package.json deps. Already implemented.
-- **SQL FROM regex matches comments inside code blocks** — English stopword list handles known cases but isn't exhaustive.
+- Plans are non-deterministic; benchmark drift replacement can fail to match.
+  Record those cases as skipped, not missed.
+- In plan mode, package declarations describe intended dependencies. In source
+  mode, declared-but-uninstalled packages are warnings, not verified imports.
+- Diff refs are passed to `git` via `execFileSync`; keep validation strict.
+- MCP stdout is protocol output. Diagnostics go to stderr.
+- Prefer source-mode checks for new product work. Plan-mode checks are support,
+  not the long-term gate.

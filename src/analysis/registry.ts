@@ -18,12 +18,29 @@ export interface CheckerInput {
   cache?: Map<string, unknown>;
 }
 
+export interface SourceLocation {
+  path: string;
+  line: number;
+  column: number;
+  endLine?: number;
+  endColumn?: number;
+}
+
+export type FindingSeverity = "error" | "warning";
+
 /** Unified result returned by every checker's `run()` method. */
 export interface CheckerResult {
   checkerId: string;
   checked: number;
   hallucinated: number;
-  hallucinations: { raw: string; category: string; suggestion?: string }[];
+  hallucinations: {
+    raw: string;
+    category: string;
+    suggestion?: string;
+    severity?: FindingSeverity;
+    location?: SourceLocation;
+    evidence?: string[];
+  }[];
   catchItems: string[];
   applicable: boolean;
   /** Optional reason when checker is not applicable for this plan/project. */

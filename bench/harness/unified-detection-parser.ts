@@ -68,6 +68,8 @@ const SCHEMA_SENTIMENT = [
   "the model is",
   "the field is",
   "the actual",
+  "actual schema",
+  "plan assumes",
   "the correct",
   "should use",
   "the schema has",
@@ -245,9 +247,11 @@ function buildSearchTerms(error: GroundTruthError): string[] {
     case "schema": {
       // error.raw is like "prisma.engagement" or "fieldName" or ".methodName"
       terms.push(error.raw);
-      // Also try without prefix
-      if (error.raw.startsWith("prisma.")) {
-        const accessor = error.raw.slice(7);
+      // Also try the semantic accessor without a client-variable prefix. Mock
+      // clients (for example mockedPrisma.engagement) represent the same
+      // schema reference as prisma.engagement.
+      if (error.raw.includes(".")) {
+        const accessor = error.raw.split(".").at(-1)!;
         terms.push(accessor);
         terms.push(accessor[0].toUpperCase() + accessor.slice(1));
       }
@@ -334,7 +338,15 @@ function buildSearchTerms(error: GroundTruthError): string[] {
 
 /** Tier 1: Direct match — the search term appears in the output. */
 function checkDirectMatch(term: string, output: string): boolean {
-  return output.includes(term);
+  return output.toLowerCase().includes(term.toLowerCase());
+}
+
+/** Remove Markdown punctuation that can split otherwise ordinary phrases. */
+function normalizeReviewText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[`*_~]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 /** Tier 2: Term appears near negative sentiment within ±3 lines. */
@@ -344,14 +356,16 @@ function checkSentimentMatch(
   sentimentPhrases: string[],
 ): boolean {
   const lines = output.split("\n");
+  const normalizedTerm = term.toLowerCase();
 
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].includes(term)) continue;
+    if (!lines[i].toLowerCase().includes(normalizedTerm)) continue;
 
-    const window = lines
-      .slice(Math.max(0, i - 3), Math.min(lines.length, i + 4))
-      .join(" ")
-      .toLowerCase();
+    const window = normalizeReviewText(
+      lines
+        .slice(Math.max(0, i - 3), Math.min(lines.length, i + 4))
+        .join(" "),
+    );
 
     for (const phrase of sentimentPhrases) {
       if (window.includes(phrase)) return true;
@@ -372,7 +386,7 @@ function checkSectionMatch(term: string, output: string): boolean {
           ? afterSection
           : afterSection.slice(0, nextHeading + 1);
 
-      if (sectionText.includes(term)) {
+      if (sectionText.toLowerCase().includes(term.toLowerCase())) {
         return true;
       }
     }

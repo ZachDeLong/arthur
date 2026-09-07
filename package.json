@@ -1,7 +1,7 @@
 {
   "name": "arthur-mcp",
-  "version": "0.5.0",
-  "description": "Ground truth verification for AI-generated code plans. Catches hallucinated file paths, schema references, imports, env vars, types, API routes, Express/Fastify routes, and Supabase schema — deterministically, zero cost, no API key.",
+  "version": "0.6.0",
+  "description": "Reference-integrity gate for AI-written code. Catches hallucinated paths, imports, schemas, env vars, routes, and package APIs against local ground truth.",
   "type": "module",
   "bin": {
     "arthur": "dist/bin/arthur.js",
@@ -9,14 +9,16 @@
     "codeverifier": "dist/bin/codeverifier.js"
   },
   "scripts": {
+    "check": "tsc --noEmit",
     "build": "tsc",
-    "prepublishOnly": "tsc",
+    "prepublishOnly": "npm run check && npm test && npm run build && npm run validate",
     "publish:check": "npm pack --dry-run",
     "arthur": "tsx bin/arthur.ts",
     "dev": "tsx bin/codeverifier.ts",
     "mcp": "tsx bin/arthur-mcp.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "validate": "tsx bench/validation/runner.ts",
     "bench": "tsx bench/harness/runner.ts",
     "bench:tier1": "tsx bench/harness/runner.ts tier1",
     "bench:tier2": "tsx bench/harness/runner.ts tier2",
@@ -25,6 +27,8 @@
     "bench:self-review": "tsx bench/harness/runner.ts self-review",
     "bench:big": "tsx bench/harness/runner.ts big",
     "bench:big:report": "tsx bench/harness/runner.ts big-report",
+    "bench:big:rescore": "tsx bench/harness/runner.ts big-rescore",
+    "bench:paired": "tsx bench/paired/runner.ts",
     "bench:tier4": "tsx bench/harness/runner.ts tier4",
     "bench:tier3:setup": "tsx bench/tier3/scripts/setup.ts",
     "bench:tier3:verify": "tsx bench/tier3/scripts/verify-plan.ts",
@@ -40,6 +44,8 @@
     "mcp-server",
     "verification",
     "hallucination",
+    "reference-integrity",
+    "agent-guardrails",
     "static-analysis",
     "code-review",
     "prisma",
@@ -57,22 +63,30 @@
     "url": "https://github.com/ZachDeLong/arthur.git"
   },
   "homepage": "https://github.com/ZachDeLong/arthur",
+  "engines": {
+    "node": ">=22"
+  },
   "files": [
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "bench/validation/FIELD_RESULTS.md",
+    "docs/DIRECTION.md",
     "dist/bin",
     "dist/src"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
-    "ignore": "^7.0.5",
-    "zod": "^4.3.6"
+    "ignore": "^7.0.8",
+    "typescript": "^5.9.3",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@types/node": "^24.0.0",
+    "openai": "^7.10.0",
+    "tsx": "^4.23.13",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DiffFile } from "../diff/resolver.js";
+import { isJavaScriptSourceFile, type DiffFile } from "../diff/resolver.js";
+import type { SourceLocation } from "./registry.js";
+import {
+  occurrenceLocation,
+  occurrenceTouchesChangedLines,
+} from "./source-locations.js";
+import { extractTypeScriptImports } from "./typescript-source.js";
 
 // --- Types ---
 
@@ -12,6 +18,7 @@ export interface ImportRef {
   reason?: string;       // 'package-not-found', 'subpath-not-exported'
   suggestion?: string;   // Fuzzy match
   file?: string;         // Source file path (source mode only)
+  location?: SourceLocation;
 }
 
 export interface ImportAnalysis {
@@ -21,6 +28,7 @@ export interface ImportAnalysis {
   hallucinations: ImportRef[];
   hallucinationRate: number;
   skippedImports: number; // Relative/alias/builtin
+  unverifiedImports: ImportRef[]; // Declared but unavailable in installed ground truth
 }
 
 // --- Node Builtins ---
@@ -40,38 +48,41 @@ const NODE_BUILTINS = new Set([
 
 // --- Extraction ---
 
-/** Extract import/require source strings from plan text (code blocks + inline). */
-export function extractImports(planText: string): string[] {
-  const sources: string[] = [];
+interface ImportOccurrence {
+  source: string;
+  index: number;
+  length: number;
+}
+
+/** Extract import/require occurrences while retaining their source positions. */
+function extractImportOccurrences(sourceText: string): ImportOccurrence[] {
+  const occurrences: ImportOccurrence[] = [];
   const seen = new Set<string>();
 
-  const add = (src: string) => {
-    const trimmed = src.trim();
-    if (trimmed && !seen.has(trimmed)) {
-      seen.add(trimmed);
-      sources.push(trimmed);
+  const addMatches = (regex: RegExp) => {
+    for (const match of sourceText.matchAll(regex)) {
+      if (match.index === undefined || !match[1]) continue;
+      const source = match[1].trim();
+      const relativeIndex = match[0].lastIndexOf(match[1]);
+      const index = match.index + Math.max(0, relativeIndex);
+      const key = `${index}:${source}`;
+      if (!source || seen.has(key)) continue;
+      seen.add(key);
+      occurrences.push({ source, index, length: source.length });
     }
   };
 
-  // import ... from 'source' / "source"
-  const importFromRegex = /(?:import|export)\s+[\s\S]*?\bfrom\s+['"]([^'"]+)['"]/g;
-  for (const match of planText.matchAll(importFromRegex)) {
-    add(match[1]);
-  }
+  // Static imports/exports, including side-effect imports.
+  addMatches(/\b(?:import|export)\s+(?:type\s+)?(?:[^'";\n]+?\s+from\s+)?['"]([^'"]+)['"]/g);
+  addMatches(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g);
+  addMatches(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g);
 
-  // require('source') / require("source")
-  const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-  for (const match of planText.matchAll(requireRegex)) {
-    add(match[1]);
-  }
+  return occurrences.sort((a, b) => a.index - b.index);
+}
 
-  // import('source') — dynamic imports
-  const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-  for (const match of planText.matchAll(dynamicImportRegex)) {
-    add(match[1]);
-  }
-
-  return sources;
+/** Extract unique import/require source strings from plan text. */
+export function extractImports(planText: string): string[] {
+  return [...new Set(extractImportOccurrences(planText).map((occurrence) => occurrence.source))];
 }
 
 // --- Classification ---
@@ -193,8 +204,12 @@ function matchSubpath(subpath: string, validSubpaths: Set<string>): boolean {
     }
     // Wildcard in the middle: "./prefix/*/suffix"
     if (pattern.includes("*")) {
+      const escaped = pattern
+        .split("*")
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("[^/]+");
       const regex = new RegExp(
-        "^" + pattern.replace(/\*/g, "[^/]+") + "$",
+        `^${escaped}$`,
       );
       if (regex.test(requested)) return true;
     }
@@ -253,7 +268,51 @@ export function clearImportCaches(): void {
 }
 
 /** Check if a package is listed in the project's package.json dependencies or devDependencies. */
-function isListedDependency(packageName: string, projectDir: string, cache?: Map<string, unknown>): boolean {
+function parseDeclaredDependencies(content: string): Set<string> {
+  const allDeps = new Set<string>();
+  try {
+    const pkg = JSON.parse(content);
+    for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+      if (pkg[field] && typeof pkg[field] === "object") {
+        for (const dep of Object.keys(pkg[field])) allDeps.add(dep);
+      }
+    }
+  } catch {
+    // Invalid package metadata provides no dependency ground truth.
+  }
+  return allDeps;
+}
+
+/** Check whether a plan explicitly adds a package before importing it. */
+function isPlannedDependency(packageName: string, planText: string): boolean {
+  const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // A package entry inside an explicit dependency object is an unambiguous
+  // declaration of intent. Do not accept arbitrary JSON keys with this name.
+  const dependencyObject =
+    /["'](?:dependencies|devDependencies|peerDependencies|optionalDependencies)["']\s*:\s*\{([\s\S]*?)\}/gi;
+  const packageJsonEntry = new RegExp(
+    `["']${escaped}["']\\s*:\\s*["'][^"'\\n]+["']`,
+    "i",
+  );
+  for (const match of planText.matchAll(dependencyObject)) {
+    if (packageJsonEntry.test(match[1])) return true;
+  }
+
+  // Also accept explicit package-manager installation commands on one line.
+  const installCommand = /\b(?:npm\s+(?:install|i|add)|pnpm\s+add|yarn\s+add|bun\s+add)\b/i;
+  return planText
+    .split("\n")
+    .some((line) => installCommand.test(line) && new RegExp(`(?:^|[\\s'"\`])${escaped}(?:$|[\\s'"\`])`, "i").test(line));
+}
+
+function isListedDependency(
+  packageName: string,
+  projectDir: string,
+  cache?: Map<string, unknown>,
+  override?: Set<string>,
+): boolean {
+  if (override) return override.has(packageName);
   const cacheKey = `deps:${projectDir}`;
   let allDeps = (cache?.get(cacheKey) as Set<string> | undefined) ?? depsCache.get(projectDir);
   if (!allDeps) {
@@ -261,14 +320,7 @@ function isListedDependency(packageName: string, projectDir: string, cache?: Map
     const pkgPath = path.join(projectDir, "package.json");
     try {
       const content = fs.readFileSync(pkgPath, "utf-8");
-      const pkg = JSON.parse(content);
-      for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
-        if (pkg[field] && typeof pkg[field] === "object") {
-          for (const dep of Object.keys(pkg[field])) {
-            allDeps.add(dep);
-          }
-        }
-      }
+      allDeps = parseDeclaredDependencies(content);
     } catch {
       // No package.json or parse error — can't validate
     }
@@ -276,6 +328,21 @@ function isListedDependency(packageName: string, projectDir: string, cache?: Map
     if (cache) cache.set(cacheKey, allDeps);
   }
   return allDeps.has(packageName);
+}
+
+/** Locate an installed package in the project or a hoisted workspace ancestor. */
+function findInstalledPackageJson(packageName: string, projectDir: string): string | null {
+  let current = path.resolve(projectDir);
+  const root = path.parse(current).root;
+
+  while (true) {
+    const candidate = path.join(current, "node_modules", packageName, "package.json");
+    if (fs.existsSync(candidate)) return candidate;
+    if (current === root) return null;
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
 }
 
 // --- Main Analysis ---
@@ -290,7 +357,8 @@ function validateImportSource(
   nodeModulesDir: string,
   filePath?: string,
   cache?: Map<string, unknown>,
-): { ref: ImportRef | null; skipped: boolean } {
+  declaredDependencies?: Set<string>,
+): { ref: ImportRef | null; skipped: boolean; unverified?: ImportRef } {
   if (shouldSkip(source)) {
     return { ref: null, skipped: true };
   }
@@ -298,11 +366,23 @@ function validateImportSource(
   const { packageName, subpath } = parsePackageName(source);
 
   // Check if package exists in node_modules
-  const pkgJsonPath = path.join(nodeModulesDir, packageName, "package.json");
-  if (!fs.existsSync(pkgJsonPath)) {
-    // Fallback: check if it's listed in the project's package.json deps
-    if (isListedDependency(packageName, projectDir, cache)) {
-      return { ref: null, skipped: false };
+  const pkgJsonPath = findInstalledPackageJson(packageName, projectDir);
+  if (!pkgJsonPath) {
+    // A declaration is intent, not installed ground truth. Surface it as an
+    // unverified warning instead of silently calling it valid.
+    if (isListedDependency(packageName, projectDir, cache, declaredDependencies)) {
+      return {
+        ref: null,
+        skipped: false,
+        unverified: {
+          raw: source,
+          packageName,
+          subpath,
+          valid: false,
+          reason: "declared-not-installed",
+          file: filePath,
+        },
+      };
     }
     const suggestion = suggestPackage(packageName, nodeModulesDir);
     return {
@@ -363,28 +443,54 @@ function validateImportSource(
 function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: Map<string, unknown>): ImportAnalysis {
   const nodeModulesDir = path.join(projectDir, "node_modules");
   const hallucinations: ImportRef[] = [];
+  const unverifiedImports: ImportRef[] = [];
   let totalImports = 0;
   let skippedImports = 0;
   let checkedImports = 0;
   let validImports = 0;
+  const packageJsonOverlay = files.find((file) => file.path === "package.json");
+  const declaredDependencies = packageJsonOverlay
+    ? packageJsonOverlay.status === "deleted"
+      ? new Set<string>()
+      : parseDeclaredDependencies(packageJsonOverlay.content)
+    : undefined;
 
   // Cache validation results by package source to avoid redundant fs lookups
-  const validatedPackages = new Map<string, { ref: ImportRef | null; skipped: boolean }>();
+  const validatedPackages = new Map<string, ReturnType<typeof validateImportSource>>();
 
   for (const diffFile of files) {
-    const sources = extractImports(diffFile.content);
-    totalImports += sources.length;
+    if (diffFile.status === "deleted" || !isJavaScriptSourceFile(diffFile.path)) continue;
+    const occurrences = extractTypeScriptImports(diffFile.path, diffFile.content)
+      .filter((occurrence) => occurrenceTouchesChangedLines(diffFile, occurrence));
+    totalImports += occurrences.length;
 
-    for (const source of sources) {
+    for (const occurrence of occurrences) {
+      const source = occurrence.source;
       // Check cache first
       let result = validatedPackages.get(source);
       if (!result) {
-        result = validateImportSource(source, projectDir, nodeModulesDir, undefined, cache);
+        result = validateImportSource(
+          source,
+          projectDir,
+          nodeModulesDir,
+          undefined,
+          cache,
+          declaredDependencies,
+        );
         validatedPackages.set(source, result);
       }
 
       if (result.skipped) {
         skippedImports++;
+        continue;
+      }
+
+      if (result.unverified) {
+        unverifiedImports.push({
+          ...result.unverified,
+          file: diffFile.path,
+          location: occurrenceLocation(diffFile, occurrence),
+        });
         continue;
       }
 
@@ -395,6 +501,7 @@ function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: 
         hallucinations.push({
           ...result.ref,
           file: diffFile.path,
+          location: occurrenceLocation(diffFile, occurrence),
         });
       } else {
         validImports++;
@@ -412,6 +519,7 @@ function analyzeImportsFromFiles(files: DiffFile[], projectDir: string, cache?: 
     hallucinations,
     hallucinationRate,
     skippedImports,
+    unverifiedImports,
   };
 }
 
@@ -432,6 +540,7 @@ export function analyzeImports(
   const nodeModulesDir = path.join(projectDir, "node_modules");
 
   const hallucinations: ImportRef[] = [];
+  const unverifiedImports: ImportRef[] = [];
   let skippedImports = 0;
   let checkedImports = 0;
   let validImports = 0;
@@ -444,10 +553,32 @@ export function analyzeImports(
       continue;
     }
 
+    if (result.unverified) {
+      // In plan mode, package.json is the intended future dependency graph.
+      // Source mode is stricter because changed code is expected to run now.
+      checkedImports++;
+      validImports++;
+      continue;
+    }
+
     checkedImports++;
 
     if (result.ref) {
-      hallucinations.push(result.ref);
+      if (
+        result.ref.reason === "package-not-found" &&
+        isPlannedDependency(result.ref.packageName, planText)
+      ) {
+        // The package is not present in current ground truth, but the plan
+        // explicitly adds it before use. Keep that uncertainty visible without
+        // mislabeling the intended future dependency as a hallucination.
+        unverifiedImports.push({
+          ...result.ref,
+          reason: "planned-dependency",
+        });
+        validImports++;
+      } else {
+        hallucinations.push(result.ref);
+      }
     } else {
       validImports++;
     }
@@ -463,5 +594,6 @@ export function analyzeImports(
     hallucinations,
     hallucinationRate,
     skippedImports,
+    unverifiedImports,
   };
 }

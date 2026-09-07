@@ -34,14 +34,33 @@ function hasCreateSignal(filePath: string, planText: string): boolean {
   const escapedPath = filePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   const createPatterns = [
-    // "Create src/foo/bar.ts" or "Add src/foo/bar.ts"
-    new RegExp(`(?:create|add|new file|introduce)\\s+\`?${escapedPath}`, "i"),
+    // Markdown headings and labels such as:
+    //   **Create:** `src/foo.ts`
+    //   ### New File: `src/foo.ts`
+    //   Add src/foo.ts
+    new RegExp(
+      `(?:create|add|new\\s+file|introduce)` +
+        `(?:[\\s*_]*:[\\s*_]*|[\\s*_]+)` +
+        `\`?${escapedPath}`,
+      "i",
+    ),
+    // Allow a short descriptor between the action and path, as in
+    // "Create migration `migrations/002_add_index.sql`" or
+    // "Create a test (`tests/a.test.ts` or `tests/b.test.ts`)".
+    new RegExp(
+      `(?:create|new\\s+file|introduce)\\b` +
+        `(?:(?!\\b(?:modify|existing|inspect|verify)\\b)[^\\n]){0,100}` +
+        `\`?${escapedPath}`,
+      "i",
+    ),
     // Path on same line as (CREATE) — handles markdown: **File: `path`** (CREATE)
     new RegExp(`${escapedPath}[^\n]*\\(\\s*(?:CREATE|create|Create|new|NEW|Add|ADD)`, "i"),
     // (CREATE) before path on same line: (CREATE) `path`
     new RegExp(`\\(\\s*(?:CREATE|create|Create|new|NEW)[^\n]*${escapedPath}`, "i"),
     // "src/foo/bar.ts (new)" or "src/foo/bar.ts (create)"
     new RegExp(`${escapedPath}[^)\n]{0,20}\\((?:new|create)\\)`, "i"),
+    // Markdown tables: | src/foo/bar.ts | Create |
+    new RegExp(`${escapedPath}[^\n]{0,30}\\|\\s*(?:create|new|add)\\s*\\|`, "i"),
   ];
 
   for (const pattern of createPatterns) {

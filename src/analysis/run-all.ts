@@ -19,6 +19,18 @@ export interface CheckerRunSummary {
   skippedCheckers: SkippedChecker[];
   totalChecked: number;
   totalFindings: number;
+  totalErrors: number;
+  totalWarnings: number;
+  coverage: CheckerCoverageSummary;
+}
+
+export interface CheckerCoverageSummary {
+  mode: CheckerInput["mode"];
+  selectedCheckers: string[];
+  sourceModeSupported: string[];
+  sourceModeUnsupported: string[];
+  applicableCheckers: string[];
+  checkersWithReferences: string[];
 }
 
 export interface CoverageGateResult {
@@ -51,16 +63,23 @@ export function runAllCheckers(
   const skippedCheckers: SkippedChecker[] = [];
   let totalChecked = 0;
   let totalFindings = 0;
-
-  for (const checker of getCheckers({
+  let totalErrors = 0;
+  let totalWarnings = 0;
+  const selectedCheckers = getCheckers({
     includeExperimental: options.includeExperimental,
-  })) {
+  });
+
+  for (const checker of selectedCheckers) {
     const result = checker.run(scopedInput, projectDir, options.checkerOptions);
     checkerResults.push({ checker, result });
 
     if (result.applicable) {
       totalChecked += result.checked;
       totalFindings += result.hallucinated;
+      for (const finding of result.hallucinations) {
+        if (finding.severity === "warning") totalWarnings++;
+        else totalErrors++;
+      }
     } else {
       skippedCheckers.push({
         checker,
@@ -75,6 +94,24 @@ export function runAllCheckers(
     skippedCheckers,
     totalChecked,
     totalFindings,
+    totalErrors,
+    totalWarnings,
+    coverage: {
+      mode: input.mode,
+      selectedCheckers: selectedCheckers.map((checker) => checker.id),
+      sourceModeSupported: input.mode === "source"
+        ? selectedCheckers.filter((checker) => checker.supportsSourceMode).map((checker) => checker.id)
+        : [],
+      sourceModeUnsupported: input.mode === "source"
+        ? selectedCheckers.filter((checker) => !checker.supportsSourceMode).map((checker) => checker.id)
+        : [],
+      applicableCheckers: checkerResults
+        .filter(({ result }) => result.applicable)
+        .map(({ checker }) => checker.id),
+      checkersWithReferences: checkerResults
+        .filter(({ result }) => result.checked > 0)
+        .map(({ checker }) => checker.id),
+    },
   };
 }
 

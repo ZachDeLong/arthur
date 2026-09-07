@@ -6,17 +6,24 @@
  */
 
 import path from "node:path";
-import type { CheckerResult, CheckerDefinition } from "./registry.js";
+import type {
+  CheckerResult,
+  CheckerDefinition,
+  FindingSeverity,
+  SourceLocation,
+} from "./registry.js";
 
 // --- Schema Types ---
 
 export interface ArthurReport {
-  schemaVersion: "1.0";
+  schemaVersion: "1.1";
   timestamp: string;
   projectDir: string;
   summary: {
     totalChecked: number;
     totalFindings: number;
+    totalErrors: number;
+    totalWarnings: number;
     checkerResults: CheckerSummary[];
   };
   findings: Finding[];
@@ -33,12 +40,13 @@ export interface CheckerSummary {
 export interface Finding {
   findingId: string;
   checker: string;
-  severity: "error";
+  severity: FindingSeverity;
   category: string;
   target: string;
   message: string;
   suggestion?: string;
   evidence?: string[];
+  location?: SourceLocation;
 }
 
 // --- Hash Utility ---
@@ -54,8 +62,14 @@ function hashString(str: string): string {
 }
 
 /** Generate a deterministic finding ID from checker + category + target. */
-function makeFindingId(checker: string, category: string, target: string): string {
-  return hashString(`${checker}:${category}:${target}`);
+function makeFindingId(
+  checker: string,
+  category: string,
+  target: string,
+  location?: SourceLocation,
+): string {
+  const position = location ? `${location.path}:${location.line}:${location.column}` : "";
+  return hashString(`${checker}:${category}:${target}:${position}`);
 }
 
 // --- Category → Message Mapping ---
@@ -75,7 +89,10 @@ const categoryMessages: Record<string, (target: string) => string> = {
   "wrong-method": (t) => `HTTP method not allowed: ${t}`,
   "package-not-found": (t) => `Package not installed: ${t}`,
   "subpath-not-found": (t) => `Subpath not exported: ${t}`,
+  "subpath-not-exported": (t) => `Subpath not exported: ${t}`,
   "hallucinated-env": (t) => `Env variable not defined: ${t}`,
+  "not-in-env-files": (t) => `Env variable not defined: ${t}`,
+  "declared-not-installed": (t) => `Package is declared but not installed: ${t}`,
 };
 
 function messageForCategory(category: string, target: string): string {
@@ -93,6 +110,8 @@ export function buildJsonReport(
   const checkerSummaries: CheckerSummary[] = [];
   let totalChecked = 0;
   let totalFindings = 0;
+  let totalErrors = 0;
+  let totalWarnings = 0;
 
   for (const { checker, result } of checkerResults) {
     checkerSummaries.push({
@@ -107,25 +126,32 @@ export function buildJsonReport(
     totalFindings += result.hallucinated;
 
     for (const h of result.hallucinations) {
+      const severity = h.severity ?? "error";
+      if (severity === "warning") totalWarnings++;
+      else totalErrors++;
       findings.push({
-        findingId: makeFindingId(checker.id, h.category, h.raw),
+        findingId: makeFindingId(checker.id, h.category, h.raw, h.location),
         checker: checker.id,
-        severity: "error",
+        severity,
         category: h.category,
         target: h.raw,
         message: messageForCategory(h.category, h.raw),
         suggestion: h.suggestion,
+        evidence: h.evidence,
+        location: h.location,
       });
     }
   }
 
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     timestamp: new Date().toISOString(),
     projectDir: path.basename(projectDir),
     summary: {
       totalChecked,
       totalFindings,
+      totalErrors,
+      totalWarnings,
       checkerResults: checkerSummaries,
     },
     findings,

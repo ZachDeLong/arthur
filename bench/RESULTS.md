@@ -1,4 +1,12 @@
-# Arthur Benchmark Results
+# Historical Arthur Benchmark Results — Not Valid for Product Comparison
+
+> **Do not use the percentages below as evidence that Arthur outperforms an
+> LLM.** Arthur's own checker output defined the candidate "errors," making its
+> reported 100% score tautological; labels were not independently fixed, and
+> later audits found false positives and parser artifacts. This file is retained
+> as historical evidence of why the benchmark was replaced. Use the locked,
+> label-separated [paired benchmark](paired/RESULTS.md) for current internal
+> results.
 
 > Generated 2026-02-13 from 12 benchmark run(s), 22 prompt evaluation(s)
 

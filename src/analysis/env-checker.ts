@@ -1,5 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isJavaScriptSourceFile, type DiffFile } from "../diff/resolver.js";
+import type { SourceLocation } from "./registry.js";
+import {
+  occurrenceLocation,
+  occurrenceTouchesChangedLines,
+} from "./source-locations.js";
+import { extractTypeScriptEnvRefs } from "./typescript-source.js";
 
 // --- Types ---
 
@@ -9,6 +16,8 @@ export interface EnvRef {
   valid: boolean;
   reason?: string;       // 'not-in-env-files'
   suggestion?: string;   // Fuzzy match: 'DB_URL'
+  file?: string;
+  location?: SourceLocation;
 }
 
 export interface EnvAnalysis {
@@ -42,19 +51,39 @@ const ENV_FILE_NAMES = [
   ".env.production", ".env.test", ".env.staging",
 ];
 
-const KEY_REGEX = /^([A-Za-z_][A-Za-z0-9_]*)\s*=/;
+const KEY_REGEX = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
 
 /** Parse all .env* files in project root. Returns set of defined var names and list of files found. */
-export function parseEnvFiles(projectDir: string): { vars: Set<string>; filesFound: string[] } {
+export function parseEnvFiles(
+  projectDir: string,
+  diffFiles?: DiffFile[],
+): { vars: Set<string>; filesFound: string[] } {
   const vars = new Set<string>();
   const filesFound: string[] = [];
+  const overlays = new Map(
+    (diffFiles ?? [])
+      .filter((file) => !file.path.includes("/") && /^\.env(?:\.|$)/.test(file.path))
+      .map((file) => [file.path, file]),
+  );
 
-  for (const name of ENV_FILE_NAMES) {
+  const discoveredNames = new Set(ENV_FILE_NAMES);
+  try {
+    for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+      if (entry.isFile() && /^\.env(?:\.|$)/.test(entry.name)) discoveredNames.add(entry.name);
+    }
+  } catch {
+    // Missing or unreadable project roots are handled as no env ground truth.
+  }
+  for (const name of overlays.keys()) discoveredNames.add(name);
+
+  for (const name of discoveredNames) {
     const filePath = path.join(projectDir, name);
-    if (!fs.existsSync(filePath)) continue;
+    const overlay = overlays.get(name);
+    if (overlay?.status === "deleted") continue;
+    if (!overlay && !fs.existsSync(filePath)) continue;
 
     filesFound.push(name);
-    const content = fs.readFileSync(filePath, "utf-8");
+    const content = overlay?.content ?? fs.readFileSync(filePath, "utf-8");
 
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
@@ -71,58 +100,49 @@ export function parseEnvFiles(projectDir: string): { vars: Set<string>; filesFou
 
 // --- Extraction ---
 
-/** Extract env variable names from plan text. */
-export function extractEnvRefs(planText: string): string[] {
-  const varNames: string[] = [];
+interface EnvOccurrence {
+  varName: string;
+  raw: string;
+  index: number;
+  length: number;
+}
+
+function extractEnvOccurrences(sourceText: string): EnvOccurrence[] {
+  const occurrences: EnvOccurrence[] = [];
   const seen = new Set<string>();
+  const patterns = [
+    /process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g,
+    /process\.env\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g,
+    /import\.meta\.env\.([A-Za-z_][A-Za-z0-9_]*)/g,
+    /os\.environ\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g,
+    /os\.environ\.get\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g,
+    /os\.getenv\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g,
+    /Deno\.env\.get\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g,
+    /ENV\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g,
+    /ENV\.fetch\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g,
+  ];
 
-  const add = (name: string) => {
-    if (name && !seen.has(name)) {
-      seen.add(name);
-      varNames.push(name);
+  for (const pattern of patterns) {
+    for (const match of sourceText.matchAll(pattern)) {
+      if (match.index === undefined || !match[1]) continue;
+      const key = `${match.index}:${match[1]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      occurrences.push({
+        varName: match[1],
+        raw: match[0],
+        index: match.index,
+        length: match[0].length,
+      });
     }
-  };
-
-  // process.env.VAR_NAME
-  for (const m of planText.matchAll(/process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
-    add(m[1]);
   }
 
-  // process.env['VAR_NAME'] / process.env["VAR_NAME"]
-  for (const m of planText.matchAll(/process\.env\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g)) {
-    add(m[1]);
-  }
+  return occurrences.sort((a, b) => a.index - b.index);
+}
 
-  // import.meta.env.VAR_NAME
-  for (const m of planText.matchAll(/import\.meta\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
-    add(m[1]);
-  }
-
-  // os.environ["VAR_NAME"] / os.environ.get("VAR_NAME") / os.getenv("VAR_NAME")
-  for (const m of planText.matchAll(/os\.environ\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g)) {
-    add(m[1]);
-  }
-  for (const m of planText.matchAll(/os\.environ\.get\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g)) {
-    add(m[1]);
-  }
-  for (const m of planText.matchAll(/os\.getenv\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g)) {
-    add(m[1]);
-  }
-
-  // Deno.env.get("VAR_NAME")
-  for (const m of planText.matchAll(/Deno\.env\.get\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g)) {
-    add(m[1]);
-  }
-
-  // ENV["VAR_NAME"] / ENV.fetch("VAR_NAME")
-  for (const m of planText.matchAll(/ENV\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g)) {
-    add(m[1]);
-  }
-  for (const m of planText.matchAll(/ENV\.fetch\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g)) {
-    add(m[1]);
-  }
-
-  return varNames;
+/** Extract unique env variable names from plan text. */
+export function extractEnvRefs(planText: string): string[] {
+  return [...new Set(extractEnvOccurrences(planText).map((occurrence) => occurrence.varName))];
 }
 
 // --- Fuzzy Suggestions ---
@@ -193,6 +213,70 @@ export function analyzeEnv(planText: string, projectDir: string): EnvAnalysis {
     validRefs,
     hallucinations,
     hallucinationRate,
+    skippedRefs,
+    envFilesFound: filesFound,
+  };
+}
+
+/** Analyze only env references that intersect changed lines in source files. */
+export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): EnvAnalysis {
+  const { vars, filesFound } = parseEnvFiles(projectDir, files);
+
+  if (filesFound.length === 0) {
+    return {
+      totalRefs: 0,
+      checkedRefs: 0,
+      validRefs: 0,
+      hallucinations: [],
+      hallucinationRate: 0,
+      skippedRefs: 0,
+      envFilesFound: [],
+    };
+  }
+
+  const hallucinations: EnvRef[] = [];
+  let totalRefs = 0;
+  let checkedRefs = 0;
+  let validRefs = 0;
+  let skippedRefs = 0;
+
+  for (const file of files) {
+    if (file.status === "deleted" || !isJavaScriptSourceFile(file.path)) continue;
+    const occurrences = extractTypeScriptEnvRefs(file.path, file.content)
+      .filter((occurrence) => occurrenceTouchesChangedLines(file, occurrence));
+
+    for (const occurrence of occurrences) {
+      totalRefs++;
+
+      if (isRuntimeVar(occurrence.varName)) {
+        skippedRefs++;
+        continue;
+      }
+
+      checkedRefs++;
+      if (vars.has(occurrence.varName)) {
+        validRefs++;
+        continue;
+      }
+
+      hallucinations.push({
+        raw: occurrence.raw,
+        varName: occurrence.varName,
+        valid: false,
+        reason: "not-in-env-files",
+        suggestion: suggestEnvVar(occurrence.varName, vars),
+        file: file.path,
+        location: occurrenceLocation(file, occurrence),
+      });
+    }
+  }
+
+  return {
+    totalRefs,
+    checkedRefs,
+    validRefs,
+    hallucinations,
+    hallucinationRate: checkedRefs > 0 ? hallucinations.length / checkedRefs : 0,
     skippedRefs,
     envFilesFound: filesFound,
   };

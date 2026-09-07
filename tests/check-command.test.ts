@@ -110,11 +110,13 @@ describe("runCheck — output formats", () => {
       const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
       const report = JSON.parse(output);
 
-      expect(report.schemaVersion).toBe("1.0");
+      expect(report.schemaVersion).toBe("1.1");
       expect(report.timestamp).toBeTruthy();
       expect(report.summary).toBeDefined();
       expect(report.summary.totalChecked).toBeTypeOf("number");
       expect(report.summary.totalFindings).toBeTypeOf("number");
+      expect(report.summary.totalErrors).toBeTypeOf("number");
+      expect(report.summary.totalWarnings).toBeTypeOf("number");
       expect(report.summary.checkerResults).toBeInstanceOf(Array);
       expect(report.findings).toBeInstanceOf(Array);
     } finally {
@@ -135,6 +137,22 @@ describe("runCheck — output formats", () => {
       expect(report.findings.length).toBeGreaterThan(0);
       expect(report.findings[0].checker).toBe("paths");
       expect(report.findings[0].severity).toBe("error");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("sarif format produces a SARIF 2.1.0 log", async () => {
+    const tmpFile = path.join(os.tmpdir(), `arthur-test-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, "## Plan\nModify src/nonexistent/fake-file.ts to add the feature.\n");
+
+    try {
+      await runCheck({ plan: tmpFile, project: fixtureA, format: "sarif" });
+      const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const report = JSON.parse(output);
+      expect(report.version).toBe("2.1.0");
+      expect(report.runs[0].tool.driver.name).toBe("Arthur");
+      expect(report.runs[0].results).toHaveLength(1);
     } finally {
       fs.unlinkSync(tmpFile);
     }
@@ -168,7 +186,7 @@ describe("runCheck — text output details", () => {
         .map(c => c[0])
         .join("\n");
       expect(output).toContain("src/nonexistent/fake-file.ts");
-      expect(output).toContain("finding");
+      expect(output).toContain("error");
     } finally {
       fs.unlinkSync(tmpFile);
     }
@@ -327,6 +345,12 @@ describe("runCheck — diff mode", () => {
     expect(code).toBe(0);
   });
 
+  it("is silent on a clean diff when quiet mode is enabled", async () => {
+    const code = await runCheck({ diff: "HEAD", project: repoDir, quiet: true });
+    expect(code).toBe(0);
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
   it("json format works in diff mode", async () => {
     fs.writeFileSync(path.join(repoDir, "app.ts"), 'import banana from "nonexistent-banana-pkg";\n');
     execSync("git add app.ts", { cwd: repoDir });
@@ -334,7 +358,30 @@ describe("runCheck — diff mode", () => {
     expect(code).toBe(1);
     const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const report = JSON.parse(output);
-    expect(report.schemaVersion).toBe("1.0");
+    expect(report.schemaVersion).toBe("1.1");
     expect(report.summary.totalFindings).toBeGreaterThan(0);
+    expect(report.meta.scope).toMatchObject({
+      mode: "diff",
+      diffRef: "HEAD",
+      staged: false,
+      includeUntracked: true,
+    });
+    expect(report.meta.scope.files[0]).toMatchObject({ path: "app.ts", status: "added" });
+  });
+
+  it("emits valid JSON and bypasses coverage gating for an empty diff", async () => {
+    const code = await runCheck({
+      diff: "HEAD",
+      project: repoDir,
+      format: "json",
+      strict: true,
+    });
+
+    expect(code).toBe(0);
+    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const report = JSON.parse(output);
+    expect(report.summary.totalFindings).toBe(0);
+    expect(report.meta.scope).toMatchObject({ mode: "diff", files: [] });
+    expect(report.meta.coverageGate.triggered).toBe(false);
   });
 });

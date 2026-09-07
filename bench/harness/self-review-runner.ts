@@ -382,6 +382,7 @@ function generateComparisonReport(
   const lines: string[] = [];
 
   lines.push("# Self-Review vs Arthur: Benchmark Results\n");
+  lines.push("> **Historical agreement study:** Static checker output defines the candidate errors. This report does not use independently fixed labels and must not be interpreted as an accuracy comparison.\n");
   lines.push(
     `> ${summary.totalRuns} comparisons using ${summary.model}. Generated ${new Date().toISOString().slice(0, 10)}.\n`,
   );
@@ -474,7 +475,7 @@ function generateComparisonReport(
   // Methodology
   lines.push("## Methodology\n");
   lines.push("1. **Plan generation:** LLM generates a plan with README-only context (no file tree, no source code)");
-  lines.push("2. **Ground truth:** Static checkers (path existence, schema validation) identify all errors deterministically");
+  lines.push("2. **Candidate findings:** Static checkers (path existence, schema validation) produce the items used for automated matching");
   lines.push("3. **Self-review:** Same model reviews its own plan with adversarial prompt + full project context");
   lines.push("4. **Arthur review:** Fresh model instance reviews the plan with adversarial prompt + full project context");
   lines.push("5. **Scoring:** Both reviews parsed for detection of ground-truth errors using multi-tier detection parsing\n");

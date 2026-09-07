@@ -58,10 +58,13 @@ export function extractGroundTruth(results: AllCheckerResults): GroundTruthError
   // SQL/Drizzle schema hallucinations
   if (results.sqlSchema) {
     for (const h of results.sqlSchema.hallucinations) {
+      const semanticRef = h.columnName
+        ? `${h.tableName}.${h.columnName}`
+        : h.tableName ?? h.raw;
       errors.push({
         category: "sql_schema",
-        raw: h.raw,
-        description: `${h.hallucinationCategory}: ${h.raw}`,
+        raw: semanticRef,
+        description: `${h.hallucinationCategory}: ${semanticRef}`,
         suggestion: h.suggestion,
       });
     }

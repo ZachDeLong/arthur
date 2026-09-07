@@ -23,7 +23,9 @@ async function loadFromStdin(): Promise<PlanInput> {
   return new Promise((resolve, reject) => {
     const chunks: string[] = [];
     process.stdin.setEncoding("utf-8");
-    process.stdin.on("data", (chunk) => chunks.push(chunk as string));
+    process.stdin.on("data", (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf-8"));
+    });
     process.stdin.on("end", () => {
       const text = chunks.join("");
       if (!text.trim()) {

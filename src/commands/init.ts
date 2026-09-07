@@ -19,10 +19,6 @@ function prompt(question: string): Promise<string> {
 export async function runInit(): Promise<void> {
   log.heading("Arthur Setup");
 
-  const apiKey = await prompt(
-    "Anthropic API key (leave blank to use ANTHROPIC_API_KEY env var): ",
-  );
-
   const modelInput = await prompt(
     `Default model [${DEFAULT_CONFIG.model}]: `,
   );
@@ -32,7 +28,6 @@ export async function runInit(): Promise<void> {
   );
 
   const config: Record<string, unknown> = {};
-  if (apiKey) config.apiKey = apiKey;
   if (modelInput) config.model = modelInput;
   if (budgetInput) {
     const parsed = parseInt(budgetInput, 10);
@@ -41,6 +36,7 @@ export async function runInit(): Promise<void> {
 
   saveGlobalConfig(config);
   log.success("Global config saved to ~/.arthur/config.json");
+  log.info("For optional LLM review, set ANTHROPIC_API_KEY in your environment. Arthur does not store API keys.");
 
   // Try to update .gitignore in cwd
   ensureGitignore(process.cwd());

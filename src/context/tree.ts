@@ -116,7 +116,7 @@ export function generateTree(
 /** Get a set of all files in the project (for cross-referencing). */
 export function getAllFiles(
   projectDir: string,
-  maxDepth: number = 6,
+  maxDepth: number = Number.POSITIVE_INFINITY,
 ): Set<string> {
   const ig = loadGitignore(projectDir);
   const files = new Set<string>();

@@ -1,11 +1,12 @@
 export interface CodeVerifierConfig {
+  /** @deprecated Stored keys are ignored; use ANTHROPIC_API_KEY. */
   apiKey?: string;
   model: string;
   tokenBudget: number;
 }
 
 export const DEFAULT_CONFIG: CodeVerifierConfig = {
-  model: "claude-sonnet-4-5-20250929",
+  model: "claude-sonnet-5",
   tokenBudget: 80_000,
 };
 

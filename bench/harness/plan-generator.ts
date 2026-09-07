@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
+import {
+  runBenchmarkLlm,
+  type BenchmarkLlmProvider,
+} from "./llm-provider.js";
 import type { PromptDefinition } from "./types.js";
 
 const PLAN_SYSTEM_PROMPT = `You are a senior software engineer creating an implementation plan. You have access ONLY to the project README below — you do NOT have access to the actual file tree or source code.
@@ -22,17 +25,23 @@ export interface PlanGenerationResult {
   outputTokens: number;
 }
 
-/** Generate an implementation plan using Claude with README-only context. */
+export interface PlanGenerationOptions {
+  provider?: BenchmarkLlmProvider;
+  maxOutputTokens?: number;
+  anthropicThinking?: "adaptive" | "disabled";
+  anthropicEffort?: "low" | "medium" | "high" | "max";
+}
+
+/** Generate an implementation plan using the selected model with README-only context. */
 export async function generatePlan(
   prompt: PromptDefinition,
   fixtureDir: string,
   apiKey: string,
   model: string,
+  options: PlanGenerationOptions = {},
 ): Promise<PlanGenerationResult> {
   const readmePath = path.join(fixtureDir, "README.md");
   const readme = fs.readFileSync(readmePath, "utf-8");
-
-  const client = new Anthropic({ apiKey });
 
   const userMessage = `## Project README
 
@@ -44,21 +53,20 @@ ${readme}
 
 ${prompt.task}`;
 
-  const response = await client.messages.create({
+  const response = await runBenchmarkLlm({
+    provider: options.provider ?? "anthropic",
+    apiKey,
     model,
-    max_tokens: 4096,
-    system: `${PLAN_SYSTEM_PROMPT}\n\n${prompt.systemContext}`,
-    messages: [{ role: "user", content: userMessage }],
+    maxOutputTokens: options.maxOutputTokens ?? 4096,
+    anthropicThinking: options.anthropicThinking,
+    anthropicEffort: options.anthropicEffort,
+    systemPrompt: `${PLAN_SYSTEM_PROMPT}\n\n${prompt.systemContext}`,
+    userMessage,
   });
 
-  const plan = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
-
   return {
-    plan,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
+    plan: response.output,
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
   };
 }

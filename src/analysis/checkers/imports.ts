@@ -15,18 +15,36 @@ registerChecker({
       ? analyzeImports(input.files, projectDir, { mode: "source", cache: input.cache })
       : analyzeImports(input.text, projectDir, { cache: input.cache });
 
+    const findings: CheckerResult["hallucinations"] = [
+      ...analysis.hallucinations.map(h => ({
+        raw: h.raw,
+        category: h.reason ?? "unknown",
+        suggestion: h.suggestion,
+        location: h.location,
+      })),
+      ...analysis.unverifiedImports.map(h => ({
+        raw: h.raw,
+        category: h.reason ?? "declared-not-installed",
+        suggestion: h.reason === "planned-dependency"
+          ? "install the planned dependency before treating this import as verified"
+          : "install dependencies before treating this import as verified",
+        severity: "warning" as const,
+        location: h.location,
+      })),
+    ];
+
     return {
       checkerId: "imports",
       checked: analysis.checkedImports,
-      hallucinated: analysis.hallucinations.length,
-      hallucinations: analysis.hallucinations.map(h => ({
-        raw: h.file ? `${h.raw} (in ${h.file})` : h.raw,
-        category: h.reason ?? "unknown",
-        suggestion: h.suggestion,
-      })),
-      catchItems: analysis.hallucinations.map(h => h.raw),
-      applicable: analysis.checkedImports > 0,
-      notApplicableReason: analysis.checkedImports > 0 ? undefined : "No package import refs found",
+      hallucinated: findings.length,
+      hallucinations: findings,
+      catchItems: [...analysis.hallucinations, ...analysis.unverifiedImports].map(h => h.raw),
+      applicable: analysis.checkedImports > 0 || analysis.unverifiedImports.length > 0,
+      notApplicableReason: analysis.checkedImports > 0 || analysis.unverifiedImports.length > 0
+        ? undefined
+        : input.mode === "source"
+          ? "No changed package import refs found"
+          : "No package import refs found in plan",
       rawAnalysis: analysis,
     };
   },
@@ -35,11 +53,11 @@ registerChecker({
     const analysis = result.rawAnalysis as ImportAnalysis;
     const lines: string[] = [];
 
-    const { checkedImports, validImports, hallucinations, skippedImports } = analysis;
+    const { checkedImports, validImports, hallucinations, skippedImports, unverifiedImports } = analysis;
 
     lines.push(`## Import Analysis`);
     lines.push(``);
-    lines.push(`**${checkedImports}** imports checked — **${validImports}** valid, **${hallucinations.length}** hallucinated, **${skippedImports}** skipped (relative/builtin)`);
+    lines.push(`**${checkedImports}** imports checked — **${validImports}** valid, **${hallucinations.length}** invalid, **${unverifiedImports.length}** unverified, **${skippedImports}** skipped (relative/builtin)`);
 
     if (hallucinations.length > 0) {
       lines.push(``);
@@ -68,6 +86,18 @@ registerChecker({
       }
     }
 
+    if (unverifiedImports.length > 0) {
+      lines.push(``);
+      lines.push(`### Unverified Imports`);
+      for (const h of unverifiedImports) {
+        const fileContext = h.file ? ` in \`${h.file}\`` : "";
+        const reason = h.reason === "planned-dependency"
+          ? "planned but not installed"
+          : "declared in package.json but not installed";
+        lines.push(`- \`${h.raw}\`${fileContext} — ${reason}`);
+      }
+    }
+
     return lines.join("\n");
   },
 
@@ -75,10 +105,11 @@ registerChecker({
     if (!result.applicable) return [];
     const analysis = result.rawAnalysis as ImportAnalysis;
     const importIssues = analysis.hallucinations.length;
+    const importWarnings = analysis.unverifiedImports.length;
     const lines: string[] = [];
 
     lines.push(`## Imports`);
-    lines.push(`**${analysis.checkedImports}** checked — **${importIssues}** hallucinated`);
+    lines.push(`**${analysis.checkedImports}** checked — **${importIssues}** invalid, **${importWarnings}** unverified`);
     if (importIssues > 0) {
       for (const h of analysis.hallucinations) {
         const reason = h.reason === "package-not-found" ? "not installed" : "subpath not exported";
@@ -86,8 +117,15 @@ registerChecker({
         const fileContext = h.file ? ` (in ${h.file})` : "";
         lines.push(`- \`${h.raw}\`${fileContext} — ${reason}${suggestion}`);
       }
-    } else {
+    } else if (importWarnings === 0) {
       lines.push(`All imports valid.`);
+    }
+    for (const h of analysis.unverifiedImports) {
+      const fileContext = h.file ? ` (in ${h.file})` : "";
+      const reason = h.reason === "planned-dependency"
+        ? "planned but not installed"
+        : "declared but not installed";
+      lines.push(`- \`${h.raw}\`${fileContext} — ${reason} (warning)`);
     }
     lines.push(``);
     return lines;
@@ -100,12 +138,12 @@ registerChecker({
   formatForFindings(result): string | undefined {
     if (!result.applicable) return undefined;
     const analysis = result.rawAnalysis as ImportAnalysis;
-    if (analysis.hallucinations.length === 0) return undefined;
+    if (analysis.hallucinations.length === 0 && analysis.unverifiedImports.length === 0) return undefined;
 
     const lines = [
       `### Import Issues`,
       ``,
-      `Static analysis found ${analysis.hallucinations.length} hallucinated import(s):`,
+      `Static analysis found ${analysis.hallucinations.length} invalid and ${analysis.unverifiedImports.length} unverified import(s):`,
       ``,
     ];
     for (const h of analysis.hallucinations) {
@@ -113,6 +151,13 @@ registerChecker({
       const suggestion = h.suggestion ? ` (${h.suggestion})` : "";
       const fileContext = h.file ? ` (in ${h.file})` : "";
       lines.push(`- \`${h.raw}\`${fileContext} — ${reason}${suggestion}`);
+    }
+    for (const h of analysis.unverifiedImports) {
+      const fileContext = h.file ? ` (in ${h.file})` : "";
+      const reason = h.reason === "planned-dependency"
+        ? "planned but not installed"
+        : "declared but not installed";
+      lines.push(`- \`${h.raw}\`${fileContext} — ${reason} (warning)`);
     }
     return lines.join("\n");
   },

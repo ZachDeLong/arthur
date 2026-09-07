@@ -6,27 +6,18 @@
  * parsing that breaks on nested generics, string literals with braces, and
  * comments containing braces.
  *
- * TypeScript is loaded dynamically — returns null if unavailable at runtime
- * (no production dependency).
+ * TypeScript ships as a runtime dependency so the tested parser is always the
+ * parser users receive. The compatibility initializer remains a no-op.
  */
 
+import * as TypeScript from "typescript";
 import type { TypeMember } from "./member-parser.js";
 
-// Module-level reference to dynamically loaded TypeScript module
-let tsModule: typeof import("typescript") | null = null;
+const tsModule: typeof import("typescript") = TypeScript;
 
-/**
- * Pre-load the TypeScript module once. Must be called before parseDtsExports().
- * Returns true if TypeScript is available, false otherwise.
- */
+/** Compatibility no-op retained for callers from Arthur 0.5. */
 export async function initTsParser(): Promise<boolean> {
-  if (tsModule) return true;
-  try {
-    tsModule = await import("typescript");
-    return true;
-  } catch {
-    return false;
-  }
+  return true;
 }
 
 /** Result of parsing a .d.ts file. */
@@ -40,10 +31,9 @@ export interface DtsParseResult {
  * - All exported names (functions, constants, classes, interfaces, types, enums, namespaces, export lists)
  * - Members of exported classes/interfaces/enums (for member-access validation)
  *
- * Returns null if TypeScript is not available (initTsParser() not called or failed).
+ * The nullable return type is retained for API compatibility with Arthur 0.5.
  */
 export function parseDtsExports(content: string): DtsParseResult | null {
-  if (!tsModule) return null;
   const ts = tsModule;
 
   const sourceFile = ts.createSourceFile(

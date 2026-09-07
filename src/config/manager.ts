@@ -64,10 +64,19 @@ export function loadConfig(projectDir: string): CodeVerifierConfig {
   const globalCfg = loadGlobalConfig();
   const projectCfg = readJsonSafe(getProjectConfigPath(projectDir));
 
+  if (globalCfg.apiKey || projectCfg.apiKey) {
+    console.error(
+      "[arthur] Stored apiKey values are deprecated and ignored. Set ANTHROPIC_API_KEY in the environment.",
+    );
+  }
+
+  const { apiKey: _globalApiKey, ...safeGlobalCfg } = globalCfg;
+  const { apiKey: _projectApiKey, ...safeProjectCfg } = projectCfg;
+
   const merged: CodeVerifierConfig = {
     ...DEFAULT_CONFIG,
-    ...globalCfg,
-    ...projectCfg,
+    ...safeGlobalCfg,
+    ...safeProjectCfg,
   };
 
   // Env var takes priority
@@ -89,7 +98,9 @@ export function saveGlobalConfig(
 
   // Merge with existing
   const existing = readJsonSafe(filePath);
-  const merged = { ...existing, ...config };
+  const { apiKey: _existingApiKey, ...safeExisting } = existing;
+  const { apiKey: _newApiKey, ...safeConfig } = config;
+  const merged = { ...safeExisting, ...safeConfig };
   fs.writeFileSync(filePath, JSON.stringify(merged, null, 2) + "\n", "utf-8");
 }
 

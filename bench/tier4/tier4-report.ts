@@ -25,12 +25,15 @@ export function generateTier4Report(
   const lines: string[] = [];
 
   // Title & headline stat
-  lines.push("# Tier 4 Benchmark: Arthur vs Self-Review on Real Production Projects\n");
+  lines.push("# Historical Tier 4 Agreement Study\n");
   lines.push(
-    `> **Arthur caught ${summary.arthurCaughtSelfReviewMissed} errors self-review missed** across ${summary.totalRuns} tasks on \`${summary.project}\`.\n`,
+    "> **Methodology warning:** Arthur's own findings define the candidate set. The percentages below measure review agreement, not independently labelled accuracy, and must not be used as evidence that Arthur outperforms an LLM.\n",
   );
   lines.push(
-    `> ${summary.totalErrors} ground-truth errors. Model: ${summary.model}. Generated ${new Date().toISOString().slice(0, 10)}.\n`,
+    `> ${summary.arthurCaughtSelfReviewMissed} Arthur findings were unmatched by the automated review parser across ${summary.totalRuns} tasks on \`${summary.project}\`.\n`,
+  );
+  lines.push(
+    `> ${summary.totalErrors} checker findings. Model: ${summary.model}. Generated ${new Date().toISOString().slice(0, 10)}.\n`,
   );
 
   // Context explanation
@@ -42,8 +45,7 @@ export function generateTier4Report(
     "generation (CLAUDE.md + task only), which is realistic.\n",
   );
   lines.push(
-    "Previous benchmarks gave self-review full project context (file tree + source code), " +
-    "inflating its detection rate. This benchmark proves Arthur's value in the realistic scenario.\n",
+    "Previous studies gave self-review different context. This run records behavior under a limited-context scenario, but it does not prove Arthur's value or accuracy.\n",
   );
 
   // Main comparison table
@@ -82,8 +84,8 @@ export function generateTier4Report(
   lines.push("");
 
   // Highlight section: most interesting misses
-  lines.push("## Highlight: Errors Arthur Caught That Self-Review Missed\n");
-  lines.push("These are the \"demo reel\" errors — things only Arthur's static checkers found.\n");
+  lines.push("## Unmatched Arthur Findings Requiring Human Adjudication\n");
+  lines.push("These are not confirmed Arthur-only catches until a human verifies the finding and the review miss.\n");
 
   for (const run of runs) {
     const missed = run.detections.filter((d) => !d.detected);
@@ -118,7 +120,7 @@ export function generateTier4Report(
   // Methodology
   lines.push("## Methodology\n");
   lines.push("1. **Plan generation:** LLM generates a plan with CLAUDE.md-only context (no file tree, no source code)");
-  lines.push("2. **Ground truth:** Arthur's static checkers run against the plan + real project on disk (paths, imports, env, routes, Supabase schema, package APIs)");
+  lines.push("2. **Candidate findings:** Arthur's static checkers run against the plan + real project on disk (paths, imports, env, routes, Supabase schema, package APIs)");
   lines.push("3. **Self-review:** Same model reviews its own plan with the **same limited context** (CLAUDE.md + task, no full tree)");
   lines.push("4. **Scoring:** Self-review output parsed for detection of each ground-truth error using 3-tier detection (direct → sentiment → section)\n");
   lines.push("**Key difference from Big Benchmark:** Self-review does NOT get full project context. It operates with the same information it had when writing the plan. This is realistic — in Claude Code, the LLM that reviews its plan doesn't suddenly get the full file tree.\n");

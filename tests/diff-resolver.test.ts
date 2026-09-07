@@ -54,6 +54,55 @@ describe("resolveDiffFiles", () => {
     expect(files[0].content).toContain("export default function");
   });
 
+  it("checks staged files against the empty tree before the first commit", () => {
+    const freshRepo = fs.mkdtempSync(path.join(os.tmpdir(), "arthur-first-commit-"));
+    try {
+      execSync("git init", { cwd: freshRepo, stdio: "pipe" });
+      const sourcePath = path.join(freshRepo, "src", "first.ts");
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, "export const first = true;\n");
+      execSync("git add src/first.ts", { cwd: freshRepo, stdio: "pipe" });
+
+      const files = resolveDiffFiles(freshRepo, "HEAD", { staged: true });
+
+      expect(files).toHaveLength(1);
+      expect(files[0]).toMatchObject({
+        path: "src/first.ts",
+        status: "added",
+        changedLines: [1],
+      });
+    } finally {
+      fs.rmSync(freshRepo, { recursive: true, force: true });
+    }
+  });
+
+  it("reads staged content from the index instead of unstaged working-tree content", () => {
+    writeFile("src/staged.ts", 'import chalk from "chalk";\n');
+    git("add src/staged.ts");
+    writeFile("src/staged.ts", 'import fake from "working-tree-only-package";\n');
+
+    const files = resolveDiffFiles(tmpDir, "HEAD", { staged: true });
+
+    expect(files).toHaveLength(1);
+    expect(files[0].content).toBe('import chalk from "chalk";\n');
+    expect(files[0].content).not.toContain("working-tree-only-package");
+  });
+
+  it("includes untracked source files by default in working-tree mode", () => {
+    writeFile("src/untracked.ts", "export const untracked = true;\n");
+
+    const files = resolveDiffFiles(tmpDir, "HEAD");
+
+    expect(files).toHaveLength(1);
+    expect(files[0].status).toBe("untracked");
+    expect(files[0].changedLines).toEqual([1]);
+  });
+
+  it("can exclude untracked files explicitly", () => {
+    writeFile("src/untracked.ts", "export const untracked = true;\n");
+    expect(resolveDiffFiles(tmpDir, "HEAD", { includeUntracked: false })).toEqual([]);
+  });
+
   it("filters to supported extensions only (ignores .md, .json)", () => {
     writeFile("docs/notes.md", "# Notes\n");
     writeFile("config.json", '{"key": "value"}\n');
@@ -97,6 +146,29 @@ describe("resolveDiffFiles", () => {
     expect(files[0].content).toBe("const x = 2;\n");
   });
 
+  it("reports only added and changed line numbers", () => {
+    writeFile("src/mod.ts", "const unchanged = 1;\nconst value = 1;\n");
+    git("add .");
+    git('commit -m "add mod"');
+
+    writeFile("src/mod.ts", "const unchanged = 1;\nconst value = 2;\nconst added = 3;\n");
+
+    const files = resolveDiffFiles(tmpDir, "HEAD");
+    expect(files[0].changedLines).toEqual([2, 3]);
+  });
+
+  it("tracks changed lines for filenames containing spaces", () => {
+    writeFile("src/with space.ts", "const first = 1;\nconst second = 1;\n");
+    git("add .");
+    git('commit -m "add spaced file"');
+    writeFile("src/with space.ts", "const first = 1;\nconst second = 2;\n");
+
+    const files = resolveDiffFiles(tmpDir, "HEAD");
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe("src/with space.ts");
+    expect(files[0].changedLines).toEqual([2]);
+  });
+
   it("returns empty array when no changes", () => {
     // No staged changes, so --staged against HEAD returns nothing
     const files = resolveDiffFiles(tmpDir, "HEAD", { staged: true });
@@ -126,7 +198,7 @@ describe("resolveDiffFiles", () => {
     expect(files[0].path).toBe("src/feature.ts");
   });
 
-  it("skips deleted files (--diff-filter=ACMR excludes D)", () => {
+  it("retains deleted source metadata without trying to analyze old content", () => {
     writeFile("src/keep.ts", "export const keep = 1;\n");
     writeFile("src/remove.ts", "export const remove = 1;\n");
     git("add .");
@@ -139,8 +211,9 @@ describe("resolveDiffFiles", () => {
 
     const files = resolveDiffFiles(tmpDir, "HEAD~1");
     const paths = files.map(f => f.path);
-    // remove.ts was Deleted — excluded by --diff-filter=ACMR
-    expect(paths).not.toContain("src/remove.ts");
+    expect(paths).toContain("src/remove.ts");
+    const removed = files.find((file) => file.path === "src/remove.ts");
+    expect(removed).toMatchObject({ status: "deleted", content: "", changedLines: [] });
   });
 
   it("does not leak system paths in error messages", () => {

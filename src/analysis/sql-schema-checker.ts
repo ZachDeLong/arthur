@@ -350,7 +350,7 @@ export function extractSqlRefs(planText: string, schema: SqlSchema): RawSqlRef[]
   for (const m of planText.matchAll(/db\.(?:select\(\)[^)]*\.from|insert|update|delete)\s*\(\s*(\w+)/g)) {
     const name = m[1];
     if (!SQL_KEYWORDS.has(name.toLowerCase())) {
-      add(m[0], name);
+      add(name, name);
     }
   }
 
@@ -358,7 +358,7 @@ export function extractSqlRefs(planText: string, schema: SqlSchema): RawSqlRef[]
   for (const m of planText.matchAll(/db\.query\.(\w+)\.\w+/g)) {
     const name = m[1];
     if (!SQL_KEYWORDS.has(name.toLowerCase())) {
-      add(m[0], name);
+      add(name, name);
     }
   }
 
@@ -380,11 +380,20 @@ export function extractSqlRefs(planText: string, schema: SqlSchema): RawSqlRef[]
   // SELECT ... FROM X / INSERT INTO X / UPDATE X SET / DELETE FROM X
   // Only search within fenced code blocks to avoid matching prose ("from the", "from previous")
   // and JS import statements ("from 'express'")
-  const codeBlockText = extractFencedCodeBlocks(planText);
-  for (const m of codeBlockText.matchAll(/\b(?:FROM|INTO|UPDATE|JOIN)\s+["'`]?(\w+)["'`]?/gi)) {
-    const name = m[1];
-    if (!SQL_KEYWORDS.has(name.toLowerCase()) && name.length > 1 && !isJsImportContext(codeBlockText, m.index!) && !ENGLISH_STOPWORDS.has(name.toLowerCase())) {
-      add(m[0], name);
+  const codeBlocks = extractSqlFencedCodeBlocks(planText);
+  for (const codeBlockText of codeBlocks) {
+    const cteNames = extractCteNames(codeBlockText);
+    for (const m of codeBlockText.matchAll(/\b(?:FROM|INTO|UPDATE|JOIN)\s+["'`]?(\w+)["'`]?/gi)) {
+      const name = m[1];
+      if (
+        !SQL_KEYWORDS.has(name.toLowerCase()) &&
+        !cteNames.has(name.toLowerCase()) &&
+        name.length > 1 &&
+        !isJsImportContext(codeBlockText, m.index!) &&
+        !ENGLISH_STOPWORDS.has(name.toLowerCase())
+      ) {
+        add(name, name);
+      }
     }
   }
 
@@ -454,13 +463,31 @@ function resolveTable(name: string, schema: SqlSchema): SqlTable | undefined {
 
 /** Extract only fenced code block contents from plan text.
  *  Returns all code block bodies joined with newlines. */
-function extractFencedCodeBlocks(text: string): string {
+function extractSqlFencedCodeBlocks(text: string): string[] {
   const blocks: string[] = [];
-  const regex = /```[^\n]*\n([\s\S]*?)```/g;
+  const regex = /```([^\n]*)\n([\s\S]*?)```/g;
   for (const match of text.matchAll(regex)) {
-    blocks.push(match[1]);
+    const language = match[1].trim().toLowerCase();
+    const body = match[2];
+    const sqlLanguage = /^(?:sql|postgres|postgresql|pgsql|mysql|sqlite)$/.test(language);
+    const sqlShape = /\bSELECT\b[\s\S]*?\bFROM\b/i.test(body)
+      || /\bINSERT\s+INTO\b/i.test(body)
+      || /\bUPDATE\s+["'`]?\w+["'`]?\s+SET\b/i.test(body)
+      || /\bDELETE\s+FROM\b/i.test(body)
+      || /\bCREATE\s+TABLE\b/i.test(body);
+    if (sqlLanguage || sqlShape) blocks.push(body);
   }
-  return blocks.join("\n");
+  return blocks;
+}
+
+/** Extract common-table-expression names so they are not mistaken for base tables. */
+function extractCteNames(sql: string): Set<string> {
+  const names = new Set<string>();
+  const cteRegex = /(?:\bWITH\b|,)\s*(?:RECURSIVE\s+)?["'`]?(\w+)["'`]?\s+AS\s*\(/gi;
+  for (const match of sql.matchAll(cteRegex)) {
+    names.add(match[1].toLowerCase());
+  }
+  return names;
 }
 
 // --- Context Filtering ---
