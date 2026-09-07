@@ -188,10 +188,12 @@ function assertRepositoryRoot(projectDir: string): string {
   } catch {
     throw new Error(`Not a Git repository: ${resolved}`);
   }
-  if (root.toLowerCase() !== resolved.toLowerCase()) {
+  const canonicalRoot = fs.realpathSync.native(root);
+  const canonicalResolved = fs.realpathSync.native(resolved);
+  if (canonicalRoot.toLowerCase() !== canonicalResolved.toLowerCase()) {
     throw new Error(`--project must be the repository root: ${root}`);
   }
-  return root;
+  return canonicalRoot;
 }
 
 function worktreeStatus(projectDir: string): string {

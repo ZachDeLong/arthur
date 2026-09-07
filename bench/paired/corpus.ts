@@ -315,9 +315,12 @@ export function loadLockedCases(): {
   cases: PairedCase[];
   manifest: PairedManifest;
 } {
-  const casesText = fs.readFileSync(casesPath, "utf-8");
+  const casesBuffer = fs.readFileSync(casesPath);
+  const casesText = casesBuffer.toString("utf-8");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as PairedManifest;
-  if (sha256(casesText) !== manifest.casesSha256) throw new Error("cases.json hash does not match manifest.json");
+  if (!matchesTextHashAcrossPlatforms(casesBuffer, manifest.casesSha256)) {
+    throw new Error("cases.json hash does not match manifest.json");
+  }
   verifySourceArtifacts(manifest);
   const cases = JSON.parse(casesText) as PairedCase[];
   const caseIds = new Set(cases.map((testCase) => testCase.id));
@@ -331,8 +334,11 @@ export function loadLockedCorpus(): {
   manifest: PairedManifest;
 } {
   const { cases, manifest } = loadLockedCases();
-  const labelsText = fs.readFileSync(labelsPath, "utf-8");
-  if (sha256(labelsText) !== manifest.labelsSha256) throw new Error("labels.json hash does not match manifest.json");
+  const labelsBuffer = fs.readFileSync(labelsPath);
+  const labelsText = labelsBuffer.toString("utf-8");
+  if (!matchesTextHashAcrossPlatforms(labelsBuffer, manifest.labelsSha256)) {
+    throw new Error("labels.json hash does not match manifest.json");
+  }
   const labels = JSON.parse(labelsText) as PairedLabel[];
   const caseIds = new Set(cases.map((testCase) => testCase.id));
   const labelIds = new Set(labels.map((label) => label.id));
