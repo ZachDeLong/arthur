@@ -7,6 +7,10 @@ import {
   occurrenceTouchesChangedLines,
 } from "./source-locations.js";
 import { extractTypeScriptEnvRefs } from "./typescript-source.js";
+import {
+  createPackageRootResolver,
+  normalizeProjectPath,
+} from "./package-boundary.js";
 
 // --- Types ---
 
@@ -53,36 +57,70 @@ const ENV_FILE_NAMES = [
 
 const KEY_REGEX = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
 
-/** Parse all .env* files in project root. Returns set of defined var names and list of files found. */
-export function parseEnvFiles(
+interface EnvContract {
+  vars: Set<string>;
+  filesFound: string[];
+}
+
+interface EnvOverlay {
+  content: string;
+  deleted: boolean;
+}
+
+function envOverlayMap(diffFiles: DiffFile[]): Map<string, EnvOverlay> {
+  const overlays = new Map<string, EnvOverlay>();
+  for (const file of diffFiles) {
+    const normalized = normalizeProjectPath(file.path);
+    if (/^\.env(?:\.|$)/.test(path.posix.basename(normalized))) {
+      overlays.set(normalized, {
+        content: file.content,
+        deleted: file.status === "deleted",
+      });
+    }
+    if (file.status === "renamed" && file.previousPath) {
+      const previousPath = normalizeProjectPath(file.previousPath);
+      if (/^\.env(?:\.|$)/.test(path.posix.basename(previousPath))) {
+        overlays.set(previousPath, { content: "", deleted: true });
+      }
+    }
+  }
+  return overlays;
+}
+
+function parseEnvDirectory(
   projectDir: string,
-  diffFiles?: DiffFile[],
-): { vars: Set<string>; filesFound: string[] } {
+  directory: string,
+  overlays: Map<string, EnvOverlay>,
+): EnvContract {
   const vars = new Set<string>();
   const filesFound: string[] = [];
-  const overlays = new Map(
-    (diffFiles ?? [])
-      .filter((file) => !file.path.includes("/") && /^\.env(?:\.|$)/.test(file.path))
-      .map((file) => [file.path, file]),
-  );
+  const normalizedDirectory = normalizeProjectPath(directory).replace(/\/$/, "");
+  const absoluteDirectory = path.join(projectDir, normalizedDirectory);
 
   const discoveredNames = new Set(ENV_FILE_NAMES);
   try {
-    for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(absoluteDirectory, { withFileTypes: true })) {
       if (entry.isFile() && /^\.env(?:\.|$)/.test(entry.name)) discoveredNames.add(entry.name);
     }
   } catch {
-    // Missing or unreadable project roots are handled as no env ground truth.
+    // Missing or unreadable package roots are handled as no env ground truth.
   }
-  for (const name of overlays.keys()) discoveredNames.add(name);
+  for (const overlayPath of overlays.keys()) {
+    const overlayDirectory = path.posix.dirname(overlayPath);
+    const normalizedOverlayDirectory = overlayDirectory === "." ? "" : overlayDirectory;
+    if (normalizedOverlayDirectory === normalizedDirectory) {
+      discoveredNames.add(path.posix.basename(overlayPath));
+    }
+  }
 
-  for (const name of discoveredNames) {
-    const filePath = path.join(projectDir, name);
-    const overlay = overlays.get(name);
-    if (overlay?.status === "deleted") continue;
+  for (const name of [...discoveredNames].sort()) {
+    const relativePath = normalizedDirectory ? `${normalizedDirectory}/${name}` : name;
+    const filePath = path.join(projectDir, relativePath);
+    const overlay = overlays.get(relativePath);
+    if (overlay?.deleted) continue;
     if (!overlay && !fs.existsSync(filePath)) continue;
 
-    filesFound.push(name);
+    filesFound.push(relativePath);
     const content = overlay?.content ?? fs.readFileSync(filePath, "utf-8");
 
     for (const line of content.split("\n")) {
@@ -96,6 +134,21 @@ export function parseEnvFiles(
   }
 
   return { vars, filesFound };
+}
+
+/** Parse all .env* files in project root. Returns set of defined var names and list of files found. */
+export function parseEnvFiles(
+  projectDir: string,
+  diffFiles?: DiffFile[],
+): EnvContract {
+  return parseEnvDirectory(projectDir, "", envOverlayMap(diffFiles ?? []));
+}
+
+function mergeEnvContracts(contracts: EnvContract[]): EnvContract {
+  return {
+    vars: new Set(contracts.flatMap((contract) => [...contract.vars])),
+    filesFound: [...new Set(contracts.flatMap((contract) => contract.filesFound))],
+  };
 }
 
 // --- Extraction ---
@@ -220,20 +273,10 @@ export function analyzeEnv(planText: string, projectDir: string): EnvAnalysis {
 
 /** Analyze only env references that intersect changed lines in source files. */
 export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): EnvAnalysis {
-  const { vars, filesFound } = parseEnvFiles(projectDir, files);
-
-  if (filesFound.length === 0) {
-    return {
-      totalRefs: 0,
-      checkedRefs: 0,
-      validRefs: 0,
-      hallucinations: [],
-      hallucinationRate: 0,
-      skippedRefs: 0,
-      envFilesFound: [],
-    };
-  }
-
+  const overlays = envOverlayMap(files);
+  const resolvePackageRoot = createPackageRootResolver(projectDir, files);
+  const contracts = new Map<string, EnvContract>();
+  const allFilesFound = new Set<string>();
   const hallucinations: EnvRef[] = [];
   let totalRefs = 0;
   let checkedRefs = 0;
@@ -244,6 +287,22 @@ export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): En
     if (file.status === "deleted" || !isJavaScriptSourceFile(file.path)) continue;
     const occurrences = extractTypeScriptEnvRefs(file.path, file.content)
       .filter((occurrence) => occurrenceTouchesChangedLines(file, occurrence));
+    if (occurrences.length === 0) continue;
+
+    const packageRoot = resolvePackageRoot(file.path);
+    let contract = contracts.get(packageRoot);
+    if (!contract) {
+      const directories = packageRoot ? ["", packageRoot] : [""];
+      contract = mergeEnvContracts(
+        directories.map((directory) => parseEnvDirectory(projectDir, directory, overlays)),
+      );
+      contracts.set(packageRoot, contract);
+    }
+
+    // Without a contract in this source file's package, there is no local
+    // ground truth and therefore nothing deterministic to assert.
+    if (contract.filesFound.length === 0) continue;
+    for (const envFile of contract.filesFound) allFilesFound.add(envFile);
 
     for (const occurrence of occurrences) {
       totalRefs++;
@@ -254,7 +313,7 @@ export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): En
       }
 
       checkedRefs++;
-      if (vars.has(occurrence.varName)) {
+      if (contract.vars.has(occurrence.varName)) {
         validRefs++;
         continue;
       }
@@ -264,7 +323,7 @@ export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): En
         varName: occurrence.varName,
         valid: false,
         reason: "not-in-env-files",
-        suggestion: suggestEnvVar(occurrence.varName, vars),
+        suggestion: suggestEnvVar(occurrence.varName, contract.vars),
         file: file.path,
         location: occurrenceLocation(file, occurrence),
       });
@@ -278,6 +337,6 @@ export function analyzeEnvSourceFiles(files: DiffFile[], projectDir: string): En
     hallucinations,
     hallucinationRate: checkedRefs > 0 ? hallucinations.length / checkedRefs : 0,
     skippedRefs,
-    envFilesFound: filesFound,
+    envFilesFound: [...allFilesFound].sort(),
   };
 }

@@ -10,6 +10,7 @@ import {
 import type { DiffFile } from "../src/diff/resolver.js";
 
 const fixtureC = path.resolve("bench/fixtures/fixture-c");
+const fixtureG = path.resolve("bench/fixtures/fixture-g");
 
 describe("analyzeApiRouteSourceFiles", () => {
   it("validates changed static route calls and reports source locations", () => {
@@ -183,5 +184,63 @@ describe("analyzeApiRouteSourceFiles", () => {
     expect(matchRoute("/api/files", new Map([[required.urlPath, required]]))).toBeUndefined();
     expect(matchRoute("/api/files/a", new Map([[required.urlPath, required]]))).toBe(required);
     expect(matchRoute("/api/search", new Map([[optional.urlPath, optional]]))).toBe(optional);
+  });
+
+  it("uses routes from the source file's workspace", () => {
+    const files: DiffFile[] = [{
+      path: "apps/web/src/client.ts",
+      content: "export const response = fetch('/api/health');\n",
+      changedLines: [1],
+      status: "added",
+    }];
+
+    const result = analyzeApiRouteSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(1);
+    expect(result.validRefs).toBe(1);
+    expect(result.hallucinations).toEqual([]);
+  });
+
+  it("does not use a route from a sibling workspace", () => {
+    const files: DiffFile[] = [{
+      path: "apps/admin/src/client.ts",
+      content: "export const response = fetch('/api/health');\n",
+      changedLines: [1],
+      status: "added",
+    }];
+
+    const result = analyzeApiRouteSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(1);
+    expect(result.hallucinations).toHaveLength(1);
+    expect(result.hallucinations[0].urlPath).toBe("/api/health");
+  });
+
+  it("keeps duplicate route paths and methods isolated by workspace", () => {
+    const files: DiffFile[] = [
+      {
+        path: "apps/web/src/client.ts",
+        content: "export const response = fetch('/api/shared', { method: 'POST' });\n",
+        changedLines: [1],
+        status: "added",
+      },
+      {
+        path: "apps/admin/src/client.ts",
+        content: "export const response = fetch('/api/shared', { method: 'POST' });\n",
+        changedLines: [1],
+        status: "added",
+      },
+    ];
+
+    const result = analyzeApiRouteSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(2);
+    expect(result.validRefs).toBe(1);
+    expect(result.hallucinations).toHaveLength(1);
+    expect(result.hallucinations[0]).toMatchObject({
+      file: "apps/web/src/client.ts",
+      method: "POST",
+      hallucinationCategory: "hallucinated-method",
+    });
   });
 });

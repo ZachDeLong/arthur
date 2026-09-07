@@ -1,0 +1,7 @@
+{
+  "name": "web-workspace",
+  "private": true,
+  "dependencies": {
+    "workspace-present": "1.0.0"
+  }
+}

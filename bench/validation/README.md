@@ -2,7 +2,9 @@
 
 `corpus.json` contains manually specified source snippets and expected outcomes
 for Arthur's blocking diff-mode rules. The labels are stored independently of
-checker output, but they have not been independently audited. Run the gate with:
+checker output, but they have not been independently audited. The corpus covers
+both single-package fixtures and sibling workspaces so root-only resolution and
+cross-workspace leakage fail the release gate. Run the gate with:
 
 ```bash
 npm run validate

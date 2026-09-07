@@ -1,6 +1,9 @@
 node_modules/
 !bench/fixtures/fixture-f/node_modules/
 bench/fixtures/fixture-f/node_modules/.package-lock.json
+!bench/fixtures/fixture-g/apps/web/node_modules/
+!bench/fixtures/fixture-g/apps/web/node_modules/workspace-present/
+!bench/fixtures/fixture-g/apps/web/node_modules/workspace-present/package.json
 dist/
 .arthur/
 .codeverifier/

@@ -9,6 +9,7 @@ import {
   occurrenceTouchesChangedLines,
 } from "./source-locations.js";
 import { extractTypeScriptRouteRefs } from "./typescript-source.js";
+import { createPackageRootResolver, normalizeProjectPath } from "./package-boundary.js";
 
 // --- Types ---
 
@@ -111,19 +112,22 @@ export function parseRouteMethods(content: string): Set<string> {
   return methods;
 }
 
-/** Scan project for Next.js App Router route files and build a URL → route index. */
-export function buildRouteIndex(
+/** Scan project for Next.js App Router route files. */
+function collectRoutes(
   projectDir: string,
   diffFiles?: DiffFile[],
-): Map<string, ApiRoute> {
+): ApiRoute[] {
   const allFiles = getAllFiles(projectDir);
-  const index = new Map<string, ApiRoute>();
-  const overlays = new Map((diffFiles ?? []).map((file) => [file.path, file]));
+  const routes: ApiRoute[] = [];
+  const overlays = new Map(
+    (diffFiles ?? []).map((file) => [normalizeProjectPath(file.path), file]),
+  );
 
   for (const file of diffFiles ?? []) {
-    if (file.previousPath) allFiles.delete(file.previousPath);
-    if (file.status === "deleted") allFiles.delete(file.path);
-    else allFiles.add(file.path);
+    if (file.previousPath) allFiles.delete(normalizeProjectPath(file.previousPath));
+    const normalized = normalizeProjectPath(file.path);
+    if (file.status === "deleted") allFiles.delete(normalized);
+    else allFiles.add(normalized);
   }
 
   for (const filePath of allFiles) {
@@ -143,10 +147,24 @@ export function buildRouteIndex(
       // Can't read file — index with empty methods
     }
 
-    index.set(urlPath, { urlPath, filePath, methods });
+    routes.push({ urlPath, filePath, methods });
   }
 
+  return routes;
+}
+
+function indexRoutes(routes: ApiRoute[]): Map<string, ApiRoute> {
+  const index = new Map<string, ApiRoute>();
+  for (const route of routes) index.set(route.urlPath, route);
   return index;
+}
+
+/** Scan project for Next.js App Router route files and build a URL → route index. */
+export function buildRouteIndex(
+  projectDir: string,
+  diffFiles?: DiffFile[],
+): Map<string, ApiRoute> {
+  return indexRoutes(collectRoutes(projectDir, diffFiles));
 }
 
 // --- Extraction ---
@@ -424,8 +442,8 @@ export function analyzeApiRouteSourceFiles(
   files: DiffFile[],
   projectDir: string,
 ): ApiRouteAnalysis {
-  const index = buildRouteIndex(projectDir, files);
-  if (index.size === 0) {
+  const routes = collectRoutes(projectDir, files);
+  if (routes.length === 0) {
     return {
       totalRefs: 0,
       checkedRefs: 0,
@@ -437,9 +455,24 @@ export function analyzeApiRouteSourceFiles(
     };
   }
 
+  const resolvePackageRoot = createPackageRootResolver(projectDir, files);
+  const routesByPackage = new Map<string, ApiRoute[]>();
+  for (const route of routes) {
+    const packageRoot = resolvePackageRoot(route.filePath);
+    const packageRoutes = routesByPackage.get(packageRoot) ?? [];
+    packageRoutes.push(route);
+    routesByPackage.set(packageRoot, packageRoutes);
+  }
+  const indexes = new Map(
+    [...routesByPackage].map(([packageRoot, packageRoutes]) => [packageRoot, indexRoutes(packageRoutes)]),
+  );
+
   const hallucinations: ApiRouteRef[] = [];
+  const indexedRouteFiles = new Set<string>();
+  let totalRefs = 0;
   let checkedRefs = 0;
   let validRefs = 0;
+  let skippedRefs = 0;
 
   for (const file of files) {
     if (file.status === "deleted" || !isJavaScriptSourceFile(file.path)) continue;
@@ -448,6 +481,17 @@ export function analyzeApiRouteSourceFiles(
         index: ref.changeIndex,
         length: ref.changeLength,
       }));
+    if (refs.length === 0) continue;
+
+    const packageRoot = resolvePackageRoot(file.path);
+    const index = indexes.get(packageRoot);
+    totalRefs += refs.length;
+    if (!index || index.size === 0) {
+      // Route files in another package cannot establish ground truth here.
+      skippedRefs += refs.length;
+      continue;
+    }
+    for (const route of index.values()) indexedRouteFiles.add(route.filePath);
 
     for (const ref of refs) {
       checkedRefs++;
@@ -488,12 +532,12 @@ export function analyzeApiRouteSourceFiles(
   }
 
   return {
-    totalRefs: checkedRefs,
+    totalRefs,
     checkedRefs,
     validRefs,
     hallucinations,
     hallucinationRate: checkedRefs > 0 ? hallucinations.length / checkedRefs : 0,
-    skippedRefs: 0,
-    routesIndexed: index.size,
+    skippedRefs,
+    routesIndexed: indexedRouteFiles.size,
   };
 }

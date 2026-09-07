@@ -4,6 +4,7 @@ import { analyzeEnvSourceFiles } from "../src/analysis/env-checker.js";
 import type { DiffFile } from "../src/diff/resolver.js";
 
 const fixtureC = path.resolve("bench/fixtures/fixture-c");
+const fixtureG = path.resolve("bench/fixtures/fixture-g");
 
 describe("analyzeEnvSourceFiles", () => {
   it("checks only env references that touch changed lines and returns locations", () => {
@@ -116,5 +117,65 @@ describe("analyzeEnvSourceFiles", () => {
 
     const result = analyzeEnvSourceFiles(files, fixtureC);
     expect(result.hallucinations.map((finding) => finding.location?.line)).toEqual([1, 2]);
+  });
+
+  it("combines root and owning-workspace env contracts", () => {
+    const files: DiffFile[] = [{
+      path: "apps/web/src/config.ts",
+      content: [
+        "export const local = process.env.WEB_TOKEN;",
+        "export const shared = process.env.ROOT_SHARED_TOKEN;",
+      ].join("\n"),
+      changedLines: [1, 2],
+      status: "added",
+    }];
+
+    const result = analyzeEnvSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(2);
+    expect(result.validRefs).toBe(2);
+    expect(result.hallucinations).toEqual([]);
+    expect(result.envFilesFound).toEqual([
+      ".env.example",
+      "apps/web/.env.example",
+    ]);
+  });
+
+  it("does not leak env declarations across sibling workspaces", () => {
+    const files: DiffFile[] = [{
+      path: "apps/admin/src/config.ts",
+      content: "export const token = process.env.WEB_TOKEN;\n",
+      changedLines: [1],
+      status: "added",
+    }];
+
+    const result = analyzeEnvSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(1);
+    expect(result.hallucinations).toHaveLength(1);
+    expect(result.envFilesFound).not.toContain("apps/web/.env.example");
+  });
+
+  it("uses a changed nested env contract in the staged snapshot", () => {
+    const files: DiffFile[] = [
+      {
+        path: "apps/admin/.env.preview.local",
+        content: "PREVIEW_TOKEN=example\n",
+        changedLines: [1],
+        status: "added",
+      },
+      {
+        path: "apps/admin/src/config.ts",
+        content: "export const token = process.env.PREVIEW_TOKEN;\n",
+        changedLines: [1],
+        status: "added",
+      },
+    ];
+
+    const result = analyzeEnvSourceFiles(files, fixtureG);
+
+    expect(result.checkedRefs).toBe(1);
+    expect(result.hallucinations).toEqual([]);
+    expect(result.envFilesFound).toContain("apps/admin/.env.preview.local");
   });
 });

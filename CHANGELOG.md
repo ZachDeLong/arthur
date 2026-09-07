@@ -36,6 +36,12 @@
   root `node_modules`.
 - Import validation caches are isolated by resolution directory, so the same
   package name can correctly pass in one workspace and fail in another.
+- Diff env checks combine repository-wide declarations with the importing
+  workspace's `.env*` files without accepting declarations from sibling apps.
+- Diff Next.js route checks use the importing package's route index, preventing
+  a route in one app from validating a reference in another app.
+- The release validation gate now includes monorepo import, env, and route
+  ownership cases.
 - Future field-study package contracts are tied to each blinded occurrence's
   workspace rather than reusing root-only dependency facts.
 - SQL plan extraction no longer treats arbitrary TypeScript code blocks as SQL.

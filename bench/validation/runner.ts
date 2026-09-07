@@ -16,6 +16,8 @@ interface GoldCase {
   source: string;
   expected: ExpectedOutcome;
   reason: string;
+  fixture?: string;
+  sourcePath?: string;
 }
 
 interface CaseResult extends GoldCase {
@@ -30,8 +32,10 @@ const corpus = JSON.parse(
 ) as GoldCase[];
 
 function classify(testCase: GoldCase): ExpectedOutcome {
+  const fixture = testCase.fixture ?? (testCase.checker === "imports" ? "fixture-a" : "fixture-c");
+  const projectDir = path.join(repoRoot, "bench/fixtures", fixture);
   const file: DiffFile = {
-    path: `src/validation/${testCase.id}.ts`,
+    path: testCase.sourcePath ?? `src/validation/${testCase.id}.ts`,
     content: `${testCase.source}\n`,
     changedLines: [1],
     status: "added",
@@ -40,7 +44,7 @@ function classify(testCase: GoldCase): ExpectedOutcome {
   if (testCase.checker === "env") {
     const result = analyzeEnvSourceFiles(
       [file],
-      path.join(repoRoot, "bench/fixtures/fixture-c"),
+      projectDir,
     );
     if (result.hallucinations.length > 0) return "error";
     return result.checkedRefs > 0 ? "clean" : "ignored";
@@ -49,7 +53,7 @@ function classify(testCase: GoldCase): ExpectedOutcome {
   if (testCase.checker === "routes") {
     const result = analyzeApiRouteSourceFiles(
       [file],
-      path.join(repoRoot, "bench/fixtures/fixture-c"),
+      projectDir,
     );
     if (result.hallucinations.length > 0) return "error";
     return result.checkedRefs > 0 ? "clean" : "ignored";
@@ -57,7 +61,7 @@ function classify(testCase: GoldCase): ExpectedOutcome {
 
   const result = analyzeImports(
     [file],
-    path.join(repoRoot, "bench/fixtures/fixture-a"),
+    projectDir,
     { mode: "source" },
   );
   if (result.hallucinations.length > 0) return "error";
