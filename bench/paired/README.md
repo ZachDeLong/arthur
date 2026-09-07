@@ -15,8 +15,11 @@ as "ground truth" creates circular, confirmation-biased results.
 - Each reference produces the same four variants: valid live use, a
   deterministic one-character invalid mutation, the invalid mutation in a
   comment, and the invalid mutation in a documentation string.
-- The corpus and every source artifact are SHA-256 locked. Changed fixtures
-  require a new benchmark version rather than silently changing old results.
+- The corpus and every source artifact are SHA-256 locked. The v1 package
+  metadata is retained under `sources-v1/`, so unrelated changes to the live
+  package scripts cannot invalidate it. The verifier treats LF and CRLF as the
+  same text, but changed fixture facts require a new benchmark version rather
+  than silently changing old results.
 - Claude receives the same relevant package/env/route facts and is run three
   times with independently ordered cases.
 - Reporting includes the full confusion matrix, Wilson 95% intervals, exact

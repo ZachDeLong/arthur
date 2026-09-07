@@ -10,9 +10,12 @@ export interface BenchmarkLlmOptions {
 }
 
 export interface BenchmarkLlmResult {
+  responseId: string;
   output: string;
   inputTokens: number;
   outputTokens: number;
+  /** Provider-reported model identifier, retained to distinguish rolling aliases from snapshots. */
+  model: string;
 }
 
 interface ResolveBenchmarkLlmOptions {
@@ -115,9 +118,11 @@ export async function runBenchmarkLlm(
     }
 
     return {
+      responseId: response.id,
       output,
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,
+      model: response.model,
     };
   }
 
@@ -158,8 +163,10 @@ export async function runBenchmarkLlm(
   }
 
   return {
+    responseId: response.id,
     output,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
+    model: response.model,
   };
 }

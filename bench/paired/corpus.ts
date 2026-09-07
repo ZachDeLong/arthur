@@ -15,6 +15,7 @@ export const repoRoot = path.resolve(here, "../..");
 export const casesPath = path.join(here, "cases.json");
 export const labelsPath = path.join(here, "labels.json");
 export const manifestPath = path.join(here, "manifest.json");
+const frozenPackageJsonPath = path.join(here, "sources-v1", "package.json");
 const seed = "arthur-paired-v1-2026-09-07";
 
 function sha256(value: string | Buffer): string {
@@ -23,6 +24,17 @@ function sha256(value: string | Buffer): string {
 
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function canonicalText(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function matchesTextHashAcrossPlatforms(content: Buffer, expectedHash: string): boolean {
+  if (sha256(content) === expectedHash) return true;
+  const canonical = canonicalText(content.toString("utf-8"));
+  return sha256(canonical) === expectedHash
+    || sha256(canonical.replace(/\n/g, "\r\n")) === expectedHash;
 }
 
 function blindId(category: PairedCategory, projectDir: string, base: string, variant: string): string {
@@ -152,9 +164,10 @@ export function generateCorpus(): {
   const labels: PairedLabel[] = [];
   const sourceHashes: Record<string, string> = {};
 
-  // Exhaustively include every direct runtime dependency in Arthur's package.json.
-  const packageJsonPath = path.join(repoRoot, "package.json");
-  const packageJsonText = fs.readFileSync(packageJsonPath, "utf-8");
+  // Exhaustively include every direct runtime dependency in the v1 source
+  // snapshot. The live package.json can gain unrelated scripts without
+  // invalidating an already-frozen benchmark.
+  const packageJsonText = fs.readFileSync(frozenPackageJsonPath, "utf-8");
   const packageJson = JSON.parse(packageJsonText) as {
     dependencies?: Record<string, string>;
   };
@@ -287,9 +300,11 @@ export function freezeCorpus(force = false): PairedManifest {
 
 function verifySourceArtifacts(manifest: PairedManifest): void {
   for (const [relativePath, expectedHash] of Object.entries(manifest.sourceHashes)) {
-    const absolutePath = path.join(repoRoot, relativePath);
+    const absolutePath = relativePath === "package.json"
+      ? frozenPackageJsonPath
+      : path.join(repoRoot, relativePath);
     if (!fs.existsSync(absolutePath)) throw new Error(`Locked source artifact is missing: ${relativePath}`);
-    if (sha256(fs.readFileSync(absolutePath)) !== expectedHash) {
+    if (!matchesTextHashAcrossPlatforms(fs.readFileSync(absolutePath), expectedHash)) {
       throw new Error(`Locked source artifact changed: ${relativePath}. Freeze a new benchmark version instead of silently rescoring.`);
     }
   }

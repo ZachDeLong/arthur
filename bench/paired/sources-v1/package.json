@@ -11,7 +11,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "build": "tsc",
-    "prepublishOnly": "npm run check && npm run build && npm test && npm run validate",
+    "prepublishOnly": "npm run check && npm test && npm run build && npm run validate",
     "publish:check": "npm pack --dry-run",
     "arthur": "tsx bin/arthur.ts",
     "dev": "tsx bin/codeverifier.ts",
@@ -29,7 +29,6 @@
     "bench:big:report": "tsx bench/harness/runner.ts big-report",
     "bench:big:rescore": "tsx bench/harness/runner.ts big-rescore",
     "bench:paired": "tsx bench/paired/runner.ts",
-    "bench:field": "tsx bench/field/runner.ts",
     "bench:tier4": "tsx bench/harness/runner.ts tier4",
     "bench:tier3:setup": "tsx bench/tier3/scripts/setup.ts",
     "bench:tier3:verify": "tsx bench/tier3/scripts/verify-plan.ts",

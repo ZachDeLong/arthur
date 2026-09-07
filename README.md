@@ -222,8 +222,9 @@ validation remains required. See
 The paired benchmark design, frozen corpus, and non-winning first result are in
 [`bench/paired/`](bench/paired/README.md).
 The preregistered release-decision study is in
-[`bench/field/PROTOCOL.md`](bench/field/PROTOCOL.md); its rules must be committed
-before any field data is collected.
+[`bench/field/`](bench/field/README.md). Protocol v1 was publicly activated at
+commit `2d914e5` before any data; the included collector locks the cohort,
+predictions, blinded reviews, and fixed pass/fail decision.
 
 ## Direction
 

@@ -210,6 +210,13 @@ Arthur's measured advantage was local latency and zero API use, not accuracy.
 Run it with `npm run bench:paired -- arthur` or, with an API key,
 `npm run bench:paired -- all 3`.
 
+The release-decision study is `bench/field/`. Protocol v1 was publicly activated
+at commit `2d914e5` before collection. Use `npm run bench:field -- --help`; never
+edit v1's protocol, cohort, or thresholds. The collector closes the cohort
+before comparison, uses a separate inventory implementation, creates detector-
+blind review packets, and refuses to score without two independent reviews,
+required adjudication, baseline attribution, and retention decisions.
+
 ## Config
 
 - Global config: `~/.arthur/config.json`
